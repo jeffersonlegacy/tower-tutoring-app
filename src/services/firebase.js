@@ -14,17 +14,25 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-// Validate Config
-if (!firebaseConfig.apiKey) {
-  console.error("Firebase API Key is missing! Check your .env file.");
+let app, db, storage, auth, analytics;
+
+try {
+  // Validate Config
+  if (!firebaseConfig.apiKey) {
+    throw new Error("Firebase API Key is missing via import.meta.env");
+  }
+
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  storage = getStorage(app);
+  auth = getAuth(app);
+  analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
+
+  console.log("Firebase Initialized Successfully");
+} catch (error) {
+  console.error("CRITICAL: Firebase Initialization Failed", error);
+  // Do not re-throw, allows app to mount and hit ErrorBoundary later
 }
 
-const app = initializeApp(firebaseConfig);
-
-// Initialize services
-export const db = getFirestore(app);
-export const storage = getStorage(app);
-export const auth = getAuth(app);
-export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
-
+export { app, db, storage, auth, analytics };
 export default app;

@@ -13,12 +13,19 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (!auth) {
+            console.error("AuthContext: No auth instance found.");
+            setLoading(false);
+            return;
+        }
+
         // 1. Listen for auth state changes
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             if (user) {
                 setCurrentUser(user);
                 setLoading(false);
             } else {
+                if (!auth) return;
                 // 2. Auto-sign in anonymously if not authenticated
                 signInAnonymously(auth).catch((error) => {
                     console.error("Auth Error:", error);
