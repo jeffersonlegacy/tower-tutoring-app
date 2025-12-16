@@ -20,6 +20,7 @@
     "@tldraw/tldraw": "^4.0.2",
     "@vitejs/plugin-react": "^5.1.2",
     "firebase": "^12.3.0",
+    "peerjs": "^1.5.5",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.10.1",
