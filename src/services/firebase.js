@@ -4,34 +4,31 @@ import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
 import { getAnalytics } from "firebase/analytics";
 
+// HARDCODED CONFIG: To bypass Vercel Env Var injection issues.
+// NOTE: Firebase API Keys are safe to expose in client code.
+// Security is handled by Firestore Rules and API Restrictions.
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: "AIzaSyBQAjV9LYgB_HUPLONqdhFEHg0K9mmR_TQ",
+  authDomain: "towertutoring-e48ac.firebaseapp.com",
+  projectId: "towertutoring-e48ac",
+  storageBucket: "towertutoring-e48ac.firebasestorage.app",
+  messagingSenderId: "962909548649",
+  appId: "1:962909548649:web:8be51e20d7f6c852c172f8",
+  measurementId: "G-GLYM0J95KZ"
 };
 
 let app, db, storage, auth, analytics;
 
 try {
-  // Validate Config
-  if (!firebaseConfig.apiKey) {
-    throw new Error("Firebase API Key is missing via import.meta.env");
-  }
-
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
   storage = getStorage(app);
   auth = getAuth(app);
   analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
-  console.log("Firebase Initialized Successfully");
+  console.log("Firebase Initialized Successfully (Hardcoded)");
 } catch (error) {
   console.error("CRITICAL: Firebase Initialization Failed", error);
-  // Do not re-throw, allows app to mount and hit ErrorBoundary later
 }
 
 export { app, db, storage, auth, analytics };
