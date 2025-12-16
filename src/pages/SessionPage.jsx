@@ -1,11 +1,11 @@
 import React, { useState, useCallback } from "react";
-import Whiteboard from "./Whiteboard";
-import Uploads from "./Uploads";
-import VideoChat from "./VideoChat";
+import Whiteboard from "../features/session/Whiteboard";
+import Uploads from "../features/session/Uploads";
+import VideoChat from "../features/session/VideoChat";
 import { useParams } from "react-router-dom";
 import { AssetRecordType } from "@tldraw/tldraw";
-import GeminiChat from "./GeminiChat";
-import Calculator from "./Calculator";
+import GeminiChat from "../features/chat/GeminiChat";
+import Calculator from "../features/tools/Calculator";
 
 export default function Session() {
     const { sessionId } = useParams();
@@ -54,16 +54,7 @@ export default function Session() {
     }, [editor]);
 
     return (
-        <div className="flex flex-col h-screen overflow-hidden bg-slate-900">
-            {/* Header */}
-            <header className="p-4 text-center text-xl font-bold bg-slate-800 text-white shadow flex justify-between items-center z-10">
-                <div className="flex items-center gap-2">
-                    <img src="/logo.png" alt="Logo" className="w-8 h-8 rounded-full" />
-                    <span>Jefferson Tutoring</span>
-                </div>
-                <span className="text-sm font-normal text-slate-400">Session: {sessionId}</span>
-            </header>
-
+        <div className="flex flex-col h-full overflow-hidden">
             {/* Main Content Area: Vertical Stack (Video Top, Whiteboard Bottom) */}
             <div className="flex flex-1 flex-col md:flex-row overflow-hidden relative">
 

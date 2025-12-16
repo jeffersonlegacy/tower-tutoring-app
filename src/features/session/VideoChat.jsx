@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Peer from 'peerjs';
-import { db } from './firebase';
+import { db } from '../../services/firebase';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 export default function VideoChat({ sessionId }) {

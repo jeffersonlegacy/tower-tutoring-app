@@ -1,6 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getAuth } from "firebase/auth";
+import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -12,7 +14,17 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
+// Validate Config
+if (!firebaseConfig.apiKey) {
+  console.error("Firebase API Key is missing! Check your .env file.");
+}
+
 const app = initializeApp(firebaseConfig);
 
+// Initialize services
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+export const auth = getAuth(app);
+export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
+
+export default app;
