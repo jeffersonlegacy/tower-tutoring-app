@@ -4,7 +4,8 @@ import { db } from '../../services/firebase';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 export default function VideoChat() {
-    const galeneUrl = import.meta.env.VITE_GALENE_URL || "https://localhost:8443/group/main-room/";
+    const rawUrl = import.meta.env.VITE_GALENE_URL || "https://localhost:8443/group/main-room/";
+    const galeneUrl = `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}username=Student&autojoin=both`;
 
     return (
         <div className="h-full w-full bg-slate-900 relative flex flex-col items-center justify-center overflow-hidden">
