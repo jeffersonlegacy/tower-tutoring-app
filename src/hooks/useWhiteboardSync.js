@@ -7,19 +7,22 @@ export function useWhiteboardSync(editor, sessionId) {
     const lastSerialized = useRef(null);
 
     useEffect(() => {
-        if (!editor || !sessionId) return;
+        if (!editor || !sessionId) {
+            console.warn("WhiteboardSync: Missing editor or sessionId", { editor: !!editor, sessionId });
+            return;
+        }
 
-        console.log("Whiteboard Sync Initialized for session:", sessionId);
+        console.log("Whiteboard Sync Starting for session:", sessionId);
         const docRef = doc(db, 'whiteboards', sessionId);
 
-        // Initial Load
         const initLoad = async () => {
             try {
+                console.log("WhiteboardSync: Fetching initial state...");
                 const snapshot = await getDoc(docRef);
                 if (snapshot.exists()) {
                     const data = snapshot.data();
                     if (data.records) {
-                        console.log("Loading remote snapshot...");
+                        console.log("WhiteboardSync: Found remote records. Loading...");
                         isRemoteUpdate.current = true;
                         editor.store.loadSnapshot({
                             document: { id: 'td-document', records: data.records },
@@ -29,22 +32,27 @@ export function useWhiteboardSync(editor, sessionId) {
                         isRemoteUpdate.current = false;
                     }
                 } else {
-                    console.log("Initializing new whiteboard document...");
-                    const initialRecords = editor.store.serialize();
-                    await setDoc(docRef, { records: initialRecords });
-                    lastSerialized.current = JSON.stringify(initialRecords);
+                    console.log("WhiteboardSync: No existing doc. Creating new one.");
+                    const records = editor.store.serialize();
+                    await setDoc(docRef, { records });
+                    lastSerialized.current = JSON.stringify(records);
                 }
             } catch (err) {
-                console.error("Init Load Error:", err);
+                console.error("WhiteboardSync: Init Load Error:", err);
             }
         };
 
         initLoad();
 
-        // Local -> Remote Sync (throttle-like via debounced update)
         let timeout;
         const unlisten = editor.store.listen((entry) => {
-            if (entry.source !== 'user' || isRemoteUpdate.current) return;
+            // LOG EVERYTHING for debugging
+            // console.log("Store event source:", entry.source);
+
+            if (isRemoteUpdate.current) return;
+            // Many versions of tldraw use 'user' but let's be more permissive if we are sure it's us
+            // or at least log what it is.
+            if (entry.source !== 'user') return;
 
             clearTimeout(timeout);
             timeout = setTimeout(async () => {
@@ -53,43 +61,44 @@ export function useWhiteboardSync(editor, sessionId) {
 
                 if (serialized === lastSerialized.current) return;
 
-                console.log("Syncing local changes to Firebase...");
                 lastSerialized.current = serialized;
                 try {
+                    console.log("WhiteboardSync: Syncing local changes to Firestore...");
                     await updateDoc(docRef, { records });
                 } catch (err) {
-                    console.error("Local -> Remote Sync Error:", err);
+                    console.error("WhiteboardSync: Update Error:", err);
                 }
-            }, 500); // 500ms debounce
+            }, 500);
         });
 
-        // Remote -> Local Sync
         const unsubscribe = onSnapshot(docRef, (snapshot) => {
             if (isRemoteUpdate.current) return;
+
+            if (!snapshot.exists()) {
+                console.warn("WhiteboardSync: Doc disappeared!");
+                return;
+            }
 
             const data = snapshot.data();
             if (data && data.records) {
                 const serialized = JSON.stringify(data.records);
                 if (serialized === lastSerialized.current) return;
 
-                console.log("Merging remote changes...");
+                console.log("WhiteboardSync: Received remote update. Loading snapshot...");
                 lastSerialized.current = serialized;
                 isRemoteUpdate.current = true;
-
-                // Use loadSnapshot for now as it's the safest way to ensure state match
-                // without complex tldraw merge conflict handling.
                 editor.store.loadSnapshot({
                     document: { id: 'td-document', records: data.records },
                     schema: editor.store.schema.serialize()
                 });
-
                 isRemoteUpdate.current = false;
             }
         }, (err) => {
-            console.error("Remote -> Local Sync Error:", err);
+            console.error("WhiteboardSync: onSnapshot Error:", err);
         });
 
         return () => {
+            console.log("Whiteboard Sync Cleanup");
             clearTimeout(timeout);
             unlisten();
             unsubscribe();
