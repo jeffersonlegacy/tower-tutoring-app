@@ -6,6 +6,8 @@ import { useParams } from "react-router-dom";
 
 import GeminiChat from "../features/chat/GeminiChat";
 import Calculator from "../features/tools/Calculator";
+import { storage } from "../services/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function Session() {
     const { sessionId } = useParams();
@@ -36,14 +38,45 @@ export default function Session() {
                         type="file"
                         className="hidden"
                         accept="image/png, image/jpeg, image/webp, image/heic, image/heif, application/pdf"
-                        onChange={(e) => {
-                            if (editor && e.target.files?.[0]) {
-                                editor.putExternalContent({
-                                    type: 'files',
-                                    files: [e.target.files[0]],
-                                    point: editor.viewportPageBounds.center,
-                                    ignoreParent: false
-                                });
+                        onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (editor && file) {
+                                try {
+                                    // 1. Upload to Firestore Storage
+                                    const storageRef = ref(storage, `sessions/${sessionId}/${Date.now()}_${file.name}`);
+                                    const snapshot = await uploadBytes(storageRef, file);
+                                    const downloadURL = await getDownloadURL(snapshot.ref);
+
+                                    // 2. Create Image Shape in Tldraw
+                                    const center = editor.viewportPageBounds.center;
+
+                                    if (file.type.startsWith('image/')) {
+                                        editor.createShapes([
+                                            {
+                                                type: 'image',
+                                                x: center.x - 100,
+                                                y: center.y - 100,
+                                                props: {
+                                                    src: downloadURL,
+                                                    w: 200,
+                                                    h: 200,
+                                                },
+                                            },
+                                        ]);
+                                    } else {
+                                        // For PDF or other files, we can just put a link or an embed if supported
+                                        // Tldraw handles files better via putExternalContent if they are local,
+                                        // but for sync we need URLs.
+                                        editor.putExternalContent({
+                                            type: 'url',
+                                            url: downloadURL,
+                                            point: center,
+                                        });
+                                    }
+                                } catch (error) {
+                                    console.error("Upload failed:", error);
+                                    alert("Failed to upload homework. Please try again.");
+                                }
                                 e.target.value = ''; // Reset
                             }
                         }}
