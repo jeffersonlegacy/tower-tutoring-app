@@ -13,7 +13,7 @@ export default function Landing() {
         <input
           className="w-full px-4 py-3 bg-slate-700 text-white border-2 border-slate-600 rounded-lg mb-4 focus:outline-none"
           type="text"
-          placeholder="Enter Session Name"
+          placeholder="Enter Room Name (e.g. Math101)"
           value={session}
           onChange={e => setSession(e.target.value)}
         />
