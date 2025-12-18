@@ -4,7 +4,10 @@ import { db } from '../../services/firebase';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 export default function VideoChat() {
-    const rawUrl = import.meta.env.VITE_GALENE_URL || "https://localhost:8443/group/main-room/";
+    let rawUrl = import.meta.env.VITE_GALENE_URL || "https://localhost:8443/group/main-room/";
+    if (!rawUrl.includes('localhost') && rawUrl.startsWith('http:')) {
+        rawUrl = rawUrl.replace('http:', 'https:');
+    }
     const galeneUrl = `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}username=Student&autojoin=both`;
 
     return (
