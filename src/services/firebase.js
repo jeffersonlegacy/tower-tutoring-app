@@ -24,6 +24,15 @@ try {
   analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
   console.log("Firebase Initialized Successfully");
+
+  // Sign in anonymously for Storage/Firestore access
+  import('firebase/auth').then(({ signInAnonymously }) => {
+    signInAnonymously(auth).then(() => {
+      console.log("Signed in anonymously");
+    }).catch((error) => {
+      console.error("Anonymous sign-in failed:", error);
+    });
+  });
 } catch (error) {
   console.error("CRITICAL: Firebase Initialization Failed", error);
 }
