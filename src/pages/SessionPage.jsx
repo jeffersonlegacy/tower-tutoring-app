@@ -75,18 +75,51 @@ export default function Session() {
                                     const center = bounds ? bounds.center : { x: 0, y: 0 };
 
                                     if (file.type.startsWith('image/')) {
-                                        editor.createShapes([
-                                            {
+                                        // We need image dimensions to create a valid asset/shape
+                                        const img = new Image();
+                                        img.onload = async () => {
+                                            const w = img.width;
+                                            const h = img.height;
+
+                                            // Create Asset
+                                            const assetId = `asset:${Date.now()}`; // Simple ID generation
+                                            const asset = {
+                                                id: assetId,
+                                                typeName: 'asset',
                                                 type: 'image',
-                                                x: center.x - 100,
-                                                y: center.y - 100,
+                                                meta: {},
                                                 props: {
-                                                    src: downloadURL,
-                                                    w: 200,
-                                                    h: 200,
+                                                    name: file.name,
+                                                    src: downloadURL, // Firebase Storage URL
+                                                    w: w,
+                                                    h: h,
+                                                    mimeType: file.type,
+                                                    isAnimated: false
+                                                }
+                                            };
+
+                                            // Register Asset
+                                            editor.createAssets([asset]);
+
+                                            // Create Shape
+                                            editor.createShapes([
+                                                {
+                                                    type: 'image',
+                                                    x: center.x - (w / 2),
+                                                    y: center.y - (h / 2),
+                                                    props: {
+                                                        assetId: assetId,
+                                                        w: w,
+                                                        h: h,
+                                                    },
                                                 },
-                                            },
-                                        ]);
+                                            ]);
+
+                                            URL.revokeObjectURL(img.src);
+                                        };
+                                        // Use local blob for fast dimension reading
+                                        img.src = URL.createObjectURL(file);
+
                                     } else {
                                         // For PDF or other files, we can just put a link or an embed if supported
                                         // Tldraw handles files better via putExternalContent if they are local,
