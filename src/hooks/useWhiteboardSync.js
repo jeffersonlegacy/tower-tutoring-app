@@ -8,7 +8,7 @@ export function useWhiteboardSync(editor, sessionId) {
 
     useEffect(() => {
         if (!editor || !sessionId) {
-            console.warn("WhiteboardSync: Missing editor or sessionId", { editor: !!editor, sessionId });
+            // Wait for editor and sessionId to be ready.
             return;
         }
 
