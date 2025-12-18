@@ -43,116 +43,107 @@ export default function Session() {
                 </div>
             )}
 
-            {/* Main Content Area: Vertical Stack (Video Top, Whiteboard Bottom) */}
+            {/* Main Content Area */}
             <div className="flex flex-1 flex-col md:flex-row overflow-hidden relative">
 
-                {/* Uploads Drawer/Sidebar (Desktop: Left, Mobile: Bottom/Collapsible could be better but let's stick to visible for now or stack) */}
-                {/* Uploads Drawer/Sidebar REPLACED by Upload Button */}
-                <div className="w-full md:w-auto bg-slate-800 border-r border-slate-700 p-2 order-3 md:order-1 flex flex-col gap-2">
-                    <button
-                        className="bg-green-600 hover:bg-green-700 text-white p-2 rounded text-sm font-bold"
-                        onClick={() => document.getElementById('homework-upload').click()}
-                    >
-                        Upload Homework
-                    </button>
-                    <input
-                        id="homework-upload"
-                        type="file"
-                        className="hidden"
-                        accept="image/png, image/jpeg, image/webp, image/heic, image/heif, application/pdf"
-                        onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (editor && file) {
-                                try {
-                                    // 1. Upload to Firestore Storage
-                                    const storageRef = ref(storage, `sessions/${sessionId}/${Date.now()}_${file.name}`);
-                                    const snapshot = await uploadBytes(storageRef, file);
-                                    const downloadURL = await getDownloadURL(snapshot.ref);
-
-                                    // 2. Create Image Shape in Tldraw
-                                    // Use getViewportPageBounds() method if available, or fall back to property
-                                    const bounds = editor.getViewportPageBounds ? editor.getViewportPageBounds() : editor.viewportPageBounds;
-                                    const center = bounds ? bounds.center : { x: 0, y: 0 };
-
-                                    if (file.type.startsWith('image/')) {
-                                        // We need image dimensions to create a valid asset/shape
-                                        const img = new Image();
-                                        img.onload = async () => {
-                                            const w = img.width;
-                                            const h = img.height;
-
-                                            // Create Asset
-                                            const assetId = `asset:${Date.now()}`; // Simple ID generation
-                                            const asset = {
-                                                id: assetId,
-                                                typeName: 'asset',
-                                                type: 'image',
-                                                meta: {},
-                                                props: {
-                                                    name: file.name,
-                                                    src: downloadURL, // Firebase Storage URL
-                                                    w: w,
-                                                    h: h,
-                                                    mimeType: file.type,
-                                                    isAnimated: false
-                                                }
-                                            };
-
-                                            // Register Asset
-                                            editor.createAssets([asset]);
-
-                                            // Create Shape
-                                            editor.createShapes([
-                                                {
-                                                    type: 'image',
-                                                    x: center.x - (w / 2),
-                                                    y: center.y - (h / 2),
-                                                    props: {
-                                                        assetId: assetId,
-                                                        w: w,
-                                                        h: h,
-                                                    },
-                                                },
-                                            ]);
-
-                                            URL.revokeObjectURL(img.src);
-                                        };
-                                        // Use local blob for fast dimension reading
-                                        img.src = URL.createObjectURL(file);
-
-                                    } else {
-                                        // For PDF or other files, we can just put a link or an embed if supported
-                                        // Tldraw handles files better via putExternalContent if they are local,
-                                        // but for sync we need URLs.
-                                        editor.putExternalContent({
-                                            type: 'url',
-                                            url: downloadURL,
-                                            point: center,
-                                        });
-                                    }
-                                } catch (error) {
-                                    console.error("Upload failed:", error);
-                                    alert("Failed to upload homework. Please try again.");
-                                }
-                                e.target.value = ''; // Reset
-                            }
-                        }}
-                    />
+                {/* Desktop: Sidebar for Video (Left) - Increased width for better visibility */}
+                {/* Mobile: Video on Top (Fixed height) */}
+                <div className="flex-none order-1 w-full md:w-[320px] lg:w-[400px] border-b md:border-b-0 md:border-r border-slate-700 bg-black flex flex-col relative z-20 shrink-0 h-[35vh] md:h-auto">
+                    <VideoChat sessionId={sessionId} />
                 </div>
 
-                {/* Center Stage */}
-                <div className="flex-1 flex flex-col h-full relative order-1 md:order-2">
-                    {/* Video Chat Container - Top */}
-                    <div className="h-1/3 min-h-[250px] w-full border-b border-slate-700 bg-black relative">
-                        <VideoChat sessionId={sessionId} />
-                    </div>
+                {/* Main Stage: Whiteboard (Right/Bottom) */}
+                <div className="flex-1 bg-slate-200 relative order-2 overflow-hidden h-full">
+                    <Whiteboard sessionId={sessionId} onMount={handleMount} />
 
-                    {/* Whiteboard Container - Bottom */}
-                    <div className="flex-1 w-full bg-slate-200 relative">
-                        <Whiteboard sessionId={sessionId} onMount={handleMount} />
+                    {/* Upload Button Overlay - Floating on top-left of whiteboard */}
+                    <div className="absolute top-4 left-4 z-20 pointer-events-auto">
+                        <button
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg shadow-lg font-bold flex items-center gap-2 transition-transform hover:scale-105 active:scale-95 border border-indigo-400/30"
+                            onClick={() => document.getElementById('homework-upload').click()}
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                            Upload Homework
+                        </button>
                     </div>
                 </div>
+
             </div>
+
+            <input
+                id="homework-upload"
+                type="file"
+                className="hidden"
+                accept="image/png, image/jpeg, image/webp, image/heic, image/heif, application/pdf"
+                onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (editor && file) {
+                        try {
+                            // 1. Upload to Firestore Storage
+                            const storageRef = ref(storage, `sessions/${sessionId}/${Date.now()}_${file.name}`);
+                            const snapshot = await uploadBytes(storageRef, file);
+                            const downloadURL = await getDownloadURL(snapshot.ref);
+
+                            // 2. Create Image Shape in Tldraw
+                            const bounds = editor.getViewportPageBounds ? editor.getViewportPageBounds() : editor.viewportPageBounds;
+                            const center = bounds ? bounds.center : { x: 0, y: 0 };
+
+                            if (file.type.startsWith('image/')) {
+                                const img = new Image();
+                                img.onload = async () => {
+                                    const w = img.width;
+                                    const h = img.height;
+
+                                    const assetId = `asset:${Date.now()}`;
+                                    const asset = {
+                                        id: assetId,
+                                        typeName: 'asset',
+                                        type: 'image',
+                                        meta: {},
+                                        props: {
+                                            name: file.name,
+                                            src: downloadURL,
+                                            w: w,
+                                            h: h,
+                                            mimeType: file.type,
+                                            isAnimated: false
+                                        }
+                                    };
+
+                                    // Must create asset BEFORE shape
+                                    editor.createAssets([asset]);
+
+                                    editor.createShapes([
+                                        {
+                                            type: 'image',
+                                            x: center.x - (w / 2),
+                                            y: center.y - (h / 2),
+                                            props: {
+                                                assetId: assetId,
+                                                w: w,
+                                                h: h,
+                                            },
+                                        },
+                                    ]);
+
+                                    URL.revokeObjectURL(img.src);
+                                };
+                                img.src = URL.createObjectURL(file);
+                            } else {
+                                editor.putExternalContent({
+                                    type: 'url',
+                                    url: downloadURL,
+                                    point: center,
+                                });
+                            }
+                        } catch (error) {
+                            console.error("Upload failed:", error);
+                            alert("Failed to upload homework. Please try again.");
+                        }
+                        e.target.value = '';
+                    }
+                }}
+            />
 
             {/* Floating Tools */}
             <GeminiChat />

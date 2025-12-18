@@ -10,7 +10,10 @@ export default function VideoChat() {
                 const response = await fetch('/api/config');
                 const config = await response.json();
 
-                let url = config.galeneServerUrl || import.meta.env.VITE_GALENE_URL || "https://localhost:8443/group/main-room/";
+                // Priority: Edge Config -> Env Var -> Hardcoded Production -> Localhost
+                let url = config.galeneServerUrl ||
+                    import.meta.env.VITE_GALENE_URL ||
+                    "https://jeffersonlegacy.fly.dev/group/main-room/"; // Hardcoded Production Fallback
 
                 // Enforce HTTPS in production
                 if (!url.includes('localhost') && url.startsWith('http:')) {
@@ -19,15 +22,20 @@ export default function VideoChat() {
 
                 // Append auto-login params
                 const finalUrl = `${url}${url.includes('?') ? '&' : '?'}username=Student&autojoin=both`;
+                console.log("VideoChat: Using URL:", finalUrl);
                 setGaleneUrl(finalUrl);
             } catch (error) {
                 console.error('Failed to fetch Edge Config:', error);
-                // Fallback to env var
-                let fallbackUrl = import.meta.env.VITE_GALENE_URL || "https://localhost:8443/group/main-room/";
+
+                // Fallback Logic on Error
+                let fallbackUrl = import.meta.env.VITE_GALENE_URL || "https://jeffersonlegacy.fly.dev/group/main-room/";
+
                 if (!fallbackUrl.includes('localhost') && fallbackUrl.startsWith('http:')) {
                     fallbackUrl = fallbackUrl.replace('http:', 'https:');
                 }
-                setGaleneUrl(`${fallbackUrl}${fallbackUrl.includes('?') ? '&' : '?'}username=Student&autojoin=both`);
+                const finalFallback = `${fallbackUrl}${fallbackUrl.includes('?') ? '&' : '?'}username=Student&autojoin=both`;
+                console.log("VideoChat: Using Fallback URL:", finalFallback);
+                setGaleneUrl(finalFallback);
             } finally {
                 setLoading(false);
             }
