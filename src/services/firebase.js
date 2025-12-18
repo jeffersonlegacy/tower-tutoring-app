@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { getAuth } from "firebase/auth";
+import { getAuth, signInAnonymously } from "firebase/auth";
 import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
@@ -26,12 +26,10 @@ try {
   console.log("Firebase Initialized Successfully");
 
   // Sign in anonymously for Storage/Firestore access
-  import('firebase/auth').then(({ signInAnonymously }) => {
-    signInAnonymously(auth).then(() => {
-      console.log("Signed in anonymously");
-    }).catch((error) => {
-      console.error("Anonymous sign-in failed:", error);
-    });
+  signInAnonymously(auth).then(() => {
+    console.log("Signed in anonymously");
+  }).catch((error) => {
+    console.error("Anonymous sign-in failed:", error);
   });
 } catch (error) {
   console.error("CRITICAL: Firebase Initialization Failed", error);
