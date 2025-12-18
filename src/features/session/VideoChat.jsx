@@ -1,14 +1,48 @@
-import React, { useEffect, useRef, useState } from 'react';
-import Peer from 'peerjs';
-import { db } from '../../services/firebase';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
 
 export default function VideoChat() {
-    let rawUrl = import.meta.env.VITE_GALENE_URL || "https://localhost:8443/group/main-room/";
-    if (!rawUrl.includes('localhost') && rawUrl.startsWith('http:')) {
-        rawUrl = rawUrl.replace('http:', 'https:');
+    const [galeneUrl, setGaleneUrl] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchConfig = async () => {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+
+                let url = config.galeneServerUrl || import.meta.env.VITE_GALENE_URL || "https://localhost:8443/group/main-room/";
+
+                // Enforce HTTPS in production
+                if (!url.includes('localhost') && url.startsWith('http:')) {
+                    url = url.replace('http:', 'https:');
+                }
+
+                // Append auto-login params
+                const finalUrl = `${url}${url.includes('?') ? '&' : '?'}username=Student&autojoin=both`;
+                setGaleneUrl(finalUrl);
+            } catch (error) {
+                console.error('Failed to fetch Edge Config:', error);
+                // Fallback to env var
+                let fallbackUrl = import.meta.env.VITE_GALENE_URL || "https://localhost:8443/group/main-room/";
+                if (!fallbackUrl.includes('localhost') && fallbackUrl.startsWith('http:')) {
+                    fallbackUrl = fallbackUrl.replace('http:', 'https:');
+                }
+                setGaleneUrl(`${fallbackUrl}${fallbackUrl.includes('?') ? '&' : '?'}username=Student&autojoin=both`);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchConfig();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="h-full w-full bg-slate-900 flex items-center justify-center text-white">
+                Loading video...
+            </div>
+        );
     }
-    const galeneUrl = `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}username=Student&autojoin=both`;
 
     return (
         <div className="h-full w-full bg-slate-900 relative flex flex-col items-center justify-center overflow-hidden">

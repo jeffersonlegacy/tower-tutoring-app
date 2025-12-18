@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import Whiteboard from "../features/session/Whiteboard";
 
 import VideoChat from "../features/session/VideoChat";
@@ -12,15 +12,37 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 export default function Session() {
     const { sessionId } = useParams();
     const [editor, setEditor] = useState(null);
+    const [maintenanceMode, setMaintenanceMode] = useState({ enabled: false, message: '' });
 
     const handleMount = useCallback((editorInstance) => {
         setEditor(editorInstance);
     }, []);
 
+    useEffect(() => {
+        const fetchConfig = async () => {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                if (config.maintenanceMode) {
+                    setMaintenanceMode(config.maintenanceMode);
+                }
+            } catch (error) {
+                console.error('Failed to fetch maintenance config:', error);
+            }
+        };
 
+        fetchConfig();
+    }, []);
 
     return (
         <div className="flex flex-col h-full overflow-hidden">
+            {/* Maintenance Mode Banner */}
+            {maintenanceMode.enabled && (
+                <div className="bg-red-600 text-white text-center p-3 font-bold z-50">
+                    ⚠️ {maintenanceMode.message || 'Maintenance in progress. Some features may be unavailable.'}
+                </div>
+            )}
+
             {/* Main Content Area: Vertical Stack (Video Top, Whiteboard Bottom) */}
             <div className="flex flex-1 flex-col md:flex-row overflow-hidden relative">
 

@@ -17,6 +17,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@tldraw/tldraw": "^3.5.0",
+    "@vercel/edge-config": "^1.4.3",
     "@vitejs/plugin-react": "^5.1.2",
     "firebase": "^12.3.0",
     "peerjs": "^1.5.5",
