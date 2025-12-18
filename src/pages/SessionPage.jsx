@@ -70,7 +70,9 @@ export default function Session() {
                                     const downloadURL = await getDownloadURL(snapshot.ref);
 
                                     // 2. Create Image Shape in Tldraw
-                                    const center = editor.viewportPageBounds.center;
+                                    // Use getViewportPageBounds() method if available, or fall back to property
+                                    const bounds = editor.getViewportPageBounds ? editor.getViewportPageBounds() : editor.viewportPageBounds;
+                                    const center = bounds ? bounds.center : { x: 0, y: 0 };
 
                                     if (file.type.startsWith('image/')) {
                                         editor.createShapes([
