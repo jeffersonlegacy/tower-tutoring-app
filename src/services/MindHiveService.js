@@ -21,12 +21,10 @@ const CONFIG = {
 
 class MindHiveService {
     constructor() {
-        this.apiKey = import.meta.env.VITE_AI_GATEWAY_API_KEY;
         this.openai = createOpenAI({
-            apiKey: this.apiKey,
-            baseURL: 'https://gateway.ai.vercel.sh/openai/v1',
-            // Dangerous: Client-side usage requires allowing browser access
-            dangerouslyAllowBrowser: true
+            apiKey: 'dummy', // API Key is now handled server-side, but SDK might need a non-empty string
+            baseURL: '/api', // Proxies to /api/chat/completions
+            // Removed dangerous browser flag as we are now proxied
         });
     }
 
