@@ -162,7 +162,9 @@ export default function VideoChat({ sessionId }) {
                     <div className={`w-2 h-2 rounded-full ${status === 'Connected to Mesh' ? 'bg-cyan-500 animate-pulse' : 'bg-yellow-500 animate-bounce'}`} />
                     <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">{status}</span>
                 </div>
-                {/* REMOVED CONFUSING ID DISPLAY - User knows their session ID from main header */}
+                <div className="text-[9px] text-slate-600 font-mono flex items-center gap-2">
+                    <span>v2.2</span>
+                </div>
             </div>
 
             {/* Video Grid */}
