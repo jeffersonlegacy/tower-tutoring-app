@@ -6,12 +6,13 @@ import { collection, doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firesto
 export default function VideoChat({ sessionId }) {
     const [localStream, setLocalStream] = useState(null);
     const [remoteStreams, setRemoteStreams] = useState({}); // { peerId: stream }
-    const [myPeerId, setMyPeerId] = useState(null);
+    const [peers, setPeers] = useState({}); // { peerId: callObject }
     const [status, setStatus] = useState('Initializing...');
 
     // Stable Refs
     const peerRef = useRef(null);
     const localVideoRef = useRef(null);
+    const peersRef = useRef({}); // keep track of active calls to prevent duplicates
 
     // Generate a random user ID for display if one isn't provided
     const userId = useRef('User-' + Math.floor(Math.random() * 1000)).current;
@@ -50,31 +51,89 @@ export default function VideoChat({ sessionId }) {
 
             peer.on('open', (id) => {
                 console.log('My Peer ID:', id);
-                setMyPeerId(id);
                 setStatus('Connected to Mesh');
 
                 // 3. Signaling: Write Presence to Firebase
                 const peerDoc = doc(db, 'whiteboards', sessionId, 'peers', id);
                 setDoc(peerDoc, { peerId: id, userId, joinedAt: Date.now() })
-                    .catch(err => console.error("Signaling Error:", err)); // Using subcollection on existing whiteboard doc for simplicity
+                    .catch(err => console.error("Signaling Error:", err));
             });
 
             peer.on('call', (call) => {
                 console.log('Incoming call from:', call.peer);
-                call.answer(stream); // Answer with local stream
-                call.on('stream', (remoteStream) => {
-                    addRemoteStream(call.peer, remoteStream);
-                });
+                // Always answer incoming calls
+                call.answer(stream);
+                handleCallStream(call);
             });
 
             // 4. Connect to others via Signaling
             subscribeToPeers(peer, stream);
         };
 
+        const handleCallStream = (call) => {
+            // Prevent duplicate listeners
+            if (peersRef.current[call.peer]) return;
+            peersRef.current[call.peer] = call;
+
+            call.on('stream', (remoteStream) => {
+                addRemoteStream(call.peer, remoteStream);
+            });
+            call.on('close', () => {
+                removeRemoteStream(call.peer);
+            });
+            call.on('error', (err) => {
+                console.warn('Call error:', err);
+                removeRemoteStream(call.peer);
+            });
+        };
+
+        const removeRemoteStream = (id) => {
+            if (peersRef.current[id]) {
+                delete peersRef.current[id];
+            }
+            setRemoteStreams(prev => {
+                const next = { ...prev };
+                delete next[id];
+                return next;
+            });
+        };
+
+        // Subscription to the room's peer list
+        const subscribeToPeers = (peerInstance, myStream) => {
+            const peersCol = collection(db, 'whiteboards', sessionId, 'peers');
+
+            return onSnapshot(peersCol, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added') {
+                        const data = change.doc.data();
+                        if (data.peerId === peerInstance.id) return; // Skip self
+
+                        // MESH LOGIC:
+                        // To avoid double-calling (race condition), we compare Peer IDs.
+                        // Only the "larger" string ID initiates the call.
+                        // The "smaller" ID waits to receive the call.
+                        if (peerInstance.id > data.peerId) {
+                            console.log(`Initiating call to ${data.peerId} (I am authority)`);
+                            const call = peerInstance.call(data.peerId, myStream);
+                            if (call) {
+                                handleCallStream(call);
+                            }
+                        } else {
+                            console.log(`Waiting for call from ${data.peerId} (They are authority)`);
+                        }
+                    }
+                    if (change.type === 'removed') {
+                        const data = change.doc.data();
+                        removeRemoteStream(data.peerId);
+                    }
+                });
+            });
+        };
+
         initMedia();
 
         return () => {
-            // Cleanup
+            // Cleanup state and local media
             if (peerRef.current) {
                 peerRef.current.destroy();
                 // Remove presence
@@ -86,6 +145,8 @@ export default function VideoChat({ sessionId }) {
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
             }
+            // Clear refs
+            peersRef.current = {};
         };
     }, [sessionId]);
 
@@ -93,45 +154,15 @@ export default function VideoChat({ sessionId }) {
         setRemoteStreams(prev => ({ ...prev, [id]: stream }));
     };
 
-    const subscribeToPeers = (peerInstance, myStream) => {
-        const peersCol = collection(db, 'whiteboards', sessionId, 'peers');
-
-        onSnapshot(peersCol, (snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === 'added') {
-                    const data = change.doc.data();
-                    if (data.peerId === peerInstance.id) return; // Skip self
-
-                    console.log('New peer found:', data.peerId);
-                    // Call them
-                    const call = peerInstance.call(data.peerId, myStream);
-                    if (call) {
-                        call.on('stream', (remoteStream) => {
-                            addRemoteStream(data.peerId, remoteStream);
-                        });
-                    }
-                }
-                if (change.type === 'removed') {
-                    const data = change.doc.data();
-                    setRemoteStreams(prev => {
-                        const next = { ...prev };
-                        delete next[data.peerId];
-                        return next;
-                    });
-                }
-            });
-        });
-    };
-
     return (
         <div className="h-full w-full bg-slate-950 relative flex flex-col border-r border-slate-800">
-            {/* Header */}
+            {/* Header - SIMPLIFIED */}
             <div className="bg-slate-900 border-b border-white/5 p-2 flex items-center justify-between z-20 shadow-md">
                 <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${myPeerId ? 'bg-cyan-500 animate-pulse' : 'bg-yellow-500 animate-bounce'}`} />
+                    <div className={`w-2 h-2 rounded-full ${status === 'Connected to Mesh' ? 'bg-cyan-500 animate-pulse' : 'bg-yellow-500 animate-bounce'}`} />
                     <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">{status}</span>
                 </div>
-                <div className="text-[10px] text-slate-600 font-mono">ID: {myPeerId ? myPeerId.substr(0, 6) : '...'}</div>
+                {/* REMOVED CONFUSING ID DISPLAY - User knows their session ID from main header */}
             </div>
 
             {/* Video Grid */}
@@ -144,6 +175,7 @@ export default function VideoChat({ sessionId }) {
                             ref={localVideoRef}
                             autoPlay
                             playsInline
+                            muted
                             className="w-full h-full object-cover transform -scale-x-100 opacity-80 group-hover:opacity-100 transition-opacity"
                         />
                         <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-[9px] text-cyan-400 font-mono border border-cyan-500/30">
