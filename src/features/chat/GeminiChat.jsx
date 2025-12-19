@@ -77,7 +77,7 @@ export default function GeminiChat() {
         return (
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-500 to-cyan-400 text-white p-4 rounded-full shadow-lg hover:scale-105 transition-transform z-50 flex items-center gap-2"
+                className="bg-gradient-to-r from-blue-500 to-cyan-400 text-white p-4 rounded-full shadow-lg hover:scale-105 transition-transform z-50 flex items-center gap-2"
             >
                 <span className="text-xl">🐝</span>
                 <span className="font-bold">AI Swarm</span>
@@ -86,7 +86,7 @@ export default function GeminiChat() {
     }
 
     return (
-        <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-slate-900 border border-slate-700 rounded-lg shadow-2xl flex flex-col z-50 overflow-hidden font-sans">
+        <div className="w-96 h-[600px] bg-slate-900 border border-slate-700 rounded-lg shadow-2xl flex flex-col z-50 overflow-hidden font-sans animation-slide-up-fade">
             {/* Header */}
             <div className="bg-slate-800 p-3 flex justify-between items-center border-b border-slate-700">
                 <div className="flex flex-col">
