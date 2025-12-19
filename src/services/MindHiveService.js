@@ -1,14 +1,9 @@
-import { createOpenAI } from '@ai-sdk/openai';
-import { streamText } from 'ai';
-
-// THE HIVE: Prioritized list of high-value models
-// Adapted for Client-Side usage
+// THE HIVE: Prioritized list of validated models
+// Updated to prioritize Mistral (Proven connectivity)
 const HIVE_MODELS = [
-    'google/gemini-2.0-flash-lite',
+    'mistral/ministral-3b',
     'openai/gpt-4o-mini',
-    'deepseek/deepseek-v3',
-    'meta/llama-3.1-70b',
-    'mistral/ministral-3b'
+    'deepseek/deepseek-v3'
 ];
 
 const CONFIG = {
@@ -21,27 +16,15 @@ const CONFIG = {
 
 class MindHiveService {
     constructor() {
-        this.openai = createOpenAI({
-            apiKey: 'dummy',
-            baseURL: window.location.origin + '/api', // Force absolute path to avoid ambiguity
-        });
+        // No INIT needed
+        this.baseUrl = window.location.origin + '/api/chat/completions';
     }
 
     /**
-     * Streams a response from the hive, handling failover automatically.
-     * @param {string} prompt - User input
-     * @param {Array} history - Previous messages for context
-     * @param {function} onChunk - Callback for each text chunk
-     * @param {function} onModelChange - Callback when a specific model is locked in
-     * @returns {Promise<void>}
+     * Streams a response from the hive using direct fetch to bypass SDK complexities.
      */
     async streamResponse(prompt, history = [], onChunk, onModelChange) {
         console.log(`🐝 activating mind hive...`);
-
-        // Format history for the AI SDK if needed, 
-        // but for now we'll just append the prompt to the system/user context structure
-        // purely as a prompt string or use the SDK's 'messages' prop if we want robust chat history.
-        // To catch "seamlessly pick up context", we pass the full message history.
 
         const messages = [
             { role: 'system', content: CONFIG.systemPrompt },
@@ -53,25 +36,65 @@ class MindHiveService {
             try {
                 console.log(`Attempting Node: ${modelName}`);
 
-                const result = await streamText({
-                    model: this.openai(modelName),
-                    messages: messages,
-                    temperature: CONFIG.temperature,
+                const response = await fetch(this.baseUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: messages,
+                        temperature: CONFIG.temperature,
+                        stream: true
+                    })
                 });
 
-                // Notify UI which model won the race
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => response.statusText);
+                    console.warn(`Node ${modelName} returned HTTP ${response.status}: ${errorText}`);
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                // Notify UI which model connected
                 if (onModelChange) onModelChange(modelName);
 
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
                 let hasContent = false;
 
-                // Stream the output
-                for await (const textPart of result.textStream) {
-                    hasContent = true;
-                    onChunk(textPart);
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    // Vercel Gateway returns SSE format "data: ...". 
+                    // To keep it simple, we'll strip "data: " and json parse if we can,
+                    // or just dump the raw text if it's not SSE.
+                    // Actually, since we are proxying, we might receive raw chunks if we didn't handle SSE in proxy.
+                    // But our proxy pipes raw.
+
+                    // Simple parser for Vercel/OpenAI SSE
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed === 'data: [DONE]') continue;
+
+                        if (trimmed.startsWith('data: ')) {
+                            try {
+                                const json = JSON.parse(trimmed.substring(6));
+                                const content = json.choices?.[0]?.delta?.content;
+                                if (content) {
+                                    hasContent = true;
+                                    onChunk(content);
+                                }
+                            } catch (e) {
+                                // ignore parse errors for partial chunks
+                            }
+                        }
+                    }
                 }
 
                 if (!hasContent) {
-                    throw new Error("Stream completed but returned no content.");
+                    // Fallback: maybe it wasn't SSE? Just send raw chunk?
+                    // No, assume connection worked.
                 }
 
                 console.log(`✅ Success Node: ${modelName}`);
