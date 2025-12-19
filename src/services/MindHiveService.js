@@ -22,9 +22,8 @@ const CONFIG = {
 class MindHiveService {
     constructor() {
         this.openai = createOpenAI({
-            apiKey: 'dummy', // API Key is now handled server-side, but SDK might need a non-empty string
-            baseURL: '/api', // Proxies to /api/chat/completions
-            // Removed dangerous browser flag as we are now proxied
+            apiKey: 'dummy',
+            baseURL: window.location.origin + '/api', // Force absolute path to avoid ambiguity
         });
     }
 
