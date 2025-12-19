@@ -5,13 +5,9 @@ import HomeworkTray from "../features/session/HomeworkTray";
 import { useParams } from "react-router-dom";
 import { useHomeworkUpload } from "../hooks/useHomeworkUpload";
 
-import { useHomeworkUpload } from "../hooks/useHomeworkUpload";
-
 export default function Session() {
     const { sessionId } = useParams();
     const [maintenanceMode, setMaintenanceMode] = useState({ enabled: false, message: '' });
-    const { uploadFile, uploading } = useHomeworkUpload(sessionId);
-    const [isDragging, setIsDragging] = useState(false);
     const { uploadFile, uploading } = useHomeworkUpload(sessionId);
     const [isDragging, setIsDragging] = useState(false);
 
@@ -112,27 +108,5 @@ export default function Session() {
             </div>
 
         </div>
-
-            {/* Floating Tools */ }
-    <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-[9999] items-end pointer-events-none">
-        {/* Pointer events none on container so clicks pass through empty space, but auto on children */}
-
-        {/* Brain Break Trigger */}
-        <button
-            onClick={() => setShowBrainBreak(true)}
-            className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 text-white shadow-lg hover:scale-110 transition-transform flex items-center justify-center border border-white/20 group pointer-events-auto"
-            title="Brain Break"
-        >
-            <span className="text-xl group-hover:rotate-12 transition-transform">🕹️</span>
-        </button>
-
-        <div className="pointer-events-auto">
-            <GeminiChat />
-        </div>
-        <div className="pointer-events-auto">
-            <Calculator />
-        </div>
-    </div>
-        </div >
     );
 }
