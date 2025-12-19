@@ -38,7 +38,12 @@ export function useWhiteboardSync(editor, sessionId) {
                     lastSerialized.current = JSON.stringify(records);
                 }
             } catch (err) {
-                console.error("WhiteboardSync: Init Load Error:", err);
+                // Suppress widely reported "Client is offline" error in dev/test
+                if (err.message && err.message.includes("offline")) {
+                    console.warn("WhiteboardSync: Client is offline. Waiting for connection...");
+                } else {
+                    console.error("WhiteboardSync: Init Load Error:", err);
+                }
             }
         };
 

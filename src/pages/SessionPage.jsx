@@ -20,14 +20,27 @@ export default function Session() {
 
     useEffect(() => {
         const fetchConfig = async () => {
+            // In local dev (Vite), /api/config is not routed to a function, so we skip it.
+            // This prevents "SyntaxError: Unexpected token 'i'" from fetching JS source.
+            if (import.meta.env.DEV) {
+                console.log("Dev Mode: Skipping /api/config fetch (using defaults)");
+                return;
+            }
+
             try {
                 const response = await fetch('/api/config');
+                // Ensure we got a valid JSON response before parsing
+                const contentType = response.headers.get("content-type");
+                if (!contentType || !contentType.includes("application/json")) {
+                    throw new Error(`Invalid content-type: ${contentType}`);
+                }
+
                 const config = await response.json();
                 if (config.maintenanceMode) {
                     setMaintenanceMode(config.maintenanceMode);
                 }
             } catch (error) {
-                console.error('Failed to fetch maintenance config:', error);
+                console.warn('Config Fetch Skipped:', error.message);
             }
         };
 

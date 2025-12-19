@@ -1,62 +1,195 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import Peer from 'peerjs';
+import { db } from '../../services/firebase';
+import { collection, doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
 
-// Restoring Self-Hosted Galene on Fly.io
-export default function VideoChat() {
-    const [galeneUrl, setGaleneUrl] = useState(null);
-    const [loading, setLoading] = useState(true);
+export default function VideoChat({ sessionId }) {
+    const [localStream, setLocalStream] = useState(null);
+    const [remoteStreams, setRemoteStreams] = useState({}); // { peerId: stream }
+    const [myPeerId, setMyPeerId] = useState(null);
+    const [status, setStatus] = useState('Initializing...');
+
+    // Stable Refs
+    const peerRef = useRef(null);
+    const localVideoRef = useRef(null);
+
+    // Generate a random user ID for display if one isn't provided
+    const userId = useRef('User-' + Math.floor(Math.random() * 1000)).current;
 
     useEffect(() => {
-        const fetchConfig = async () => {
+        if (!sessionId) return;
+        setStatus('Accessing Media...');
+
+        // 1. Get Local Stream
+        const initMedia = async () => {
             try {
-                // Priority: Hardcoded Production (Most reliable) -> Edge Config -> Env Var
-                // We prioritize the known working Fly.io URL to avoid config drift.
-                const HARDCODED_URL = "https://jeffersonlegacy.fly.dev/group/main-room/";
-
-                let url = HARDCODED_URL;
-
-                // Enforce HTTPS
-                if (!url.includes('localhost') && url.startsWith('http:')) {
-                    url = url.replace('http:', 'https:');
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                setLocalStream(stream);
+                if (localVideoRef.current) {
+                    localVideoRef.current.srcObject = stream;
+                    localVideoRef.current.muted = true; // Always mute self
                 }
-
-                // Params:
-                // username=Guest: Pre-fills username
-                // autojoin=both: Skips the login screen if password is empty (which it is for this room)
-                const finalUrl = `${url}?username=Guest&autojoin=both`;
-
-                console.log("VideoChat: Connecting to Self-Hosted Galene:", finalUrl);
-                setGaleneUrl(finalUrl);
-            } catch (error) {
-                console.error("Config error:", error);
-            } finally {
-                setLoading(false);
+                initPeer(stream);
+            } catch (err) {
+                console.error("Failed to access media:", err);
+                setStatus('Camera Blocked / Error');
             }
         };
 
-        fetchConfig();
-    }, []);
+        const initPeer = (stream) => {
+            setStatus('Connecting to Neural Net...');
 
-    if (loading) {
-        return (
-            <div className="h-full w-full bg-slate-900 flex items-center justify-center text-white">
-                Loading video server...
-            </div>
-        );
-    }
+            // 2. Initialize PeerJS (Public Cloud Broker)
+            const peer = new Peer(undefined, {
+                host: '0.peerjs.com',
+                port: 443,
+                path: '/'
+            });
+
+            peerRef.current = peer;
+
+            peer.on('open', (id) => {
+                console.log('My Peer ID:', id);
+                setMyPeerId(id);
+                setStatus('Connected to Mesh');
+
+                // 3. Signaling: Write Presence to Firebase
+                const peerDoc = doc(db, 'whiteboards', sessionId, 'peers', id);
+                setDoc(peerDoc, { peerId: id, userId, joinedAt: Date.now() })
+                    .catch(err => console.error("Signaling Error:", err)); // Using subcollection on existing whiteboard doc for simplicity
+            });
+
+            peer.on('call', (call) => {
+                console.log('Incoming call from:', call.peer);
+                call.answer(stream); // Answer with local stream
+                call.on('stream', (remoteStream) => {
+                    addRemoteStream(call.peer, remoteStream);
+                });
+            });
+
+            // 4. Connect to others via Signaling
+            subscribeToPeers(peer, stream);
+        };
+
+        initMedia();
+
+        return () => {
+            // Cleanup
+            if (peerRef.current) {
+                peerRef.current.destroy();
+                // Remove presence
+                if (peerRef.current.id) {
+                    deleteDoc(doc(db, 'whiteboards', sessionId, 'peers', peerRef.current.id))
+                        .catch(e => console.warn("Cleanup error", e));
+                }
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, [sessionId]);
+
+    const addRemoteStream = (id, stream) => {
+        setRemoteStreams(prev => ({ ...prev, [id]: stream }));
+    };
+
+    const subscribeToPeers = (peerInstance, myStream) => {
+        const peersCol = collection(db, 'whiteboards', sessionId, 'peers');
+
+        onSnapshot(peersCol, (snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === 'added') {
+                    const data = change.doc.data();
+                    if (data.peerId === peerInstance.id) return; // Skip self
+
+                    console.log('New peer found:', data.peerId);
+                    // Call them
+                    const call = peerInstance.call(data.peerId, myStream);
+                    if (call) {
+                        call.on('stream', (remoteStream) => {
+                            addRemoteStream(data.peerId, remoteStream);
+                        });
+                    }
+                }
+                if (change.type === 'removed') {
+                    const data = change.doc.data();
+                    setRemoteStreams(prev => {
+                        const next = { ...prev };
+                        delete next[data.peerId];
+                        return next;
+                    });
+                }
+            });
+        });
+    };
 
     return (
-        <div className="h-full w-full bg-slate-900 relative flex flex-col items-center justify-center overflow-hidden">
-            {/* Fallback Link */}
-            <div className="absolute top-0 left-0 w-full bg-slate-800/80 text-slate-300 text-[10px] p-1 text-center z-50">
-                Self-Hosted Server | <a href={galeneUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-white">Open in new tab</a>
+        <div className="h-full w-full bg-slate-950 relative flex flex-col border-r border-slate-800">
+            {/* Header */}
+            <div className="bg-slate-900 border-b border-white/5 p-2 flex items-center justify-between z-20 shadow-md">
+                <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${myPeerId ? 'bg-cyan-500 animate-pulse' : 'bg-yellow-500 animate-bounce'}`} />
+                    <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">{status}</span>
+                </div>
+                <div className="text-[10px] text-slate-600 font-mono">ID: {myPeerId ? myPeerId.substr(0, 6) : '...'}</div>
             </div>
 
-            <iframe
-                src={galeneUrl}
-                className="w-full h-full border-none"
-                allow="camera; microphone; display-capture; autoplay; clipboard-write"
-                title="Tower Tutoring Video"
+            {/* Video Grid */}
+            <div className="flex-1 p-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-fr h-full">
+
+                    {/* Local User */}
+                    <div className="relative rounded-xl overflow-hidden bg-slate-900 border border-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.1)] group min-h-[200px]">
+                        <video
+                            ref={localVideoRef}
+                            autoPlay
+                            playsInline
+                            className="w-full h-full object-cover transform -scale-x-100 opacity-80 group-hover:opacity-100 transition-opacity"
+                        />
+                        <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-[9px] text-cyan-400 font-mono border border-cyan-500/30">
+                            YOU
+                        </div>
+                    </div>
+
+                    {/* Remote Users */}
+                    {Object.entries(remoteStreams).map(([id, stream]) => (
+                        <RemoteVideo key={id} id={id} stream={stream} />
+                    ))}
+
+                    {/* Empty State / Searching */}
+                    {Object.keys(remoteStreams).length === 0 && (
+                        <div className="rounded-xl border border-dashed border-slate-800 flex items-center justify-center min-h-[200px]">
+                            <div className="text-center space-y-2 opacity-50">
+                                <span className="text-2xl animate-pulse">📡</span>
+                                <p className="text-[10px] text-slate-500 font-mono uppercase">Scanning for signals...</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Sub-component for remote video to handle ref lifecycle
+function RemoteVideo({ id, stream }) {
+    const ref = useRef();
+
+    useEffect(() => {
+        if (ref.current) ref.current.srcObject = stream;
+    }, [stream]);
+
+    return (
+        <div className="relative rounded-xl overflow-hidden bg-slate-900 border border-purple-500/20 shadow-[0_0_15px_rgba(168,85,247,0.1)] group min-h-[200px]">
+            <video
+                ref={ref}
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
             />
+            <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-[9px] text-purple-400 font-mono border border-purple-500/30">
+                PEER ({id.substr(0, 4)})
+            </div>
         </div>
     );
 }

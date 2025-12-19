@@ -130,3 +130,4 @@ dist/
 dist-ssr/
 *.local
 .vercel
+.env*.local
