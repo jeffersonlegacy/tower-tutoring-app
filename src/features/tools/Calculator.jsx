@@ -25,7 +25,7 @@ export default function Calculator() {
         return (
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-24 right-6 bg-slate-700 text-white p-3 rounded-full shadow-lg hover:bg-slate-600 transition-transform z-40"
+                className="bg-slate-700 text-white p-3 rounded-full shadow-lg hover:bg-slate-600 transition-transform z-40"
                 title="Calculator"
             >
                 🧮
@@ -42,7 +42,7 @@ export default function Calculator() {
     ];
 
     return (
-        <div className="fixed bottom-24 right-6 w-64 bg-slate-800 border border-slate-600 rounded-lg shadow-2xl overflow-hidden z-40">
+        <div className="w-64 bg-slate-800 border border-slate-600 rounded-lg shadow-2xl overflow-hidden z-40 animate-slide-up-fade">
             <div className="bg-slate-900 p-2 flex justify-between items-center">
                 <span className="text-white font-bold text-sm">Calculator</span>
                 <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white">✕</button>
@@ -56,10 +56,10 @@ export default function Calculator() {
                         key={btn}
                         onClick={() => handlePress(btn)}
                         className={`p-3 font-bold rounded ${btn === '='
-                                ? 'bg-blue-600 text-white'
-                                : btn === 'C'
-                                    ? 'col-span-4 bg-red-500 text-white mt-1'
-                                    : 'bg-slate-600 text-white hover:bg-slate-500'
+                            ? 'bg-blue-600 text-white'
+                            : btn === 'C'
+                                ? 'col-span-4 bg-red-500 text-white mt-1'
+                                : 'bg-slate-600 text-white hover:bg-slate-500'
                             }`}
                     >
                         {btn}
