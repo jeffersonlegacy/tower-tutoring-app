@@ -4,12 +4,18 @@ import VideoChat from "../features/session/VideoChat";
 import HomeworkTray from "../features/session/HomeworkTray";
 import { useParams } from "react-router-dom";
 import { useHomeworkUpload } from "../hooks/useHomeworkUpload";
+import BrainBreak from "../features/games/BrainBreak";
+import GeminiChat from "../features/chat/GeminiChat"; // We might need to embed this or use a simplified version
+import Calculator from "../features/tools/Calculator"; // Same
 
 export default function Session() {
     const { sessionId } = useParams();
     const [maintenanceMode, setMaintenanceMode] = useState({ enabled: false, message: '' });
     const { uploadFile, uploading } = useHomeworkUpload(sessionId);
     const [isDragging, setIsDragging] = useState(false);
+
+    // Sidebar Mode: 'homework' | 'arcade' | 'ai' | 'tools'
+    const [sidebarMode, setSidebarMode] = useState('homework');
 
     useEffect(() => {
         const fetchConfig = async () => {
@@ -93,9 +99,31 @@ export default function Session() {
                         <VideoChat sessionId={sessionId} />
                     </div>
 
-                    {/* Bottom: Homework Tray (Fills remaining) */}
-                    <div className="flex-1 overflow-hidden">
-                        <HomeworkTray sessionId={sessionId} />
+                    {/* Sidebar Tabs */}
+                    <div className="flex items-center bg-slate-900 border-b border-slate-700">
+                        <button
+                            onClick={() => setSidebarMode('homework')}
+                            className={`flex-1 p-2 text-xs font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'homework' ? 'text-white bg-slate-800 border-b-2 border-cyan-500' : 'text-slate-500 hover:text-slate-300'}`}
+                        >
+                            Files
+                        </button>
+                        <button
+                            onClick={() => setSidebarMode('arcade')}
+                            className={`flex-1 p-2 text-xs font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'arcade' ? 'text-white bg-slate-800 border-b-2 border-pink-500' : 'text-slate-500 hover:text-slate-300'}`}
+                        >
+                            Arcade
+                        </button>
+                        {/* We can add AI/Tools tabs here later if verified */}
+                    </div>
+
+                    {/* Bottom: Sidebar Content (Fills remaining) */}
+                    <div className="flex-1 overflow-hidden relative">
+                        {sidebarMode === 'homework' && (
+                            <HomeworkTray sessionId={sessionId} />
+                        )}
+                        {sidebarMode === 'arcade' && (
+                            <BrainBreak sessionId={sessionId} onClose={() => setSidebarMode('homework')} />
+                        )}
                     </div>
 
                 </div>

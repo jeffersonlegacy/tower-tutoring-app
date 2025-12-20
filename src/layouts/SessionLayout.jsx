@@ -1,12 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, useParams } from 'react-router-dom';
-import GeminiChat from "../features/chat/GeminiChat";
-import Calculator from "../features/tools/Calculator";
-import BrainBreak from "../features/games/BrainBreak";
-
 export default function SessionLayout() {
     const { sessionId } = useParams();
-    const [showBrainBreak, setShowBrainBreak] = useState(false);
 
     return (
         <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-900 relative">
