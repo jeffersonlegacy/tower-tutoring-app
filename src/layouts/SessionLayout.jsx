@@ -26,10 +26,10 @@ export default function SessionLayout() {
                 <Outlet />
             </div>
 
-            {/* Brain Break Modal */}
-            {showBrainBreak && (
-                <BrainBreak sessionId={sessionId} onClose={() => setShowBrainBreak(false)} />
-            )}
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-hidden relative w-full h-full z-10">
+                <Outlet />
+            </div>
 
             {/* Global Floating Tools (Toolbar) */}
             <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-[9999] items-end pointer-events-none">
