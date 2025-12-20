@@ -32,29 +32,29 @@ export default function BrainBreak({ sessionId, onClose }) {
             <div className="flex-1 overflow-y-auto p-2 bg-logo-pattern">
 
                 {game === 'menu' && (
-                    <div className="grid grid-cols-1 gap-2">
+                    <div className="grid grid-cols-1 gap-3 p-2">
                         <button
                             onClick={() => setGame('connect4')}
-                            className="group relative h-24 rounded-xl overflow-hidden border border-white/10 hover:border-pink-500/50 transition-all bg-slate-800 hover:bg-slate-800/80 w-full"
+                            className="group relative h-28 rounded-2xl overflow-hidden border-2 border-white/20 hover:border-pink-400 transition-all bg-slate-800 shadow-lg hover:shadow-pink-500/20"
                         >
-                            <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4">
-                                <div className="text-2xl group-hover:scale-110 transition-transform duration-300">🔴</div>
+                            <div className="absolute inset-0 bg-gradient-to-br from-pink-500/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="absolute inset-0 flex flex-row items-center justify-start px-6 gap-6">
+                                <div className="text-4xl filter drop-shadow-[0_0_8px_rgba(236,72,153,0.8)] group-hover:scale-110 transition-transform duration-300">🔴</div>
                                 <div className="flex flex-col items-start gap-1">
-                                    <div className="font-bold text-slate-200 group-hover:text-pink-400 text-sm">NEON CONNECT</div>
-                                    <div className="text-[10px] text-slate-500">Classic 4-in-a-row</div>
+                                    <div className="font-black text-white text-lg tracking-tighter drop-shadow-md group-hover:text-pink-300 transition-colors uppercase">NEON CONNECT</div>
+                                    <div className="text-xs font-medium text-slate-300 bg-black/40 px-2 py-0.5 rounded-full border border-white/10 uppercase tracking-widest">4-In-A-Row</div>
                                 </div>
                             </div>
                         </button>
 
                         <button
-                            className="group relative h-24 rounded-xl overflow-hidden border border-white/10 transition-all bg-slate-800 opacity-50 cursor-not-allowed w-full"
+                            className="group relative h-28 rounded-2xl overflow-hidden border-2 border-white/5 transition-all bg-slate-900/50 opacity-40 cursor-not-allowed w-full"
                         >
-                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4">
-                                <div className="text-2xl grayscale">🏒</div>
+                            <div className="absolute inset-0 flex flex-row items-center justify-start px-6 gap-6">
+                                <div className="text-4xl grayscale opacity-50">🏒</div>
                                 <div className="flex flex-col items-start gap-1">
-                                    <div className="font-bold text-slate-500 text-sm">AIR HOCKEY</div>
-                                    <div className="text-[10px] bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">LOCKED</div>
+                                    <div className="font-bold text-slate-400 text-lg uppercase tracking-wider">AIR HOCKEY</div>
+                                    <div className="text-[10px] bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-slate-600 font-mono">ENCRYPTED // LOCKED</div>
                                 </div>
                             </div>
                         </button>
