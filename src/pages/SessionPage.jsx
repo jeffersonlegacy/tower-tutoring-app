@@ -17,6 +17,9 @@ export default function Session() {
     // Sidebar Mode: 'homework' | 'arcade' | 'ai' | 'tools'
     const [sidebarMode, setSidebarMode] = useState('homework');
 
+    // Main Tab Mode (Mobile Only): 'board' | 'sidebar'
+    const [mainTab, setMainTab] = useState('board');
+
     useEffect(() => {
         const fetchConfig = async () => {
             // In local dev (Vite), /api/config is not routed to a function, so we skip it.
@@ -67,11 +70,27 @@ export default function Session() {
 
     return (
         <div
-            className="flex flex-col h-full overflow-hidden relative"
+            className="flex flex-col h-full overflow-hidden relative bg-slate-900"
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
+            {/* Mobile Tab Switcher (Visible only on small screens) */}
+            <div className="md:hidden flex items-center bg-slate-800 border-b border-slate-700 shrink-0 z-30">
+                <button
+                    onClick={() => setMainTab('board')}
+                    className={`flex-1 p-3 text-sm font-bold uppercase tracking-widest transition-all ${mainTab === 'board' ? 'text-blue-400 bg-slate-900 border-b-2 border-blue-500' : 'text-slate-500'}`}
+                >
+                    Board
+                </button>
+                <button
+                    onClick={() => setMainTab('sidebar')}
+                    className={`flex-1 p-3 text-sm font-bold uppercase tracking-widest transition-all ${mainTab === 'sidebar' ? 'text-pink-400 bg-slate-900 border-b-2 border-pink-500' : 'text-slate-500'}`}
+                >
+                    Tools
+                </button>
+            </div>
+
             {/* Drag Overlay */}
             {isDragging && (
                 <div className="absolute inset-0 bg-indigo-500/20 z-50 flex items-center justify-center backdrop-blur-sm pointer-events-none border-4 border-indigo-500 border-dashed m-4 rounded-xl">
@@ -91,33 +110,32 @@ export default function Session() {
             {/* Main Content Area */}
             <div className="flex flex-1 flex-col md:flex-row overflow-hidden relative">
 
-                {/* Sidebar (Video + Homework) - Optimized for Mobile visibility */}
-                <div className="flex-none order-1 w-full md:w-[300px] lg:w-[350px] border-b md:border-b-0 md:border-r border-slate-700 bg-black flex flex-col relative z-20 shrink-0 h-[50vh] md:h-full">
+                {/* Sidebar (Video + Tools) */}
+                <div className={`flex-none w-full md:w-[300px] lg:w-[350px] border-b md:border-b-0 md:border-r border-slate-700 bg-black flex flex-col relative z-20 shrink-0 h-full ${mainTab === 'sidebar' ? 'flex' : 'hidden md:flex'}`}>
 
                     {/* Top: Video (Adaptive Height) */}
-                    <div className="h-[180px] md:h-[250px] shrink-0 border-b border-slate-700 transition-all duration-300">
+                    <div className="h-[180px] md:h-[250px] shrink-0 border-b border-slate-700 bg-slate-900/50">
                         <VideoChat sessionId={sessionId} />
                     </div>
 
-                    {/* Sidebar Tabs */}
+                    {/* Sidebar Tabs (Local) */}
                     <div className="flex items-center bg-slate-900 border-b border-slate-700 shrink-0">
                         <button
                             onClick={() => setSidebarMode('homework')}
-                            className={`flex-1 p-2 text-xs font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'homework' ? 'text-white bg-slate-800 border-b-2 border-cyan-500' : 'text-slate-500 hover:text-slate-300'}`}
+                            className={`flex-1 p-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'homework' ? 'text-white bg-slate-800 border-b-2 border-cyan-500' : 'text-slate-500 hover:text-slate-300'}`}
                         >
                             Files
                         </button>
                         <button
                             onClick={() => setSidebarMode('arcade')}
-                            className={`flex-1 p-2 text-xs font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'arcade' ? 'text-white bg-slate-800 border-b-2 border-pink-500' : 'text-slate-500 hover:text-slate-300'}`}
+                            className={`flex-1 p-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'arcade' ? 'text-white bg-slate-800 border-b-2 border-pink-500' : 'text-slate-500 hover:text-slate-300'}`}
                         >
                             Arcade
                         </button>
-                        {/* We can add AI/Tools tabs here later if verified */}
                     </div>
 
-                    {/* Bottom: Sidebar Content (Fills remaining) */}
-                    <div className="flex-1 overflow-hidden relative">
+                    {/* Bottom: Sidebar Content */}
+                    <div className="flex-1 overflow-hidden relative bg-slate-900/20">
                         {sidebarMode === 'homework' && (
                             <HomeworkTray sessionId={sessionId} />
                         )}
@@ -128,8 +146,8 @@ export default function Session() {
 
                 </div>
 
-                {/* Main Stage: Whiteboard (Right) */}
-                <div className="flex-1 bg-slate-200 relative order-2 overflow-hidden h-full">
+                {/* Main Stage: Whiteboard (Right/Bottom) */}
+                <div className={`flex-1 bg-slate-200 relative overflow-hidden h-full ${mainTab === 'board' ? 'block' : 'hidden md:block'}`}>
                     <Whiteboard sessionId={sessionId} />
                 </div>
 
