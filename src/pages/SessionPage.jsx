@@ -91,16 +91,16 @@ export default function Session() {
             {/* Main Content Area */}
             <div className="flex flex-1 flex-col md:flex-row overflow-hidden relative">
 
-                {/* Sidebar (Video + Homework) - Slightly reduced width to unsqueeze whiteboard */}
-                <div className="flex-none order-1 w-full md:w-[300px] lg:w-[350px] border-b md:border-b-0 md:border-r border-slate-700 bg-black flex flex-col relative z-20 shrink-0 h-[45vh] md:h-full">
+                {/* Sidebar (Video + Homework) - Optimized for Mobile visibility */}
+                <div className="flex-none order-1 w-full md:w-[300px] lg:w-[350px] border-b md:border-b-0 md:border-r border-slate-700 bg-black flex flex-col relative z-20 shrink-0 h-[50vh] md:h-full">
 
-                    {/* Top: Video (Fixed relative height or pixel height) */}
-                    <div className="h-[250px] shrink-0 border-b border-slate-700">
+                    {/* Top: Video (Adaptive Height) */}
+                    <div className="h-[180px] md:h-[250px] shrink-0 border-b border-slate-700 transition-all duration-300">
                         <VideoChat sessionId={sessionId} />
                     </div>
 
                     {/* Sidebar Tabs */}
-                    <div className="flex items-center bg-slate-900 border-b border-slate-700">
+                    <div className="flex items-center bg-slate-900 border-b border-slate-700 shrink-0">
                         <button
                             onClick={() => setSidebarMode('homework')}
                             className={`flex-1 p-2 text-xs font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'homework' ? 'text-white bg-slate-800 border-b-2 border-cyan-500' : 'text-slate-500 hover:text-slate-300'}`}
