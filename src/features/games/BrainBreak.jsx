@@ -28,53 +28,53 @@ export default function BrainBreak({ sessionId, onClose }) {
                 )}
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-2 bg-logo-pattern">
-
-                {game === 'menu' && (
-                    <div className="grid grid-cols-1 gap-3 p-2">
-                        <button
-                            onClick={() => setGame('connect4')}
-                            className="group relative h-28 rounded-2xl overflow-hidden border-2 border-white/20 hover:border-pink-400 transition-all bg-slate-800 shadow-lg hover:shadow-pink-500/20"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-pink-500/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                            <div className="absolute inset-0 flex flex-row items-center justify-start px-6 gap-6">
-                                <div className="text-4xl filter drop-shadow-[0_0_8px_rgba(236,72,153,0.8)] group-hover:scale-110 transition-transform duration-300">🔴</div>
-                                <div className="flex flex-col items-start gap-1">
-                                    <div className="font-black text-white text-lg tracking-tighter drop-shadow-md group-hover:text-pink-300 transition-colors uppercase">NEON CONNECT</div>
-                                    <div className="text-xs font-medium text-slate-300 bg-black/40 px-2 py-0.5 rounded-full border border-white/10 uppercase tracking-widest">4-In-A-Row</div>
+            {/* Content Container with Background Pattern */}
+            <div className="flex-1 overflow-y-auto bg-logo-pattern">
+                <div className="relative z-10 p-2 min-h-full">
+                    {game === 'menu' && (
+                        <div className="grid grid-cols-1 gap-3 p-2">
+                            <button
+                                onClick={() => setGame('connect4')}
+                                className="group relative h-28 rounded-2xl overflow-hidden border-2 border-white/20 hover:border-pink-400 transition-all bg-slate-800 shadow-lg hover:shadow-pink-500/20"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-br from-pink-500/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                <div className="absolute inset-0 flex flex-row items-center justify-start px-6 gap-6">
+                                    <div className="text-4xl filter drop-shadow-[0_0_8px_rgba(236,72,153,0.8)] group-hover:scale-110 transition-transform duration-300">🔴</div>
+                                    <div className="flex flex-col items-start gap-1">
+                                        <div className="font-black text-white text-lg tracking-tighter drop-shadow-md group-hover:text-pink-300 transition-colors uppercase">NEON CONNECT</div>
+                                        <div className="text-xs font-medium text-slate-300 bg-black/40 px-2 py-0.5 rounded-full border border-white/10 uppercase tracking-widest">4-In-A-Row</div>
+                                    </div>
                                 </div>
-                            </div>
-                        </button>
+                            </button>
 
-                        <button
-                            className="group relative h-28 rounded-2xl overflow-hidden border-2 border-white/5 transition-all bg-slate-900/50 opacity-40 cursor-not-allowed w-full"
-                        >
-                            <div className="absolute inset-0 flex flex-row items-center justify-start px-6 gap-6">
-                                <div className="text-4xl grayscale opacity-50">🏒</div>
-                                <div className="flex flex-col items-start gap-1">
-                                    <div className="font-bold text-slate-400 text-lg uppercase tracking-wider">AIR HOCKEY</div>
-                                    <div className="text-[10px] bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-slate-600 font-mono">ENCRYPTED // LOCKED</div>
+                            <button
+                                className="group relative h-28 rounded-2xl overflow-hidden border-2 border-white/5 transition-all bg-slate-900/50 opacity-40 cursor-not-allowed w-full"
+                            >
+                                <div className="absolute inset-0 flex flex-row items-center justify-start px-6 gap-6">
+                                    <div className="text-4xl grayscale opacity-50">🏒</div>
+                                    <div className="flex flex-col items-start gap-1">
+                                        <div className="font-bold text-slate-400 text-lg uppercase tracking-wider">AIR HOCKEY</div>
+                                        <div className="text-[10px] bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-slate-600 font-mono">ENCRYPTED // LOCKED</div>
+                                    </div>
                                 </div>
-                            </div>
-                        </button>
-                    </div>
-                )}
-
-                {game === 'connect4' && (
-                    <div className="animate-slide-up h-full flex flex-col">
-                        <button
-                            onClick={() => setGame('menu')}
-                            className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 mb-2 px-2 shrink-0"
-                        >
-                            ← Back to Menu
-                        </button>
-                        <div className="flex-1 overflow-y-auto min-h-0 bg-slate-950/50 rounded-xl border border-white/5">
-                            <Connect4 sessionId={sessionId} />
+                            </button>
                         </div>
-                    </div>
-                )}
+                    )}
 
+                    {game === 'connect4' && (
+                        <div className="animate-slide-up h-full flex flex-col">
+                            <button
+                                onClick={() => setGame('menu')}
+                                className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 mb-2 px-2 shrink-0"
+                            >
+                                ← Back to Menu
+                            </button>
+                            <div className="flex-1 overflow-y-auto min-h-0 bg-slate-950/50 rounded-xl border border-white/5">
+                                <Connect4 sessionId={sessionId} />
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

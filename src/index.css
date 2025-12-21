@@ -16,12 +16,19 @@
     }
 
     .bg-logo-pattern {
+        position: relative;
+    }
+
+    .bg-logo-pattern::before {
+        content: "";
+        position: absolute;
+        inset: 0;
         background-image: url('/logo.png');
         background-size: 50px 50px;
         background-repeat: repeat;
         opacity: 0.03;
-        /* Very subtle */
         pointer-events: none;
+        z-index: 0;
     }
 
     .animate-slide {
