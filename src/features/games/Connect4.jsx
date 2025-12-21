@@ -26,7 +26,7 @@ export default function Connect4() {
             await insertCoin({
                 streamMode: true, // Optimizes for rapid updates
                 gameId: "connect4_playroom",
-                skipLobby: false // Show the invite UI
+                skipLobby: true // DIRECT START - No QR Code
             });
 
             onPlayerJoin((state) => {
@@ -161,6 +161,14 @@ export default function Connect4() {
         setState('winner', null);
     };
 
+    const copyInvite = () => {
+        // Playroom appends ?r=ROOMCODE to the URL automatically.
+        // We just verify it's there.
+        const url_ = window.location.href;
+        navigator.clipboard.writeText(url_);
+        alert("Invite Link Copied! Send it to Player 2.");
+    };
+
     // Determine visual state for UI
     const amIHost = isHost();
     const myRole = amIHost ? 'red' : 'yellow';
@@ -169,8 +177,11 @@ export default function Connect4() {
         <div className="flex flex-col items-center gap-2 p-2 select-none overflow-hidden h-full font-mono w-full max-w-sm mx-auto">
 
             {/* Playroom HUD */}
-            <div className="flex justify-between w-full px-4 text-[10px] font-bold text-slate-400">
+            <div className="flex justify-between items-center w-full px-4 text-[10px] font-bold text-slate-400">
                 <span>YOU: {myRole.toUpperCase()}</span>
+                <button onClick={copyInvite} className="bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded text-[8px] tracking-wide uppercase transition-colors">
+                    🔗 Invite P2
+                </button>
                 <span>TURN: {turn.toUpperCase()}</span>
             </div>
 
