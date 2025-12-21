@@ -4,59 +4,74 @@ import { db } from '../../services/firebase';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 
 /**
- * ELITE VIDEO ENGINE v3.0
+ * ELITE VIDEO ENGINE v4.0 (Stabilized)
  * Features:
  * - PeerJS with Firebase Presence Signaling
  * - Mesh Networking with Deterministic Authority
  * - Auto-Reconnect & Heartbeat
- * - Bandwidth Constrained for Tldraw Performance
+ * - HARD RESET Capability for troubleshooting
+ * - Visual Diagnostics Panel
  */
 export default function VideoChat({ sessionId }) {
     const [localStream, setLocalStream] = useState(null);
     const [remoteStreams, setRemoteStreams] = useState({}); // { peerId: { stream, userId } }
     const [status, setStatus] = useState('Initializing...');
+    const [lastError, setLastError] = useState(null);
+    const [myPeerId, setMyPeerId] = useState(null);
+
+    // Media State
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
+    const [showDebug, setShowDebug] = useState(false);
 
     const peerRef = useRef(null);
     const localVideoRef = useRef(null);
     const peersRef = useRef({}); // Track active PeerJS call objects
     const presenceRef = useRef(null);
+    const streamsRef = useRef({}); // Ref mirror for state to avoid closure staleness
 
-    const userId = useRef('User-' + Math.floor(Math.random() * 1000)).current;
+    // Unique user ID for this session instance
+    const userId = useRef('User-' + Math.floor(Math.random() * 10000)).current;
 
     useEffect(() => {
         if (!sessionId) return;
+        let mounted = true;
 
-        let active = true;
-
-        const initMedia = async () => {
+        const startEngine = async () => {
             try {
-                // Optimization: Constraints for lower bandwidth to prioritize Whiteboard
+                // 1. Get Media
+                setStatus('REQUESTING CAMERA...');
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { width: { max: 640 }, height: { max: 480 }, frameRate: { max: 15 } },
                     audio: { echoCancellation: true, noiseSuppression: true }
                 });
 
-                if (!active) return;
+                if (!mounted) return;
+
                 setLocalStream(stream);
                 if (localVideoRef.current) {
                     localVideoRef.current.srcObject = stream;
-                    localVideoRef.current.muted = true;
+                    localVideoRef.current.muted = true; // Prevent local echo
                 }
+
+                // 2. Initialize Peer
                 initPeer(stream);
+
             } catch (err) {
                 console.error("Media Access Failure:", err);
-                setStatus('PERMISSIONS ERROR');
+                setStatus('CAMERA BLOCKED');
+                setLastError(err.message);
             }
         };
 
         const initPeer = (stream) => {
-            // Using a resilient PeerJS config
+            setStatus('CONNECTING TO CLOUD...');
+
             const peer = new Peer(undefined, {
                 host: '0.peerjs.com',
                 secure: true,
                 port: 443,
+                debug: 1, // Errors only
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
@@ -68,186 +83,233 @@ export default function VideoChat({ sessionId }) {
             peerRef.current = peer;
 
             peer.on('open', (id) => {
-                if (!active) return;
+                if (!mounted) return;
                 console.log('[RTC] Identity Confirmed:', id);
-                setStatus('LIVE');
+                setStatus('ONLINE');
+                setMyPeerId(id);
+                setLastError(null);
 
-                // Presence with heartbeat
+                // Publish Presence
                 presenceRef.current = id;
                 const peerDoc = doc(db, 'whiteboards', sessionId, 'peers', id);
                 setDoc(peerDoc, {
                     peerId: id,
                     userId,
                     active: true,
-                    lastSeen: serverTimestamp()
-                }).catch(console.error);
+                    lastSeen: serverTimestamp(),
+                    userAgent: navigator.userAgent
+                }).catch(e => setLastError("Signaling Write Error: " + e.message));
             });
 
             peer.on('call', (call) => {
-                console.log('[RTC] Inbound Signal from:', call.peer);
+                console.log('[RTC] Inbound Call:', call.peer);
                 call.answer(stream);
                 setupCall(call);
             });
 
             peer.on('disconnected', () => {
-                setStatus('RECONNECTING...');
-                peer.reconnect();
-            });
-
-            peer.on('error', (err) => {
-                console.error('[RTC] Hardware/Network Failure:', err.type);
-                if (err.type === 'peer-unavailable') {
-                    // Handled by signal removal
+                setStatus('DISCONNECTED - RETRYING...');
+                if (mounted && peer && !peer.destroyed) {
+                    peer.reconnect();
                 }
             });
 
-            // Signal Discovery
-            const unsubscribeSignaling = subscribeToPeers(peer, stream);
-            return unsubscribeSignaling;
-        };
-
-        const setupCall = (call) => {
-            if (peersRef.current[call.peer]) {
-                peersRef.current[call.peer].close();
-            }
-            peersRef.current[call.peer] = call;
-
-            call.on('stream', (remoteStream) => {
-                setRemoteStreams(prev => ({ ...prev, [call.peer]: remoteStream }));
+            peer.on('error', (err) => {
+                console.error('[RTC] Error:', err);
+                // "peer-unavailable" means a peer left/died. We handle that via signaling removal.
+                if (err.type !== 'peer-unavailable') {
+                    setLastError(`${err.type}: ${err.message}`);
+                    if (err.type === 'network' || err.type === 'server-error') {
+                        setStatus('NETWORK ERR');
+                    }
+                }
             });
 
-            call.on('close', () => cleanupRemote(call.peer));
-            call.on('error', () => cleanupRemote(call.peer));
-        };
-
-        const cleanupRemote = (id) => {
-            delete peersRef.current[id];
-            setRemoteStreams(prev => {
-                const next = { ...prev };
-                delete next[id];
-                return next;
-            });
+            // Start Signaling Listener
+            subscribeToPeers(peer, stream);
         };
 
         const subscribeToPeers = (peerInstance, myStream) => {
             const peersCol = collection(db, 'whiteboards', sessionId, 'peers');
             return onSnapshot(peersCol, (snapshot) => {
+                if (!mounted) return;
+
                 snapshot.docChanges().forEach((change) => {
-                    if (!active) return;
                     const data = change.doc.data();
-                    if (data.peerId === peerInstance.id) return;
+                    if (!data || data.peerId === peerInstance.id) return;
 
                     if (change.type === 'added') {
-                        // Authority Check: Higher ID calls Lower ID to avoid dual-call race
+                        console.log(`[RTC] Peer Discovered: ${data.peerId}`);
+                        // Deterministic Mesh: Higher ID calls Lower ID
+                        // This prevents two peers calling each other simultaneously
                         if (peerInstance.id > data.peerId) {
-                            console.log(`[RTC] Calling Authority ${data.peerId}`);
+                            console.log(`[RTC] Initiating Call -> ${data.peerId}`);
                             const call = peerInstance.call(data.peerId, myStream);
                             if (call) setupCall(call);
                         }
                     } else if (change.type === 'removed') {
+                        console.log(`[RTC] Peer Lost: ${data.peerId}`);
                         cleanupRemote(data.peerId);
                     }
                 });
+            }, (error) => {
+                console.error("Signaling Read Error:", error);
+                setLastError("Signaling Read Error");
             });
         };
 
-        initMedia();
+        startEngine();
 
+        // Cleanup
         return () => {
-            active = false;
+            mounted = false;
+            // 1. Remove presence to tell others to stop calling
             if (presenceRef.current) {
                 deleteDoc(doc(db, 'whiteboards', sessionId, 'peers', presenceRef.current)).catch(() => { });
             }
-            if (peerRef.current) peerRef.current.destroy();
-            if (localStream) localStream.getTracks().forEach(t => t.stop());
+            // 2. Destroy peer connection
+            if (peerRef.current) {
+                peerRef.current.destroy();
+                peerRef.current = null;
+            }
+            // 3. Stop local media
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+            }
+            // 4. Clear refs
             peersRef.current = {};
+            setRemoteStreams({});
         };
-    }, [sessionId]);
+    }, [sessionId]); // Only re-run if Session ID changes
+
+    /* --- Logic --- */
+
+    const setupCall = (call) => {
+        // Prevent duplicate handling
+        const existingCall = peersRef.current[call.peer];
+        if (existingCall) {
+            console.warn(`[RTC] Replacing existing call with ${call.peer}`);
+            existingCall.close();
+        }
+
+        peersRef.current[call.peer] = call;
+
+        call.on('stream', (remoteStream) => {
+            console.log(`[RTC] Stream Received from ${call.peer}`);
+            setRemoteStreams(prev => ({ ...prev, [call.peer]: remoteStream }));
+        });
+
+        call.on('close', () => cleanupRemote(call.peer));
+        call.on('error', (e) => {
+            console.error(`[RTC] Call Error with ${call.peer}:`, e);
+            cleanupRemote(call.peer);
+        });
+    };
+
+    const cleanupRemote = (id) => {
+        if (peersRef.current[id]) {
+            peersRef.current[id].close();
+            delete peersRef.current[id];
+        }
+        setRemoteStreams(prev => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+        });
+    };
+
+    /* --- Actions --- */
+
+    // HARD RESET: Fully intentional reload of the component state
+    const forceReset = () => {
+        if (window.confirm("Restart Video Engine? This will briefly cut connection.")) {
+            window.location.reload(); // Simple, brutal, effective for "Executive" troubleshooting
+            // Alternatively we could unmount/remount, but reload clears browser WebRTC cache issues too.
+        }
+    };
 
     const toggleAudio = () => {
         if (localStream) {
-            const enabled = localStream.getAudioTracks()[0].enabled;
-            localStream.getAudioTracks()[0].enabled = !enabled;
-            setIsMuted(!enabled);
+            const track = localStream.getAudioTracks()[0];
+            if (track) {
+                track.enabled = !track.enabled;
+                setIsMuted(!track.enabled);
+            }
         }
     };
 
     const toggleVideo = () => {
         if (localStream) {
-            const enabled = localStream.getVideoTracks()[0].enabled;
-            localStream.getVideoTracks()[0].enabled = !enabled;
-            setIsVideoOff(!enabled);
+            const track = localStream.getVideoTracks()[0];
+            if (track) {
+                track.enabled = !track.enabled;
+                setIsVideoOff(!track.enabled);
+            }
         }
     };
 
+    /* --- Render --- */
     return (
-        <div className="h-full w-full bg-slate-950 flex flex-col border-r border-slate-800 overflow-hidden font-mono">
-            {/* HUD Header */}
-            <div className="bg-slate-900/80 backdrop-blur-md border-b border-white/5 p-2 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2">
-                    <div className={`w-1.5 h-1.5 rounded-full ${status === 'LIVE' ? 'bg-cyan-400 shadow-[0_0_8px_#22d3ee]' : 'bg-red-500 animate-pulse'}`} />
-                    <span className="text-[10px] font-black tracking-tighter text-slate-300 uppercase underline decoration-cyan-500/30 font-mono">
-                        COMMS: {status}
+        <div className="h-full w-full bg-slate-950 flex flex-col border-r border-slate-800 overflow-hidden font-mono relative">
+
+            {/* Status Bar */}
+            <div className={`shrink-0 p-2 flex items-center justify-between border-b transition-colors ${status === 'ONLINE' ? 'bg-slate-900 border-white/5' : 'bg-red-900/20 border-red-500/30'}`}>
+                <div className="flex items-center gap-2 cursor-pointer" onClick={() => setShowDebug(!showDebug)}>
+                    <div className={`w-2 h-2 rounded-full ${status === 'ONLINE' ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500 animate-pulse'}`} />
+                    <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase">
+                        {status}
                     </span>
                 </div>
 
                 <div className="flex gap-1">
-                    <button
-                        onClick={toggleAudio}
-                        className={`w-6 h-6 rounded border flex items-center justify-center transition-all ${isMuted ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-slate-800 border-white/10 text-slate-400 hover:text-white'}`}
-                        title={isMuted ? "Unmute" : "Mute"}
-                    >
+                    <button onClick={forceReset} className="px-2 py-0.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/30 rounded text-[8px] font-bold uppercase transition-all" title="Restart Video Engine">
+                        ⚡ RST
+                    </button>
+                    <button onClick={toggleAudio} className={`w-6 h-6 rounded flex items-center justify-center border transition-all ${isMuted ? 'bg-red-500/20 border-red-500 text-red-500' : 'bg-slate-800 border-white/10 text-slate-400'}`}>
                         {isMuted ? '🔇' : '🎤'}
                     </button>
-                    <button
-                        onClick={toggleVideo}
-                        className={`w-6 h-6 rounded border flex items-center justify-center transition-all ${isVideoOff ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-slate-800 border-white/10 text-slate-400 hover:text-white'}`}
-                        title={isVideoOff ? "Start Camera" : "Stop Camera"}
-                    >
+                    <button onClick={toggleVideo} className={`w-6 h-6 rounded flex items-center justify-center border transition-all ${isVideoOff ? 'bg-red-500/20 border-red-500 text-red-500' : 'bg-slate-800 border-white/10 text-slate-400'}`}>
                         {isVideoOff ? '🚫' : '📹'}
                     </button>
                 </div>
             </div>
 
-            {/* Viewport Grid */}
-            <div className="flex-1 p-2 overflow-y-auto overflow-x-hidden space-y-2">
-                {/* Local View */}
-                <div className="relative aspect-video rounded-lg overflow-hidden bg-black border border-white/5 group ring-1 ring-cyan-500/20">
+            {/* Diagnostics Panel (Collapsible) */}
+            {showDebug && (
+                <div className="bg-black/50 p-2 text-[8px] font-mono text-slate-500 border-b border-white/5 animate-in slide-in-from-top-2">
+                    <p>ID: <span className="text-slate-300 select-all">{myPeerId || '...'}</span></p>
+                    <p>PEERS: {Object.keys(remoteStreams).length} connected</p>
+                    {lastError && <p className="text-red-400 font-bold mt-1">ERR: {lastError}</p>}
+                </div>
+            )}
+
+            {/* Video Grid */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+
+                {/* Local User */}
+                <div className="relative aspect-video rounded-lg overflow-hidden bg-black border border-white/10 group">
                     <video
                         ref={localVideoRef}
                         autoPlay
                         playsInline
                         muted
-                        className={`w-full h-full object-cover transform -scale-x-100 transition-opacity ${isVideoOff ? 'opacity-0' : 'opacity-70 group-hover:opacity-100'}`}
+                        className={`w-full h-full object-cover transform -scale-x-100 ${isVideoOff ? 'opacity-0' : 'opacity-100'}`}
                     />
-                    {isVideoOff && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
-                            <span className="text-xl grayscale opacity-20">📷</span>
-                        </div>
-                    )}
-                    <div className="absolute top-2 left-2 flex items-center gap-1.5">
-                        <div className="px-1.5 py-0.5 bg-cyan-500 text-black text-[8px] font-black uppercase tracking-tighter rounded">YOU</div>
-                        {isMuted && <span className="bg-red-500/80 p-0.5 rounded text-[8px]">🔇</span>}
+                    {isVideoOff && <div className="absolute inset-0 flex items-center justify-center text-2xl opacity-20">📷</div>}
+                    <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/60 backdrop-blur rounded text-[8px] font-bold text-white uppercase tracking-wider">
+                        YOU {isMuted && <span className="text-red-400 ml-1">MUTED</span>}
                     </div>
                 </div>
 
-                {/* Remote Participants */}
-                {Object.entries(remoteStreams).map(([id, stream]) => (
-                    <div key={id} className="relative aspect-video rounded-lg overflow-hidden bg-black border border-white/5 ring-1 ring-purple-500/20">
-                        <RemoteVideo stream={stream} />
-                        <div className="absolute top-2 left-2 flex items-center gap-1.5">
-                            <div className="px-1.5 py-0.5 bg-purple-500 text-white text-[8px] font-black uppercase tracking-tighter rounded">PEER // {id.slice(0, 4)}</div>
-                        </div>
-                    </div>
+                {/* Remote Users */}
+                {Object.entries(remoteStreams).map(([peerId, stream]) => (
+                    <RemoteVideo key={peerId} peerId={peerId} stream={stream} />
                 ))}
 
-                {/* Idle Mode */}
-                {Object.keys(remoteStreams).length === 0 && (
-                    <div className="aspect-video rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center bg-slate-900/10">
-                        <div className="flex flex-col items-center gap-2 animate-pulse opacity-30">
-                            <div className="w-8 h-8 rounded-full border-2 border-slate-700 border-t-cyan-500 animate-spin" />
-                            <span className="text-[8px] uppercase tracking-[0.3em] font-black">Waiting for student...</span>
-                        </div>
+                {Object.keys(remoteStreams).length === 0 && status === 'ONLINE' && (
+                    <div className="text-center py-8 opacity-30">
+                        <div className="text-2xl mb-2">📡</div>
+                        <div className="text-[8px] uppercase tracking-widest">Waiting for Peers...</div>
                     </div>
                 )}
             </div>
