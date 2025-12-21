@@ -108,19 +108,26 @@ export default function VideoChat({ sessionId }) {
             });
 
             peer.on('disconnected', () => {
-                setStatus('DISCONNECTED - RETRYING...');
-                if (mounted && peer && !peer.destroyed) {
-                    peer.reconnect();
-                }
+                setStatus('...RECONNECTING');
+                // Smart Backoff: Wait 2s before trying, increases change of success
+                setTimeout(() => {
+                    if (mounted && peer && !peer.destroyed) {
+                        console.log('[RTC] Attempting Reconnect...');
+                        peer.reconnect();
+                    }
+                }, 2000);
             });
 
             peer.on('error', (err) => {
-                console.error('[RTC] Error:', err);
-                // "peer-unavailable" means a peer left/died. We handle that via signaling removal.
-                if (err.type !== 'peer-unavailable') {
-                    setLastError(`${err.type}: ${err.message}`);
-                    if (err.type === 'network' || err.type === 'server-error') {
-                        setStatus('NETWORK ERR');
+                // Suppress noisy network errors if they are just transient
+                if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') {
+                    // Only log if persistent or critical
+                    // We rely on 'disconnected' event to trigger reconnect
+                    console.warn('[RTC] Network Glitch (Auto-Recovering):', err.message);
+                } else {
+                    console.error('[RTC] Error:', err);
+                    if (err.type !== 'peer-unavailable') {
+                        setLastError(`${err.type}: ${err.message}`);
                     }
                 }
             });
