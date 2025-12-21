@@ -132,12 +132,13 @@ export default function Connect4({ sessionId }) {
             // 4. Atomic Update to Firestore
             // This is "Open Play" - we don't check whose turn it is strictly via auth.
             // Whoever clicks first gets the move.
-            await updateDoc(gameDocRef, {
+            // FIXED: Use setDoc with merge:true to create doc if missing (prevents crash on new sessions)
+            await setDoc(gameDocRef, {
                 board: currentBoard,
                 turn: nextTurn,
                 winner: newWinner,
                 lastMoveTime: Date.now()
-            });
+            }, { merge: true });
 
         } catch (e) {
             console.error("Move failed:", e);

@@ -143,16 +143,19 @@ export default function VideoChat({ sessionId }) {
 
                 snapshot.docChanges().forEach((change) => {
                     const data = change.doc.data();
-                    if (!data || data.peerId === peerInstance.id) return;
+                    if (!data) return;
+
+                    if (data.peerId === peerInstance.id) return; // Ignore self
 
                     if (change.type === 'added') {
-                        console.log(`[RTC] Peer Discovered: ${data.peerId}`);
+                        console.log(`[RTC] Peer Discovered: ${data.peerId} (Active: ${data.active})`);
                         // Deterministic Mesh: Higher ID calls Lower ID
-                        // This prevents two peers calling each other simultaneously
                         if (peerInstance.id > data.peerId) {
                             console.log(`[RTC] Initiating Call -> ${data.peerId}`);
                             const call = peerInstance.call(data.peerId, myStream);
                             if (call) setupCall(call);
+                        } else {
+                            console.log(`[RTC] Waiting for call from higher ID: ${data.peerId}`);
                         }
                     } else if (change.type === 'removed') {
                         console.log(`[RTC] Peer Lost: ${data.peerId}`);
@@ -161,7 +164,7 @@ export default function VideoChat({ sessionId }) {
                 });
             }, (error) => {
                 console.error("Signaling Read Error:", error);
-                setLastError("Signaling Read Error");
+                setLastError("Signaling Read Error: " + error.code);
             });
         };
 
