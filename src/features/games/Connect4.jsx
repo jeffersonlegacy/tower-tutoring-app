@@ -82,53 +82,48 @@ export default function Connect4({ sessionId }) {
         if (winner || isProcessing || (localPlayerRole && turn !== localPlayerRole)) return;
 
         setIsProcessing(true);
-        console.log(`[C4] Attempting drop in col ${colIndex} as ${turn} `);
+        console.log(`[C4] Attempting drop in col ${colIndex} as ${turn}`);
 
         const gameDocRef = doc(db, 'whiteboards', sessionId, 'games', 'connect4_v4');
 
         try {
-            await runTransaction(db, async (transaction) => {
-                const gameSnap = await transaction.get(gameDocRef);
-                const data = gameSnap.data();
-                if (!data || data.winner || data.turn !== turn) return;
-
-                const currentBoard = [...data.board];
-                let targetIdx = -1;
-
-                // Find bottom-most empty row in this column
-                for (let r = ROWS - 1; r >= 0; r--) {
-                    const idx = r * COLS + colIndex;
-                    if (!currentBoard[idx]) {
-                        targetIdx = idx;
-                        break;
-                    }
+            // Simplified atomic update without the 'database does not exist' transaction risk
+            let targetIdx = -1;
+            for (let r = ROWS - 1; r >= 0; r--) {
+                const idx = r * COLS + colIndex;
+                if (!board[idx]) {
+                    targetIdx = idx;
+                    break;
                 }
+            }
 
-                if (targetIdx === -1) {
-                    console.warn("[C4] Column full");
-                    return;
-                }
+            if (targetIdx === -1) {
+                console.warn("[C4] Column full");
+                setIsProcessing(false);
+                return;
+            }
 
-                currentBoard[targetIdx] = turn;
-                const nextTurn = turn === 'red' ? 'yellow' : 'red';
-                const moveCount = (data.moveCount || 0) + 1;
+            const newBoard = [...board];
+            newBoard[targetIdx] = turn;
+            const nextTurn = turn === 'red' ? 'yellow' : 'red';
+            const moveCount = (board.filter(c => c !== null).length) + 1;
 
-                let newWinner = null;
-                if (checkWin(currentBoard, targetIdx, turn)) {
-                    newWinner = turn;
-                    winSound.current.play().catch(() => { });
-                } else if (moveCount >= ROWS * COLS) {
-                    newWinner = 'draw';
-                }
+            let newWinner = null;
+            if (checkWin(newBoard, targetIdx, turn)) {
+                newWinner = turn;
+                winSound.current.play().catch(() => { });
+            } else if (moveCount >= ROWS * COLS) {
+                newWinner = 'draw';
+            }
 
-                transaction.update(gameDocRef, {
-                    board: currentBoard,
-                    turn: nextTurn,
-                    winner: newWinner,
-                    moveCount: moveCount,
-                    lastUpdated: Date.now()
-                });
+            await updateDoc(gameDocRef, {
+                board: newBoard,
+                turn: nextTurn,
+                winner: newWinner,
+                moveCount: moveCount,
+                lastUpdated: Date.now()
             });
+
         } catch (e) {
             console.error("[C4] Drop Failed:", e);
         } finally {
