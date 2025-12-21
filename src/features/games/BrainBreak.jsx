@@ -35,26 +35,26 @@ export default function BrainBreak({ sessionId, onClose }) {
                         <div className="grid grid-cols-1 gap-3 p-2">
                             <button
                                 onClick={() => setGame('connect4')}
-                                className="group relative h-28 rounded-2xl overflow-hidden border-2 border-white/20 hover:border-pink-400 transition-all bg-slate-800 shadow-lg hover:shadow-pink-500/20"
+                                className="group relative h-20 rounded-xl overflow-hidden border-2 border-white/20 hover:border-pink-400 transition-all bg-slate-800 shadow-lg hover:shadow-pink-500/20"
                             >
                                 <div className="absolute inset-0 bg-gradient-to-br from-pink-500/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                <div className="absolute inset-0 flex flex-row items-center justify-start px-6 gap-6">
-                                    <div className="text-4xl filter drop-shadow-[0_0_8px_rgba(236,72,153,0.8)] group-hover:scale-110 transition-transform duration-300">🔴</div>
-                                    <div className="flex flex-col items-start gap-1">
-                                        <div className="font-black text-white text-lg tracking-tighter drop-shadow-md group-hover:text-pink-300 transition-colors uppercase">NEON CONNECT</div>
-                                        <div className="text-xs font-medium text-slate-300 bg-black/40 px-2 py-0.5 rounded-full border border-white/10 uppercase tracking-widest">4-In-A-Row</div>
+                                <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4">
+                                    <div className="text-3xl filter drop-shadow-[0_0_8px_rgba(236,72,153,0.8)] group-hover:scale-110 transition-transform duration-300">🔴</div>
+                                    <div className="flex flex-col items-start">
+                                        <div className="font-black text-white text-base tracking-tighter drop-shadow-md group-hover:text-pink-300 transition-colors uppercase">NEON CONNECT</div>
+                                        <div className="text-[10px] font-medium text-slate-300 bg-black/40 px-2 py-0.5 rounded-full border border-white/10 uppercase tracking-widest">4-In-A-Row</div>
                                     </div>
                                 </div>
                             </button>
 
                             <button
-                                className="group relative h-28 rounded-2xl overflow-hidden border-2 border-white/5 transition-all bg-slate-900/50 opacity-40 cursor-not-allowed w-full"
+                                className="group relative h-20 rounded-xl overflow-hidden border-2 border-white/5 transition-all bg-slate-900/50 opacity-40 cursor-not-allowed w-full"
                             >
-                                <div className="absolute inset-0 flex flex-row items-center justify-start px-6 gap-6">
-                                    <div className="text-4xl grayscale opacity-50">🏒</div>
-                                    <div className="flex flex-col items-start gap-1">
-                                        <div className="font-bold text-slate-400 text-lg uppercase tracking-wider">AIR HOCKEY</div>
-                                        <div className="text-[10px] bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-slate-600 font-mono">ENCRYPTED // LOCKED</div>
+                                <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4">
+                                    <div className="text-3xl grayscale opacity-50">🏒</div>
+                                    <div className="flex flex-col items-start leading-tight">
+                                        <div className="font-bold text-slate-400 text-sm uppercase tracking-wider">AIR HOCKEY</div>
+                                        <div className="text-[8px] bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-slate-600 font-mono">ENCRYPTED // LOCKED</div>
                                     </div>
                                 </div>
                             </button>
