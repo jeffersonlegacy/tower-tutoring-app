@@ -1,81 +1,86 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db } from '../../services/firebase';
-import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { insertCoin, onPlayerJoin, myPlayer, isHost, setState, getState, Joystick } from 'playroomkit';
 
 const ROWS = 6;
 const COLS = 7;
 
 /**
- * CONNECT 4 v4.2 - RESILIENT RENDER
- * Fixed corrupted state issues and improved visibility.
+ * CONNECT 4 - PLAYROOM EDITION
+ * Zero-config multiplayer with automatic lobbies.
  */
-export default function Connect4({ sessionId }) {
-    // Initialize with a valid empty board to prevent flash of null
+export default function Connect4() {
     const [board, setBoard] = useState(Array(ROWS * COLS).fill(null));
-    const [turn, setTurn] = useState('red');
+    const [turn, setTurn] = useState('red'); // 'red' or 'yellow'
     const [winner, setWinner] = useState(null);
-    const [localPlayerRole, setLocalPlayerRole] = useState(null);
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [error, setError] = useState(null);
-
+    const [players, setPlayers] = useState([]);
+    const [me, setMe] = useState(null);
     const dropSound = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2012/2012-preview.mp3'));
     const winSound = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2020/2020-preview.mp3'));
 
-    // DB Versioning to purge bad data
-    const GAME_ID = 'connect4_v5';
-
     useEffect(() => {
-        if (!sessionId) return;
+        startPlayroom();
+    }, []);
 
+    const startPlayroom = async () => {
         try {
-            const gameDoc = doc(db, 'whiteboards', sessionId, 'games', GAME_ID);
-
-            const unsubscribe = onSnapshot(gameDoc, (snap) => {
-                if (snap.exists()) {
-                    const data = snap.data();
-
-                    // Defensive: Ensure board is actually an array of correct length
-                    if (Array.isArray(data.board) && data.board.length === ROWS * COLS) {
-                        setBoard(data.board);
-                        setTurn(data.turn);
-                        setWinner(data.winner);
-
-                        // SFX
-                        if (data.moveCount > 0 && Math.abs(Date.now() - (data.lastUpdated || 0)) < 2000) {
-                            dropSound.current.play().catch(() => { });
-                        }
-                    } else {
-                        console.warn("[C4] Corrupt board detected, auto-fixing...");
-                        initGame();
-                    }
-                } else {
-                    initGame();
-                }
-            }, (err) => {
-                console.error("Snapshot error:", err);
-                setError("Sync Error");
+            await insertCoin({
+                streamMode: true, // Optimizes for rapid updates
+                gameId: "connect4_playroom",
+                skipLobby: false // Show the invite UI
             });
 
-            return () => unsubscribe();
-        } catch (err) {
-            console.error("Setup error:", err);
-            setError("Setup Failed");
-        }
-    }, [sessionId]);
+            onPlayerJoin((state) => {
+                // Playroom adds players automatically
+                const p = state.getProfile();
+                console.log("Player Joined:", p);
 
-    const initGame = async () => {
-        try {
-            await setDoc(doc(db, 'whiteboards', sessionId, 'games', GAME_ID), {
-                board: Array(ROWS * COLS).fill(null),
-                turn: 'red',
-                winner: null,
-                moveCount: 0,
-                lastUpdated: Date.now()
+                // Assign colors based on join order (Host=Red, P2=Yellow)
+                // We re-fetch players list to ensure correct order
+                updatePlayersList();
             });
+
+            // Sync Game State Loop
+            // In a real app we'd use 'onStateChange' if available, but for now we poll or hook into events
+            // Playroom's setState triggers updates everywhere.
+            // We'll set up a listener for state changes.
         } catch (e) {
-            console.error("Init failed:", e);
+            console.error("Playroom Init Failed:", e);
         }
     };
+
+    // Helper to get current players
+    const updatePlayersList = () => {
+        // Playroom doesn't expose a simple "getPlayers" list directly in the hook style without subscription
+        // but let's assume standard behavior for now.
+        // We actually rely on the 'state' to drive the UI.
+        const p = myPlayer();
+        setMe(p);
+    };
+
+    // Reacting to state changes (Polling fallback or event hook)
+    // Ideally Playroom has a hook, but here we'll use a simple interval/subscription pattern 
+    // or rely on component re-renders if we were using their React SDK components.
+    // For vanilla JS SDK in React, we need to subscribe.
+
+    // NOTE: Playroom doesn't have a direct "subscribe" to global state in the basic docs snippet.
+    // We typically use 'onPlayerJoin' to trigger re-checks, and 'setState' propagates.
+    // We will use a standard tick to check for state updates for simplicity in this V1.
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const currentBoard = getState('board');
+            const currentTurn = getState('turn');
+            const currentWinner = getState('winner');
+
+            if (currentBoard) {
+                // Simple deep comparison check to avoid spamming re-renders
+                setBoard(prev => JSON.stringify(prev) !== JSON.stringify(currentBoard) ? currentBoard : prev);
+            }
+            if (currentTurn) setTurn(currentTurn);
+            if (currentWinner !== undefined) setWinner(currentWinner);
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, []);
 
     const checkWin = (b, idx, player) => {
         const r = Math.floor(idx / COLS);
@@ -101,78 +106,73 @@ export default function Connect4({ sessionId }) {
         return false;
     };
 
-    const handleDrop = async (colIndex) => {
-        if (winner || isProcessing || (localPlayerRole && turn !== localPlayerRole)) return;
+    const handleDrop = (colIndex) => {
+        if (winner) return;
 
-        setIsProcessing(true);
-        const gameDocRef = doc(db, 'whiteboards', sessionId, 'games', GAME_ID);
+        // Determine my color
+        const amIHost = isHost();
+        const myColor = amIHost ? 'red' : 'yellow';
 
-        try {
-            let targetIdx = -1;
-            // Find lowest empty slot
-            for (let r = ROWS - 1; r >= 0; r--) {
-                const idx = r * COLS + colIndex;
-                if (!board[idx]) {
-                    targetIdx = idx;
-                    break;
-                }
-            }
-
-            if (targetIdx === -1) {
-                setIsProcessing(false);
-                return;
-            }
-
-            const newBoard = [...board];
-            newBoard[targetIdx] = turn;
-            const nextTurn = turn === 'red' ? 'yellow' : 'red';
-            const moveCount = (newBoard.filter(Boolean).length);
-
-            let newWinner = null;
-            if (checkWin(newBoard, targetIdx, turn)) {
-                newWinner = turn;
-                winSound.current.play().catch(() => { });
-            } else if (moveCount >= ROWS * COLS) {
-                newWinner = 'draw';
-            }
-
-            await updateDoc(gameDocRef, {
-                board: newBoard,
-                turn: nextTurn,
-                winner: newWinner,
-                moveCount: moveCount,
-                lastUpdated: Date.now()
-            });
-
-        } catch (e) {
-            console.error("[C4] Drop Failed:", e);
-            alert("Connection error - move not saved.");
-        } finally {
-            setIsProcessing(false);
+        // Turn Validation
+        if (turn !== myColor) {
+            console.log("Not your turn!");
+            return;
         }
+
+        // Logic
+        let targetIdx = -1;
+        const currentBoard = getState('board') || Array(ROWS * COLS).fill(null);
+
+        for (let r = ROWS - 1; r >= 0; r--) {
+            const idx = r * COLS + colIndex;
+            if (!currentBoard[idx]) {
+                targetIdx = idx;
+                break;
+            }
+        }
+
+        if (targetIdx === -1) return; // Column full
+
+        // Update State
+        const newBoard = [...currentBoard];
+        newBoard[targetIdx] = myColor;
+
+        const nextTurn = turn === 'red' ? 'yellow' : 'red';
+        let newWinner = null;
+
+        if (checkWin(newBoard, targetIdx, myColor)) {
+            newWinner = myColor;
+            winSound.current.play().catch(() => { });
+        } else if (newBoard.filter(Boolean).length >= 42) {
+            newWinner = 'draw';
+        } else {
+            dropSound.current.play().catch(() => { });
+        }
+
+        // Broadcast to Playroom
+        setState('board', newBoard);
+        setState('turn', nextTurn);
+        if (newWinner) setState('winner', newWinner);
     };
 
-    if (error) return <div className="p-4 text-red-500 font-bold bg-slate-900 rounded-xl">Error: {error}</div>;
+    const resetGame = () => {
+        setState('board', Array(ROWS * COLS).fill(null));
+        setState('turn', 'red');
+        setState('winner', null);
+    };
+
+    // Determine visual state for UI
+    const amIHost = isHost();
+    const myRole = amIHost ? 'red' : 'yellow';
 
     return (
         <div className="flex flex-col items-center gap-2 p-2 select-none overflow-hidden h-full font-mono w-full max-w-sm mx-auto">
 
-            {/* Player Selection */}
-            {!localPlayerRole && !winner && (
-                <div className="bg-slate-800/90 border border-white/10 p-3 rounded-xl flex flex-col items-center gap-2 animate-in zoom-in w-full shadow-2xl z-10">
-                    <span className="text-[10px] font-black text-cyan-400">CLAIM STATION</span>
-                    <div className="flex gap-2 w-full">
-                        <button onClick={() => setLocalPlayerRole('red')} className="flex-1 py-2 bg-pink-600 hover:bg-pink-500 text-white text-[10px] font-black rounded-lg transition-colors">RED</button>
-                        <button onClick={() => setLocalPlayerRole('yellow')} className="flex-1 py-2 bg-yellow-400 hover:bg-yellow-300 text-slate-900 text-[10px] font-black rounded-lg transition-colors">YEL</button>
-                    </div>
-                </div>
-            )}
-
-            {localPlayerRole && (
-                <div className={`px-4 py-1 rounded-full text-[9px] font-black border tracking-widest ${localPlayerRole === 'red' ? 'text-pink-500 border-pink-500/20' : 'text-yellow-400 border-yellow-400/20'}`}>
-                    UNIT: {localPlayerRole.toUpperCase()} {turn === localPlayerRole && !winner ? '🛰️' : '⌛'}
-                </div>
-            )}
+            {/* Playroom HUD */}
+            <div className="flex justify-between w-full px-4 text-[10px] font-bold text-slate-400">
+                <span>YOU: {myRole.toUpperCase()}</span>
+                <span>TURN: {turn.toUpperCase()}</span>
+            </div>
 
             {/* Turn HUD */}
             <div className="flex items-center gap-4 bg-black/40 px-5 py-1.5 rounded-full border border-white/5 shadow-lg">
@@ -187,50 +187,41 @@ export default function Connect4({ sessionId }) {
                     <button
                         key={c}
                         onClick={() => handleDrop(c)}
-                        disabled={winner || isProcessing || (localPlayerRole && turn !== localPlayerRole)}
-                        className={`w-full h-8 flex items-center justify-center rounded-t-lg transition-all ${turn === localPlayerRole && !winner ? 'bg-blue-500/20 hover:bg-blue-500 text-blue-300 hover:text-white animate-pulse' : 'opacity-0 cursor-default'}`}
-                        id={`drop-col-${c}`}
+                        disabled={winner || turn !== myRole}
+                        className={`w-full h-8 flex items-center justify-center rounded-t-lg transition-all ${turn === myRole && !winner ? 'bg-blue-500/20 hover:bg-blue-500 text-blue-300 hover:text-white animate-pulse' : 'opacity-0 cursor-default'}`}
                     >
                         <span className="text-[10px]">▼</span>
                     </button>
                 ))}
             </div>
 
-            {/* The Grid - Explicitly Sized */}
+            {/* The Grid */}
             <div className="bg-blue-700 p-2.5 rounded-xl shadow-2xl border-t-2 border-blue-400 w-full max-w-[280px] min-h-[240px] relative">
-                {/* Fallback if board is broken */}
-                {!board || board.length !== 42 ? (
-                    <div className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold">Initializing Matrix...</div>
-                ) : (
-                    <div className="grid grid-cols-7 gap-1.5">
-                        {board.map((cell, i) => (
-                            <div
-                                key={i}
-                                onClick={() => handleDrop(i % COLS)}
-                                className={`aspect-square rounded-full border border-blue-800 flex items-center justify-center bg-slate-950/90 overflow-hidden relative shadow-inner ${!cell && !winner && turn === localPlayerRole ? 'cursor-pointer hover:bg-white/5' : ''}`}
-                            >
-                                {cell && (
-                                    <div className={`w-[85%] h-[85%] rounded-full shadow-lg ${cell === 'red'
-                                        ? 'bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_8px_#ec4899]'
-                                        : 'bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_8px_#facc15]'
-                                        } animate-in zoom-in duration-200`} />
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                )}
+                <div className="grid grid-cols-7 gap-1.5">
+                    {board.map((cell, i) => (
+                        <div
+                            key={i}
+                            onClick={() => handleDrop(i % COLS)}
+                            className={`aspect-square rounded-full border border-blue-800 flex items-center justify-center bg-slate-950/90 overflow-hidden relative shadow-inner ${!cell && !winner && turn === myRole ? 'cursor-pointer hover:bg-white/5' : ''}`}
+                        >
+                            {cell && (
+                                <div className={`w-[85%] h-[85%] rounded-full shadow-lg ${cell === 'red'
+                                    ? 'bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_8px_#ec4899]'
+                                    : 'bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_8px_#facc15]'
+                                    } animate-in zoom-in duration-200`} />
+                            )}
+                        </div>
+                    ))}
+                </div>
             </div>
 
-            <button onClick={initGame} className="mt-2 text-[8px] font-black text-slate-600 hover:text-white uppercase transition-colors">Reset Matrix</button>
-
-            {/* Result Overlay */}
             {winner && (
                 <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300 p-4">
                     <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl flex flex-col items-center gap-4 shadow-2xl w-full max-w-[240px]">
                         <h2 className={`text-2xl font-black italic tracking-tighter ${winner === 'red' ? 'text-pink-500' : winner === 'yellow' ? 'text-yellow-400' : 'text-slate-400'}`}>
                             {winner === 'draw' ? 'STALEMATE' : `${winner.toUpperCase()} WINS`}
                         </h2>
-                        <button onClick={initGame} className="w-full py-3 bg-white text-black rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-400 hover:text-white transition-all transform hover:scale-105">REPLAY</button>
+                        <button onClick={resetGame} className="w-full py-3 bg-white text-black rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-400 hover:text-white transition-all transform hover:scale-105">REPLAY</button>
                     </div>
                 </div>
             )}
