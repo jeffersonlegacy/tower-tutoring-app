@@ -114,7 +114,7 @@ export default function Session() {
                 <div className={`flex-none w-full md:w-[300px] lg:w-[350px] border-b md:border-b-0 md:border-r border-slate-700 bg-black flex flex-col relative z-20 shrink-0 h-full ${mainTab === 'sidebar' ? 'flex' : 'hidden md:flex'}`}>
 
                     {/* Top: Video (Adaptive Height) */}
-                    <div className="h-[180px] md:h-[250px] shrink-0 border-b border-slate-700 bg-slate-900/50">
+                    <div className="h-[220px] md:h-[320px] shrink-0 border-b border-slate-700 bg-slate-900/50">
                         <VideoChat sessionId={sessionId} />
                     </div>
 

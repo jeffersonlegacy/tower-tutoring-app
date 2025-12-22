@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../services/firebase';
-import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, runTransaction } from 'firebase/firestore';
 import confetti from 'canvas-confetti'; // Delight Feature
 
 const ROWS = 6;
@@ -113,56 +113,59 @@ export default function Connect4({ sessionId }) {
     };
 
     const handleDrop = async (colIndex) => {
-        // Validation: Game over or currently processing a network request
+        // Validation: Game over or currently processing
         if (winner || isProcessing) return;
 
         setIsProcessing(true);
         const gameDocRef = doc(db, 'whiteboards', sessionId, 'games', GAME_ID);
 
         try {
-            // 1. Calculate the move locally first
-            let targetIdx = -1;
-            const currentBoard = [...board];
+            await runTransaction(db, async (transaction) => {
+                const gameDoc = await transaction.get(gameDocRef);
+                if (!gameDoc.exists()) throw "Game does not exist!";
 
-            // Find lowest empty slot in column
-            for (let r = ROWS - 1; r >= 0; r--) {
-                const idx = r * COLS + colIndex;
-                if (!currentBoard[idx]) {
-                    targetIdx = idx;
-                    break;
+                const data = gameDoc.data();
+                const currentBoard = data.board || Array(ROWS * COLS).fill(null);
+                const currentTurn = data.turn || 'red';
+                const currentWinner = data.winner;
+
+                if (currentWinner) return; // Game already over
+
+                // 1. Calculate the move based on SERVER state (not local)
+                let targetIdx = -1;
+                for (let r = ROWS - 1; r >= 0; r--) {
+                    const idx = r * COLS + colIndex;
+                    if (!currentBoard[idx]) {
+                        targetIdx = idx;
+                        break;
+                    }
                 }
-            }
 
-            if (targetIdx === -1) {
-                setIsProcessing(false);
-                return; // Column full
-            }
+                if (targetIdx === -1) return; // Column full
 
-            // 2. Apply move
-            currentBoard[targetIdx] = turn;
-            const nextTurn = turn === 'red' ? 'yellow' : 'red';
+                // 2. Apply move
+                currentBoard[targetIdx] = currentTurn;
+                const nextTurn = currentTurn === 'red' ? 'yellow' : 'red';
 
-            // 3. Check Win
-            let newWinner = null;
-            if (checkWin(currentBoard, targetIdx, turn)) {
-                newWinner = turn;
-            } else if (currentBoard.filter(Boolean).length === 42) {
-                newWinner = 'draw';
-            }
+                // 3. Check Win
+                let newWinner = null;
+                if (checkWin(currentBoard, targetIdx, currentTurn)) {
+                    newWinner = currentTurn;
+                } else if (currentBoard.filter(Boolean).length === 42) {
+                    newWinner = 'draw';
+                }
 
-            // 4. Atomic Update to Firestore
-            // This is "Open Play" - we don't check whose turn it is strictly via auth.
-            // Whoever clicks first gets the move.
-            // FIXED: Use setDoc with merge:true to create doc if missing (prevents crash on new sessions)
-            await setDoc(gameDocRef, {
-                board: currentBoard,
-                turn: nextTurn,
-                winner: newWinner,
-                lastMoveTime: Date.now()
-            }, { merge: true });
+                // 4. Update
+                transaction.update(gameDocRef, {
+                    board: currentBoard,
+                    turn: nextTurn,
+                    winner: newWinner,
+                    lastMoveTime: Date.now()
+                });
+            });
 
         } catch (e) {
-            console.error("Move failed:", e);
+            console.error("Move transaction failed:", e);
         } finally {
             setIsProcessing(false);
         }
