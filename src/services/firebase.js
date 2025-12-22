@@ -18,7 +18,8 @@ let app, db, storage, auth, analytics;
 
 try {
   app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
+  // Critical: Access the named Firestore-Native database
+  db = getFirestore(app, "towertutoring");
   storage = getStorage(app);
   auth = getAuth(app);
   analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
