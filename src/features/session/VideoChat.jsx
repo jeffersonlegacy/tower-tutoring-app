@@ -12,7 +12,9 @@ export default function VideoChat({ sessionId }) {
 
     const mirotalkBase = "https://p2p.mirotalk.com/join";
     const roomName = `${sessionId}_VIDEO_SECURE`;
-    const userName = `User_${Math.floor(Math.random() * 1000)}`;
+
+    // Fix: Persist userName across re-renders to prevent iframe reload on tab switch
+    const [userName] = React.useState(() => `User_${Math.floor(Math.random() * 1000)}`);
 
     const videoUrl = `${mirotalkBase}/${roomName}?name=${userName}&video=true&audio=true&screen=0&notify=0`;
 
