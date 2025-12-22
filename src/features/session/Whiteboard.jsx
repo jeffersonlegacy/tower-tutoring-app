@@ -155,31 +155,24 @@ export default function Whiteboard({ sessionId }) {
     }
   };
 
+  // Safety Clear State
+  const [confirmClear, setConfirmClear] = useState(false);
+
   const clearBoard = async () => {
-    if (!window.confirm("Clear the entire board?")) return;
+    if (!confirmClear) {
+      setConfirmClear(true);
+      setTimeout(() => setConfirmClear(false), 2000); // Reset after 2s
+      return;
+    }
+
+    // Process Clear
+    setConfirmClear(false);
 
     // Clear local immediate
     strokesRef.current = {};
     drawAllStrokes();
 
     // Clear Firestore (Batch delete for efficiency)
-    // Note: For very large boards, might need recursive delete, but batch limit is 500
-    // We'll just delete the collection via individual deletes for simplicity or a cloud function (but we only have client SDK here)
-    // Let's iterate the refs we know about.
-    const batch = writeBatch(db);
-    const strokes = await collection(db, 'whiteboards', sessionId, 'drawings');
-    // Ideally we query, but leveraging our local subscribed cache is faster for "What needs deleting"
-    // Actually, better to fetch IDs to be sure.
-    // For MVP: JUST DELETE THE KNOWN STROKES
-    // (A more robust way deletes the whole subcollection)
-
-    // Wait, 'delete collection' from client is hard. 
-    // We will just create a 'clear' event or delete known docs.
-    // New approach: "Clear" just pushes a special 'clear' action? 
-    // Or simpler: Just iterate local/known keys and delete them.
-
-    // Let's just create a new 'version' of the whiteboard effectively clearing it?
-    // No, let's delete docs.
     const knownIds = Object.keys(strokesRef.current);
     knownIds.forEach(id => {
       deleteDoc(doc(db, 'whiteboards', sessionId, 'drawings', id)).catch(e => console.error(e));
@@ -235,9 +228,9 @@ export default function Whiteboard({ sessionId }) {
 
         <button
           onClick={clearBoard}
-          className="text-xs font-bold text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-colors uppercase tracking-wider"
+          className={`text-xs font-bold px-3 py-1.5 rounded transition-all uppercase tracking-wider ${confirmClear ? 'bg-red-500 text-white animate-pulse shadow-lg scale-105' : 'text-red-500 hover:bg-red-50'}`}
         >
-          Clear
+          {confirmClear ? 'CONFIRM?' : 'CLEAR'}
         </button>
       </div>
 

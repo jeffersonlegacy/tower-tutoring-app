@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../services/firebase';
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import confetti from 'canvas-confetti'; // Delight Feature
 
 const ROWS = 6;
 const COLS = 7;
@@ -35,14 +36,28 @@ export default function Connect4({ sessionId }) {
                 if (data.board && Array.isArray(data.board)) {
                     setBoard(data.board);
                     setTurn(data.turn);
-                    setWinner(data.winner);
+
+                    // Trigger sound/confetti only on new winner
+                    if (data.winner && data.winner !== winner) {
+                        setWinner(data.winner);
+                        winSound.current.play().catch(() => { });
+
+                        if (data.winner !== 'draw') {
+                            const color = data.winner === 'red' ? '#ec4899' : '#facc15';
+                            confetti({
+                                particleCount: 150,
+                                spread: 70,
+                                origin: { y: 0.6 },
+                                colors: [color, '#ffffff']
+                            });
+                        }
+                    } else {
+                        setWinner(data.winner);
+                    }
 
                     // Play sound if a move just happened
                     if (data.lastMoveTime && Date.now() - data.lastMoveTime < 1000) {
                         dropSound.current.play().catch(() => { });
-                    }
-                    if (data.winner && !winner) { // Play win sound only once
-                        winSound.current.play().catch(() => { });
                     }
                 }
             } else {

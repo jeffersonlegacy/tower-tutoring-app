@@ -23,6 +23,7 @@
     "@vercel/edge-config": "^1.4.3",
     "@vitejs/plugin-react": "^5.1.2",
     "ai": "^5.0.115",
+    "canvas-confetti": "^1.9.4",
     "dotenv": "^17.2.3",
     "firebase": "^12.3.0",
     "peerjs": "^1.5.5",
