@@ -17,6 +17,7 @@ export default function Connect4({ sessionId }) {
     const [turn, setTurn] = useState('red');
     const [winner, setWinner] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const prevWinnerRef = useRef(null);
 
     // SFX
     const dropSound = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2012/2012-preview.mp3'));
@@ -37,21 +38,26 @@ export default function Connect4({ sessionId }) {
                     setBoard(data.board);
                     setTurn(data.turn);
 
-                    // Trigger sound/confetti only on new winner
-                    if (data.winner && data.winner !== winner) {
+                    // Use Ref to Compare vs Last Processed Winner (avoids closure staleness)
+                    // We only trigger effects if the winner changes FROM what we last saw.
+                    if (data.winner !== prevWinnerRef.current) {
+                        prevWinnerRef.current = data.winner;
                         setWinner(data.winner);
-                        winSound.current.play().catch(() => { });
 
-                        if (data.winner !== 'draw') {
-                            const color = data.winner === 'red' ? '#ec4899' : '#facc15';
-                            confetti({
-                                particleCount: 150,
-                                spread: 70,
-                                origin: { y: 0.6 },
-                                colors: [color, '#ffffff']
-                            });
+                        if (data.winner) {
+                            winSound.current.play().catch(() => { });
+                            if (data.winner !== 'draw') {
+                                const color = data.winner === 'red' ? '#ec4899' : '#facc15';
+                                confetti({
+                                    particleCount: 150,
+                                    spread: 70,
+                                    origin: { y: 0.6 },
+                                    colors: [color, '#ffffff']
+                                });
+                            }
                         }
                     } else {
+                        // Ensure state stays synced even if ref didn't change (rare case of mismatched state)
                         setWinner(data.winner);
                     }
 
