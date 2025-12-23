@@ -138,6 +138,12 @@ export default function Session() {
                             Files
                         </button>
                         <button
+                            onClick={() => setSidebarMode('ai')}
+                            className={`flex-1 p-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'ai' ? 'text-white bg-slate-800 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}
+                        >
+                            Mind Hive
+                        </button>
+                        <button
                             onClick={() => setSidebarMode('arcade')}
                             className={`flex-1 p-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'arcade' ? 'text-white bg-slate-800 border-b-2 border-pink-500' : 'text-slate-500 hover:text-slate-300'}`}
                         >
@@ -149,6 +155,9 @@ export default function Session() {
                     <div className="flex-1 overflow-hidden relative bg-slate-900/20">
                         {sidebarMode === 'homework' && (
                             <HomeworkTray sessionId={sessionId} />
+                        )}
+                        {sidebarMode === 'ai' && (
+                            <GeminiChat sessionId={sessionId} />
                         )}
                         {sidebarMode === 'arcade' && (
                             <BrainBreak sessionId={sessionId} onClose={() => setSidebarMode('homework')} />

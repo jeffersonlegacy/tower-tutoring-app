@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Connect4 from './Connect4';
+import MathSprint from './MathSprint';
 
 export default function BrainBreak({ sessionId, onClose }) {
     const [game, setGame] = useState('menu'); // 'menu' | 'connect4' | 'airhockey'
@@ -33,6 +34,7 @@ export default function BrainBreak({ sessionId, onClose }) {
                 <div className="relative z-10 p-2 min-h-full">
                     {game === 'menu' && (
                         <div className="grid grid-cols-1 gap-3 p-2">
+                            {/* Connect 4 */}
                             <button
                                 onClick={() => setGame('connect4')}
                                 className="group relative h-20 rounded-xl overflow-hidden border-2 border-white/20 hover:border-pink-400 transition-all bg-slate-800 shadow-lg hover:shadow-pink-500/20"
@@ -47,6 +49,22 @@ export default function BrainBreak({ sessionId, onClose }) {
                                 </div>
                             </button>
 
+                            {/* Math Sprint */}
+                            <button
+                                onClick={() => setGame('mathsprint')}
+                                className="group relative h-20 rounded-xl overflow-hidden border-2 border-white/20 hover:border-cyan-400 transition-all bg-slate-800 shadow-lg hover:shadow-cyan-500/20"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4">
+                                    <div className="text-3xl filter drop-shadow-[0_0_8px_rgba(34,211,238,0.8)] group-hover:scale-110 transition-transform duration-300">⚡</div>
+                                    <div className="flex flex-col items-start">
+                                        <div className="font-black text-white text-base tracking-tighter drop-shadow-md group-hover:text-cyan-300 transition-colors uppercase">MATH SPRINT</div>
+                                        <div className="text-[10px] font-medium text-slate-300 bg-black/40 px-2 py-0.5 rounded-full border border-white/10 uppercase tracking-widest">Rapid Fire</div>
+                                    </div>
+                                </div>
+                            </button>
+
+                            {/* Air Hockey (Locked) */}
                             <button
                                 className="group relative h-20 rounded-xl overflow-hidden border-2 border-white/5 transition-all bg-slate-900/50 opacity-40 cursor-not-allowed w-full"
                             >
@@ -74,8 +92,13 @@ export default function BrainBreak({ sessionId, onClose }) {
                             </div>
                         </div>
                     )}
+
+                    {game === 'mathsprint' && (
+                        <div className="animate-slide-up h-full">
+                            <MathSprint sessionId={sessionId} onBack={() => setGame('menu')} />
+                        </div>
+                    )}
                 </div>
             </div>
-        </div>
-    );
+            );
 }
