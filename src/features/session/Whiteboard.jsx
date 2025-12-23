@@ -13,13 +13,20 @@ export default function Whiteboard({ sessionId }) {
       {/* 
         CRACKER0DKS WHITEBOARD INTEGRATION
         - Source: https://github.com/cracker0dks/whiteboard
+        
+        MOBILE SCALING HACK:
+        The native UI of this whiteboard is not mobile-responsive (buttons stack 4 rows deep).
+        We force a "Tablet/Desktop" viewport on mobile by making the container 200% wide
+        and scaling it down by 0.5. This forces the toolbar into a single row.
       */}
-      <iframe
-        src={whiteboardUrl}
-        className="flex-1 w-full h-full border-none bg-white"
-        title="Collaborative Whiteboard"
-        allow="camera; microphone; clipboard-read; clipboard-write; display-capture"
-      />
+      <div className="w-[200%] h-[200%] md:w-full md:h-full origin-top-left transform scale-50 md:scale-100 md:transform-none bg-white">
+        <iframe
+          src={whiteboardUrl}
+          className="w-full h-full border-none"
+          title="Collaborative Whiteboard"
+          allow="camera; microphone; clipboard-read; clipboard-write; display-capture"
+        />
+      </div>
 
       {/* Contextual Banner for Pro Engine */}
       {/* Contextual Banner for Pro Engine (Hidden on mobile to save vertical space) */}
