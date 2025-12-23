@@ -22,7 +22,8 @@ export default function Whiteboard({ sessionId }) {
       />
 
       {/* Contextual Banner for Pro Engine */}
-      <div className="absolute bottom-0 left-0 right-0 bg-slate-950/80 backdrop-blur-sm border-t border-white/5 px-3 py-1.5 flex justify-between items-center z-20">
+      {/* Contextual Banner for Pro Engine (Hidden on mobile to save vertical space) */}
+      <div className="hidden md:flex absolute bottom-0 left-0 right-0 bg-slate-950/80 backdrop-blur-sm border-t border-white/5 px-3 py-1.5 justify-between items-center z-20">
         <div className="flex items-center gap-2">
           <span className="text-[9px] font-black text-blue-400 tracking-tighter">ENGINE: CRACKER0DKS v2.0</span>
           <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_5px_#3b82f6] animate-pulse"></div>

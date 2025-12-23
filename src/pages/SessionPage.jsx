@@ -76,7 +76,8 @@ export default function Session() {
             onDrop={handleDrop}
         >
             {/* Mobile Tab Switcher (Visible only on small screens) */}
-            <div className="md:hidden flex items-center bg-slate-800 border-b border-slate-700 shrink-0 z-30">
+            {/* Hiding this when on 'board' to give full screen real estate, accessible via a small floating toggle instead */}
+            <div className={`md:hidden flex items-center bg-slate-800 border-b border-slate-700 shrink-0 z-30 ${mainTab === 'board' ? 'hidden' : 'flex'}`}>
                 <button
                     onClick={() => setMainTab('board')}
                     className={`flex-1 p-3 text-sm font-bold uppercase tracking-widest transition-all ${mainTab === 'board' ? 'text-blue-400 bg-slate-900 border-b-2 border-blue-500' : 'text-slate-500'}`}
@@ -90,6 +91,16 @@ export default function Session() {
                     Tools
                 </button>
             </div>
+
+            {/* Floating Mobile Toggle for full-screen board */}
+            {mainTab === 'board' && (
+                <button
+                    onClick={() => setMainTab('sidebar')}
+                    className="md:hidden absolute top-4 right-4 z-40 bg-slate-900/80 text-white p-2 rounded-full backdrop-blur-md border border-white/10 shadow-lg"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                </button>
+            )}
 
             {/* Drag Overlay */}
             {isDragging && (

@@ -1,6 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // 1. OPEN ACCESS for Connect 4 Games (Seamless Play)
+    match /whiteboards/{sessionId}/games/{gameId} {
+      allow read, write: if true;
+    }
+
+    // 2. AUTH REQUIRED for everything else
     match /{document=**} {
       allow read, write: if request.auth != null;
     }
