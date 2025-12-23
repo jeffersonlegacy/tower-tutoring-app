@@ -100,5 +100,6 @@ export default function BrainBreak({ sessionId, onClose }) {
                     )}
                 </div>
             </div>
-            );
+        </div>
+    );
 }
