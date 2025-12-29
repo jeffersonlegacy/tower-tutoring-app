@@ -220,69 +220,106 @@ export default function Yahtzee({ sessionId, onBack }) {
     // --- LOBBY ---
     if (gameState?.status === 'LOBBY') {
         return (
-            <div className="flex flex-col h-full bg-[#fefce8] items-center justify-center p-6 text-slate-800 font-sans">
-                <div className="w-full max-w-md bg-white shadow-xl rounded-sm overflow-hidden border border-slate-300">
-                    <div className="bg-[#dc2626] p-6 text-center">
-                        <h1 className="text-4xl font-black text-white tracking-tighter italic drop-shadow-md">YAHTZEE</h1>
-                        <p className="text-red-100 font-bold tracking-widest text-xs mt-1 uppercase">Classic Dice Game</p>
+            <div className="flex flex-col h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-950 via-slate-950 to-black p-6 select-none overflow-y-auto font-sans">
+
+                {/* Background Grid */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(234,179,8,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(234,179,8,0.1)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)] opacity-30 pointer-events-none"></div>
+
+                <div className="w-full max-w-md mx-auto relative z-10 animate-in zoom-in duration-500">
+                    <div className="flex flex-col items-center mb-10 text-center">
+                        <span className="text-8xl mb-4 animate-bounce drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]">🎲</span>
+                        <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-orange-500 tracking-tighter filter drop-shadow-[0_0_20px_rgba(234,179,8,0.5)] italic transform -skew-x-6">
+                            YAHTZEE
+                        </h1>
+                        <p className="text-yellow-500 font-bold tracking-[0.5em] text-xs mt-2 uppercase animate-pulse">High Stakes Dice</p>
                     </div>
 
-                    <div className="p-6 space-y-6">
+                    <div className="space-y-6">
                         {/* Mode Select */}
                         {isHost && (
-                            <div className="flex bg-slate-100 p-1 rounded-lg">
+                            <div className="bg-slate-900/80 backdrop-blur-md p-2 rounded-xl border border-yellow-500/30 flex gap-2">
                                 {['BLITZ', 'CLASSIC'].map(m => (
                                     <button
                                         key={m}
                                         onClick={() => updateState({ mode: m })}
-                                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${gameState.mode === m ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                        className={`flex-1 py-3 text-xs font-black rounded-lg transition-all uppercase tracking-wider ${gameState.mode === m
+                                            ? 'bg-gradient-to-br from-yellow-500 to-orange-600 text-black shadow-lg shadow-orange-500/20'
+                                            : 'text-slate-500 hover:text-white hover:bg-white/5'
                                             }`}
                                     >
-                                        {m} ({m === 'BLITZ' ? '3 Rnds' : '13 Rnds'})
+                                        {m} <span className="block text-[8px] opacity-70 font-normal">{m === 'BLITZ' ? '3 Rounds' : '13 Rounds'}</span>
                                     </button>
                                 ))}
                             </div>
                         )}
 
-                        {/* Players */}
-                        <div className="space-y-2">
-                            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Players ({playersList.length}/10)</div>
-                            {playersList.map(p => (
-                                <div key={p.id} className="flex items-center gap-3 p-2 border-b border-slate-100">
-                                    <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center font-bold text-slate-600">{p.name[0]}</div>
-                                    <span className="font-bold text-slate-700">{p.name} {p.id === playerId ? '(You)' : ''}</span>
-                                    {p.isBot && <span className="text-[10px] bg-slate-200 px-2 rounded-full text-slate-500">BOT</span>}
+                        {/* Players List */}
+                        <div className="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-white/10 overflow-hidden">
+                            <div className="bg-black/40 p-3 border-b border-white/5 flex justify-between items-center">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Lobby ({playersList.length}/10)</span>
+                                <div className="flex gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                    <span className="text-[10px] font-bold text-green-500 uppercase">Live</span>
                                 </div>
-                            ))}
-                            {playersList.length === 0 && <div className="text-center italic text-slate-400 py-4">Waiting for players...</div>}
+                            </div>
+                            <div className="divide-y divide-white/5 max-h-48 overflow-y-auto">
+                                {playersList.map(p => (
+                                    <div key={p.id} className="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors">
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shadow-inner
+                                            ${p.id === playerId ? 'bg-yellow-500 text-black' : 'bg-slate-800 text-slate-400'}`}>
+                                            {p.name[0]}
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className={`font-bold text-sm ${p.id === playerId ? 'text-white' : 'text-slate-300'}`}>
+                                                {p.name} {p.id === playerId ? '(You)' : ''}
+                                            </span>
+                                            <span className="text-[10px] text-slate-600 uppercase font-mono">{p.isBot ? 'CPU OPPONENT' : 'HUMAN PLAYER'}</span>
+                                        </div>
+                                        {p.isHost && <span className="ml-auto text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/30">HOST</span>}
+                                    </div>
+                                ))}
+                                {playersList.length === 0 && <div className="text-center italic text-slate-600 py-8 text-sm">Waiting for players to join...</div>}
+                            </div>
                         </div>
 
                         {/* Actions */}
-                        {!myPlayer ? (
-                            <button onClick={handleJoin} className="w-full py-4 bg-green-600 text-white font-black text-xl rounded shadow-lg hover:bg-green-500 hover:-translate-y-1 transition-all uppercase tracking-widest">
-                                Join Game
-                            </button>
-                        ) : (
-                            isHost ? (
-                                <div className="space-y-3">
-                                    <button onClick={handleStart} className="w-full py-4 bg-[#dc2626] text-white font-black text-xl rounded shadow-lg hover:bg-red-500 hover:-translate-y-1 transition-all uppercase tracking-widest flex items-center justify-center gap-2">
-                                        <span>Start Game</span>
-                                        <span className="text-2xl">🎲</span>
-                                    </button>
-                                    <button onClick={() => {
-                                        const bots = ['Robo', 'Dicer', 'Chancey'];
-                                        const name = bots[Math.floor(Math.random() * bots.length)] + ' ' + Math.floor(Math.random() * 99);
-                                        updateState({ players: [...playersList, { id: `BOT_${Date.now()}`, name, isBot: true }] });
-                                    }} className="w-full py-2 text-slate-400 text-xs font-bold uppercase hover:text-red-500 transition-colors">
-                                        + Add Bot
-                                    </button>
-                                </div>
+                        <div className="space-y-4 pt-4">
+                            {!myPlayer ? (
+                                <button onClick={handleJoin} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xl rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all uppercase tracking-widest transform hover:scale-105">
+                                    Join Lobby
+                                </button>
                             ) : (
-                                <div className="text-center text-slate-500 font-bold animate-pulse">Waiting for Host...</div>
-                            )
-                        )}
+                                isHost ? (
+                                    <div className="space-y-3">
+                                        <button onClick={handleStart} className="w-full group relative overflow-hidden py-5 bg-gradient-to-r from-yellow-500 to-orange-600 text-black font-black text-xl rounded-xl shadow-[0_0_20px_rgba(234,179,8,0.4)] transition-all uppercase tracking-widest hover:scale-105 active:scale-95">
+                                            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 skew-y-12"></div>
+                                            <div className="relative flex items-center justify-center gap-3">
+                                                <span>Start Match</span>
+                                                <span className="text-2xl group-hover:rotate-180 transition-transform duration-500">🎲</span>
+                                            </div>
+                                        </button>
+                                        <button onClick={() => {
+                                            const bots = ['Robo', 'Dicer', 'Chancey', 'SnakeEyes'];
+                                            const name = bots[Math.floor(Math.random() * bots.length)] + ' ' + Math.floor(Math.random() * 99);
+                                            updateState({ players: [...playersList, { id: `BOT_${Date.now()}`, name, isBot: true }] });
+                                        }} className="w-full py-3 border border-white/10 hover:border-yellow-500/50 rounded-xl text-slate-400 text-xs font-bold uppercase hover:text-yellow-400 hover:bg-white/5 transition-all flex items-center justify-center gap-2">
+                                            <span>+ Add AI Opponent</span>
+                                            <span>🤖</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="w-full py-4 bg-slate-900 border border-slate-800 rounded-xl text-center">
+                                        <div className="flex items-center justify-center gap-3 mb-1">
+                                            <span className="w-2 h-2 bg-yellow-500 rounded-full animate-ping"></span>
+                                            <span className="text-yellow-500 font-bold uppercase tracking-widest text-sm">Awaiting Host</span>
+                                        </div>
+                                        <span className="text-slate-600 text-xs">The match will begin shortly</span>
+                                    </div>
+                                )
+                            )}
+                        </div>
                     </div>
-                    <button onClick={onBack} className="w-full py-3 text-slate-400 font-bold text-xs uppercase hover:bg-slate-50">Exit</button>
+                    <button onClick={onBack} className="w-full mt-8 py-3 text-slate-500 hover:text-white font-bold text-xs uppercase tracking-[0.2em] transition-colors rounded-xl hover:bg-white/5">Exit Arcade</button>
                 </div>
             </div>
         );

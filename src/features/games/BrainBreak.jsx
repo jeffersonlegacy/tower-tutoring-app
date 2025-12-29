@@ -44,6 +44,21 @@ export default function BrainBreak({ sessionId, onClose }) {
                 <div className="relative z-10 p-2 min-h-full">
                     <div className="grid grid-cols-1 gap-3 p-2">
 
+                        {/* Header */}
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 italic tracking-tighter filter drop-shadow-[0_0_10px_rgba(6,182,212,0.5)]">
+                                    NEON ARCADE
+                                </h1>
+                                <p className="text-cyan-500 font-mono text-xs tracking-[0.3em] font-bold uppercase mt-1 animate-pulse">
+                                    Ready Player One
+                                </p>
+                            </div>
+                            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+
                         {/* Leaderboard Button */}
                         <button
                             onClick={() => setGame('leaderboard')}
@@ -63,8 +78,6 @@ export default function BrainBreak({ sessionId, onClose }) {
                             onClick={() => setGame('mathinvaders')}
                             className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-purple-500 transition-all bg-slate-900 shadow-xl"
                         >
-                            {/* <div className="absolute inset-0 bg-[url('https://media.giphy.com/media/26tn33aiTi1jbp6xm/giphy.gif')] bg-cover opacity-20 group-hover:opacity-40 transition-opacity mix-blend-screen"></div> */}
-                            {/* Using gradient instead of external GIF for reliability */}
                             <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
                             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-transparent"></div>
 
@@ -79,9 +92,9 @@ export default function BrainBreak({ sessionId, onClose }) {
                             </div>
                         </button>
 
-                        {/* GAME: Battleship */}
+                        {/* GAME: Math Sprint */}
                         <button
-                            onClick={() => setGame('battleship')}
+                            onClick={() => setGame('mathsprint')}
                             className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-blue-500 transition-all bg-slate-900 shadow-xl"
                         >
                             <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
@@ -89,18 +102,18 @@ export default function BrainBreak({ sessionId, onClose }) {
 
                             <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
                                 <div className="p-3 bg-black/50 rounded-lg border border-blue-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(59,130,246,0.5)]">
-                                    <span className="text-3xl">🚢</span>
+                                    <span className="text-3xl">⏱</span>
                                 </div>
                                 <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 text-xl uppercase tracking-tighter filter drop-shadow">BATTLESHIP</span>
-                                    <span className="text-[10px] font-bold text-white/80 bg-blue-600/50 px-2 py-0.5 rounded-full border border-blue-400/30">NAVAL STRATEGY</span>
+                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 text-xl uppercase tracking-tighter filter drop-shadow">MATH SPRINT</span>
+                                    <span className="text-[10px] font-bold text-white/80 bg-blue-600/50 px-2 py-0.5 rounded-full border border-blue-400/30">SPEED DRILLS</span>
                                 </div>
                             </div>
                         </button>
 
-                        {/* GAME: Swipe Fight */}
+                        {/* GAME: Battleship */}
                         <button
-                            onClick={() => setGame('swipefight')}
+                            onClick={() => setGame('battleship')}
                             className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-cyan-500 transition-all bg-slate-900 shadow-xl"
                         >
                             <div className="absolute inset-0 bg-gradient-to-br from-cyan-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
@@ -108,11 +121,30 @@ export default function BrainBreak({ sessionId, onClose }) {
 
                             <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
                                 <div className="p-3 bg-black/50 rounded-lg border border-cyan-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(34,211,238,0.5)]">
+                                    <span className="text-3xl">🚢</span>
+                                </div>
+                                <div className="flex flex-col items-start">
+                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 text-xl uppercase tracking-tighter filter drop-shadow">BATTLESHIP</span>
+                                    <span className="text-[10px] font-bold text-white/80 bg-cyan-600/50 px-2 py-0.5 rounded-full border border-cyan-400/30">NAVAL STRATEGY</span>
+                                </div>
+                            </div>
+                        </button>
+
+                        {/* GAME: Swipe Fight */}
+                        <button
+                            onClick={() => setGame('swipefight')}
+                            className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-teal-500 transition-all bg-slate-900 shadow-xl"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-br from-teal-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-teal-600/20 to-transparent"></div>
+
+                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
+                                <div className="p-3 bg-black/50 rounded-lg border border-teal-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(45,212,191,0.5)]">
                                     <span className="text-3xl">⚡</span>
                                 </div>
                                 <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 text-xl uppercase tracking-tighter filter drop-shadow">SWIPE FIGHT</span>
-                                    <span className="text-[10px] font-bold text-white/80 bg-cyan-600/50 px-2 py-0.5 rounded-full border border-cyan-400/30">SPEED MATH</span>
+                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400 text-xl uppercase tracking-tighter filter drop-shadow">SWIPE FIGHT</span>
+                                    <span className="text-[10px] font-bold text-white/80 bg-teal-600/50 px-2 py-0.5 rounded-full border border-teal-400/30">SPEED MATH</span>
                                 </div>
                             </div>
                         </button>
@@ -122,7 +154,7 @@ export default function BrainBreak({ sessionId, onClose }) {
                             onClick={() => setGame('yahtzee')}
                             className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-yellow-500 transition-all bg-slate-900 shadow-xl"
                         >
-                            <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
+                            <div className="absolute inset-0 bg-gradient-to-br from-yellow-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
                             <div className="absolute inset-0 bg-gradient-to-r from-yellow-600/20 to-transparent"></div>
 
                             <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
@@ -130,8 +162,8 @@ export default function BrainBreak({ sessionId, onClose }) {
                                     <span className="text-3xl">🎲</span>
                                 </div>
                                 <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-yellow-400 text-xl uppercase tracking-tighter filter drop-shadow">YAHTZEE</span>
-                                    <span className="text-[10px] font-bold text-white/80 bg-purple-600/50 px-2 py-0.5 rounded-full border border-purple-400/30">CLASSIC DICE</span>
+                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400 text-xl uppercase tracking-tighter filter drop-shadow">YAHTZEE</span>
+                                    <span className="text-[10px] font-bold text-white/80 bg-yellow-600/50 px-2 py-0.5 rounded-full border border-yellow-400/30">CLASSIC DICE</span>
                                 </div>
                             </div>
                         </button>
@@ -155,7 +187,7 @@ export default function BrainBreak({ sessionId, onClose }) {
                             </div>
                         </button>
 
-                        {/* GAME: Connect 4 */}
+                        {/* GAME: Neon Connect (Was Connect 4) */}
                         <button
                             onClick={() => setGame('connect4')}
                             className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-pink-500 transition-all bg-slate-900 shadow-xl"
@@ -173,7 +205,6 @@ export default function BrainBreak({ sessionId, onClose }) {
                                 </div>
                             </div>
                         </button>
-
                     </div>
                 </div>
             </div>
@@ -183,13 +214,14 @@ export default function BrainBreak({ sessionId, onClose }) {
                 <GameOverlay
                     title={
                         game === 'leaderboard' ? 'Session Stats' :
-                            game === 'connect4' ? 'Neon Connect 4' :
-                                game === 'swipefight' ? 'Swipe Fight' :
-                                    game === 'airhockey' ? 'Air Hockey Rush' :
-                                        game === 'yahtzee' ? 'Yahtzee' :
-                                            game === 'battleship' ? 'Naval Command' :
-                                                game === 'mathinvaders' ? 'Math Invaders' :
-                                                    'Arcade'
+                            game === 'connect4' ? 'Neon Connect' :
+                                game === 'mathsprint' ? 'Math Sprint' :
+                                    game === 'swipefight' ? 'Swipe Fight' :
+                                        game === 'airhockey' ? 'Air Hockey Rush' :
+                                            game === 'yahtzee' ? 'Yahtzee' :
+                                                game === 'battleship' ? 'Naval Command' :
+                                                    game === 'mathinvaders' ? 'Math Invaders' :
+                                                        'Arcade'
                     }
                     onClose={closeGame}
                 >

@@ -305,49 +305,51 @@ export default function AirHockey({ sessionId, onBack }) {
 
             {/* Menu Overlay */}
             {gameState.status === 'MENU' && (
-                <div className="absolute inset-0 z-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 space-y-8 animate-in fade-in select-none">
+                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-auto cursor-auto space-y-8 select-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-950 via-slate-950 to-black">
 
-                    <div className="text-center relative">
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-emerald-500 rounded-full blur-[80px] opacity-20"></div>
-                        <h2 className="text-6xl font-black italic tracking-tighter mb-2 relative z-10">
-                            <span className="text-white drop-shadow-md">AIR</span>
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">HOCKEY</span>
-                        </h2>
-                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.5em] relative z-10">Cyberpunk Physics Engine</div>
+                    {/* Background Grid */}
+                    <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.1)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)] opacity-30 pointer-events-none"></div>
+
+                    <div className="relative z-10 flex flex-col items-center animate-in zoom-in duration-500">
+                        <span className="text-8xl leading-none mb-4 animate-bounce drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]">🏒</span>
+                        <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-t from-emerald-400 to-teal-400 tracking-tighter filter drop-shadow-[0_0_20px_rgba(16,185,129,0.5)] mb-2 italic transform -skew-x-6">
+                            AIR HOCKEY
+                        </h1>
+                        <p className="text-emerald-500 font-mono font-bold tracking-[0.5em] text-sm animate-pulse uppercase">Zero Friction Physics</p>
                     </div>
 
-                    <div className="w-full max-w-[280px] space-y-4 relative z-10">
+                    <div className="w-full max-w-xs space-y-4 relative z-10">
                         <button
                             onClick={() => updateState({ status: 'PLAYING', mode: 'AI' })}
-                            className="w-full group relative overflow-hidden bg-slate-800 border-2 border-slate-700/50 hover:border-emerald-500 rounded-xl p-4 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] text-left"
+                            className="w-full group relative overflow-hidden bg-slate-900 border border-white/10 hover:border-emerald-500 rounded-xl p-6 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] text-left"
                         >
-                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             <div className="flex items-center justify-between relative z-10">
                                 <div className="flex flex-col">
-                                    <span className="text-lg font-black text-white group-hover:text-emerald-400 uppercase italic">Training</span>
-                                    <span className="text-[10px] font-bold text-slate-500">VS CPU</span>
+                                    <span className="text-xl font-black text-white group-hover:text-emerald-400 uppercase italic tracking-wider">Training</span>
+                                    <span className="text-[10px] font-bold text-slate-500 tracking-widest">VS CPU</span>
                                 </div>
-                                <span className="text-2xl opacity-50 group-hover:opacity-100 transition-opacity">🤖</span>
+                                <span className="text-3xl opacity-50 group-hover:opacity-100 transition-opacity">🤖</span>
                             </div>
                         </button>
 
                         <button
                             disabled={!isHost}
                             onClick={() => updateState({ status: 'PLAYING', mode: 'PVP' })}
-                            className="w-full group relative overflow-hidden bg-slate-800 border-2 border-slate-700/50 hover:border-cyan-500 rounded-xl p-4 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] text-left disabled:opacity-50 disabled:grayscale disabled:scale-100 disabled:cursor-not-allowed"
+                            className="w-full group relative overflow-hidden bg-slate-900 border border-white/10 hover:border-cyan-500 rounded-xl p-6 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] text-left disabled:opacity-50 disabled:grayscale disabled:scale-100 disabled:cursor-not-allowed"
                         >
-                            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-cyan-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             <div className="flex items-center justify-between relative z-10">
                                 <div className="flex flex-col">
-                                    <span className="text-lg font-black text-white group-hover:text-cyan-400 uppercase italic">Versus</span>
-                                    <span className="text-[10px] font-bold text-slate-500">1v1 ONLINE</span>
+                                    <span className="text-xl font-black text-white group-hover:text-cyan-400 uppercase italic tracking-wider">Versus</span>
+                                    <span className="text-[10px] font-bold text-slate-500 tracking-widest">1v1 ONLINE</span>
                                 </div>
-                                <span className="text-2xl opacity-50 group-hover:opacity-100 transition-opacity">⚔️</span>
+                                <span className="text-3xl opacity-50 group-hover:opacity-100 transition-opacity">⚔️</span>
                             </div>
                         </button>
                     </div>
 
-                    <button onClick={onBack} className="text-xs font-bold text-slate-600 hover:text-white uppercase tracking-[0.2em] transition-colors py-2 px-6 hover:bg-white/5 rounded-full">
+                    <button onClick={onBack} className="mt-8 text-xs font-bold text-slate-500 hover:text-white uppercase tracking-[0.2em] transition-colors hover:bg-white/5 rounded-xl border border-transparent hover:border-white/10 py-3 px-8">
                         Exit Rink
                     </button>
                 </div>

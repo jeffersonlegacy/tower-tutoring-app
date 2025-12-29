@@ -104,52 +104,74 @@ export default function MathSprint({ sessionId, onBack }) {
 
             {/* CONFIG SCREEN */}
             {gameState === 'config' && (
-                <div className="flex flex-col gap-6 max-w-sm mx-auto w-full mt-10">
-                    <h1 className="text-3xl font-black text-center mb-4 bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
-                        SPEED MATH
-                    </h1>
+                <div className="flex flex-col items-center justify-center h-full p-6 text-center select-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-950 via-slate-950 to-black relative overflow-hidden">
 
-                    <div className="space-y-2">
-                        <label className="text-xs text-slate-500 font-bold uppercase">Subject</label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {['add', 'sub', 'mult', 'div', 'mixed'].map(op => (
-                                <button
-                                    key={op}
-                                    onClick={() => setSubject(op)}
-                                    className={`p-3 rounded-lg border text-sm font-bold uppercase transition-all ${subject === op
-                                        ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/20'
-                                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
-                                >
-                                    {op === 'mult' ? 'multiply' : op}
-                                </button>
-                            ))}
+                    <div className="absolute inset-0 bg-[linear-gradient(rgba(14,165,233,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(14,165,233,0.1)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)] opacity-30 pointer-events-none"></div>
+
+                    <div className="relative z-10 w-full max-w-sm flex flex-col items-center gap-6 animate-in fade-in zoom-in duration-500">
+                        <div className="mb-2">
+                            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-br from-cyan-400 to-blue-600 tracking-tighter drop-shadow-[0_0_15px_rgba(6,182,212,0.5)] italic transform -skew-x-6">
+                                MATH SPRINT
+                            </h1>
+                            <p className="text-cyan-500 font-mono font-bold tracking-[0.5em] text-xs uppercase mt-2">High Velocity Drills</p>
                         </div>
-                    </div>
 
-                    <div className="space-y-2">
-                        <label className="text-xs text-slate-500 font-bold uppercase">Difficulty</label>
-                        <div className="grid grid-cols-4 gap-2">
-                            {['easy', 'medium', 'hard', 'insane'].map(lvl => (
+                        <div className="w-full bg-slate-900/50 backdrop-blur-md p-6 rounded-2xl border border-white/5 space-y-6 shadow-2xl">
+                            <div className="space-y-3">
+                                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest block text-left">Training Module</label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {['add', 'sub', 'mult', 'div'].map(op => (
+                                        <button
+                                            key={op}
+                                            onClick={() => setSubject(op)}
+                                            className={`aspect-square rounded-xl border-2 flex items-center justify-center text-xl font-black transition-all ${subject === op
+                                                ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_15px_rgba(37,99,235,0.5)] scale-110'
+                                                : 'bg-slate-800 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300'}`}
+                                        >
+                                            {op === 'add' ? '+' : op === 'sub' ? '-' : op === 'mult' ? '×' : '÷'}
+                                        </button>
+                                    ))}
+                                </div>
                                 <button
-                                    key={lvl}
-                                    onClick={() => setDifficulty(lvl)}
-                                    className={`p-2 rounded-lg border text-[10px] font-bold uppercase transition-all ${difficulty === lvl
-                                        ? 'bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-500/20'
-                                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
+                                    onClick={() => setSubject('mixed')}
+                                    className={`w-full py-2 rounded-lg text-xs font-bold uppercase tracking-widest border transition-all ${subject === 'mixed'
+                                        ? 'bg-cyan-600 border-cyan-400 text-white shadow-lg'
+                                        : 'bg-slate-800 border-slate-700 text-slate-500 hover:bg-slate-700'
+                                        }`}
                                 >
-                                    {lvl}
+                                    ⚡ Mixed Operations ⚡
                                 </button>
-                            ))}
-                        </div>
-                    </div>
+                            </div>
 
-                    <button
-                        disabled={!subject}
-                        onClick={startGame}
-                        className="mt-8 bg-gradient-to-r from-cyan-500 to-blue-600 p-4 rounded-xl font-black text-xl tracking-widest hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 shadow-xl shadow-cyan-500/20"
-                    >
-                        START RUN
-                    </button>
+                            <div className="space-y-3">
+                                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest block text-left">Difficulty</label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {['easy', 'medium', 'hard', 'insane'].map(lvl => (
+                                        <button
+                                            key={lvl}
+                                            onClick={() => setDifficulty(lvl)}
+                                            className={`py-2 rounded-lg border text-[10px] font-bold uppercase transition-all ${difficulty === lvl
+                                                ? 'bg-purple-600 border-purple-400 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)]'
+                                                : 'bg-slate-800 border-slate-700 text-slate-500 hover:bg-slate-700'}`}
+                                        >
+                                            {lvl}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <button
+                            disabled={!subject}
+                            onClick={startGame}
+                            className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 p-6 rounded-xl font-black text-xl italic tracking-widest hover:scale-105 transition-transform disabled:opacity-50 disabled:grayscale disabled:hover:scale-100 shadow-[0_0_30px_rgba(6,182,212,0.4)] relative overflow-hidden group"
+                        >
+                            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 transform skew-y-12"></div>
+                            <span className="relative z-10 flex items-center justify-center gap-2">
+                                START RUN <span className="text-2xl animate-pulse">⏱</span>
+                            </span>
+                        </button>
+                    </div>
                 </div>
             )}
 

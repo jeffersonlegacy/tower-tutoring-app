@@ -435,23 +435,34 @@ export default function Connect4({ sessionId, onBack }) {
     // MENU SCREEN
     if (gameState.status === 'MENU') {
         return (
-            <div className="flex flex-col items-center justify-center h-full p-6 text-center select-none font-mono">
-                <h1 className="text-4xl font-black text-pink-500 mb-2 filter drop-shadow-[0_0_10px_#ec4899] italic">NEON CONNECT</h1>
-                <div className="w-full max-w-xs space-y-4">
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-auto cursor-auto space-y-8 select-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-pink-950 via-slate-950 to-black">
+
+                {/* Background Grid */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(236,72,153,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(236,72,153,0.1)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)] opacity-30 pointer-events-none"></div>
+
+                <div className="relative z-10 flex flex-col items-center animate-in zoom-in duration-500">
+                    <span className="text-8xl leading-none mb-4 animate-bounce drop-shadow-[0_0_15px_rgba(236,72,153,0.5)]">🔴</span>
+                    <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-t from-pink-600 to-red-400 tracking-tighter filter drop-shadow-[0_0_20px_rgba(236,72,153,0.5)] mb-2 italic transform -skew-x-6">
+                        NEON CONNECT
+                    </h1>
+                    <p className="text-pink-400 font-mono font-bold tracking-[0.5em] text-sm animate-pulse uppercase">Tactical Linkage</p>
+                </div>
+
+                <div className="w-full max-w-xs space-y-4 relative z-10">
                     <div className="w-full max-w-xs space-y-4">
                         {localDifficulty ? (
-                            <div className="space-y-2 animate-in fade-in slide-in-from-right-8">
-                                <div className="text-white font-bold mb-4 uppercase tracking-widest text-xs">Select Difficulty</div>
+                            <div className="space-y-2 animate-in fade-in slide-in-from-right-8 bg-slate-900/50 p-6 rounded-xl border border-white/5 backdrop-blur-md">
+                                <div className="text-white font-bold mb-4 uppercase tracking-widest text-xs text-center">Select AI Level</div>
                                 {['BEGINNER', 'MEDIUM', 'HARD', 'EXPERT', 'IMPOSSIBLE'].map(d => (
-                                    <button key={d} onClick={() => setMode('SOLO', d)} className={`w-full py-3 rounded-lg font-black text-white text-xs uppercase tracking-widest transition-all hover:scale-105 border border-white/10 ${d === 'BEGINNER' ? 'bg-green-600' :
-                                            d === 'MEDIUM' ? 'bg-blue-600' :
-                                                d === 'HARD' ? 'bg-orange-600' :
-                                                    d === 'EXPERT' ? 'bg-red-600' : 'bg-slate-900 border-red-500 shadow-[0_0_15px_red]'
+                                    <button key={d} onClick={() => setMode('SOLO', d)} className={`w-full py-3 rounded-lg font-black text-white text-xs uppercase tracking-widest transition-all hover:scale-105 border border-white/10 ${d === 'BEGINNER' ? 'bg-green-600 shadow-[0_0_10px_rgba(22,163,74,0.4)]' :
+                                        d === 'MEDIUM' ? 'bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]' :
+                                            d === 'HARD' ? 'bg-orange-600 shadow-[0_0_10px_rgba(234,88,12,0.4)]' :
+                                                d === 'EXPERT' ? 'bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.4)]' : 'bg-slate-900 border-red-500 shadow-[0_0_15px_red]'
                                         }`}>
                                         {d}
                                     </button>
                                 ))}
-                                <button onClick={() => setLocalDifficulty(false)} className="mt-4 text-[10px] text-slate-500 hover:text-white uppercase tracking-widest">Back</button>
+                                <button onClick={() => setLocalDifficulty(false)} className="w-full mt-4 text-[10px] text-slate-500 hover:text-white uppercase tracking-widest border-t border-white/10 pt-2">Back</button>
                             </div>
                         ) : (
                             <>
@@ -459,7 +470,7 @@ export default function Connect4({ sessionId, onBack }) {
                                     <span className="text-2xl group-hover:rotate-12 transition-transform">🤖</span>
                                     <span>SOLO PRACTICE</span>
                                 </button>
-                                <button onClick={() => setMode('PVP')} className="w-full py-4 bg-gradient-to-r from-pink-600 to-purple-600 rounded-xl font-bold text-white transition-all hover:scale-105 shadow-lg flex items-center justify-center gap-3">
+                                <button onClick={() => setMode('PVP')} className="w-full py-4 bg-gradient-to-r from-pink-600 to-purple-600 rounded-xl font-bold text-white transition-all hover:scale-105 shadow-[0_0_20px_rgba(219,39,119,0.4)] flex items-center justify-center gap-3">
                                     <span className="text-2xl">⚔️</span>
                                     <span>VS PLAYER</span>
                                 </button>

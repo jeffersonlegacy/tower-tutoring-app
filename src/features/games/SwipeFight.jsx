@@ -367,26 +367,27 @@ export default function SwipeFight({ sessionId, onBack }) { // Renamed component
     // LOADING
     if (!gameState) return <div className="text-white p-4 font-mono animate-pulse text-center mt-20">CONNECTING...</div>;
 
-    // WAITING / LOBBY SCREEN
-    if (gameState?.status === 'waiting') {
-        const difficultyColors = { 'K-2': 'text-emerald-400', '3-5': 'text-cyan-400', '6-8': 'text-blue-400', 'HS': 'text-purple-400' };
+    {/* WAITING / LOBBY SCREEN */ }
+    {
+        gameState?.status === 'waiting' && (
+            <div className="absolute inset-0 z-30 flex flex-col h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-950 via-slate-950 to-black p-6 select-none overflow-y-auto">
 
-        return (
-            <div className="flex flex-col h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black p-6 select-none overflow-y-auto">
+                {/* Background Grid */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(6,182,212,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.1)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)] opacity-30 pointer-events-none"></div>
 
                 {/* Header */}
-                <div className="flex flex-col items-center mb-8 relative">
+                <div className="flex flex-col items-center mb-8 relative z-10 animate-in zoom-in duration-500">
                     <span className="text-[120px] absolute opacity-5 font-black text-cyan-500 blur-xl top-1/2 -translate-y-1/2 transform -rotate-6 pointer-events-none">FIGHT</span>
-                    <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 italic tracking-tighter filter drop-shadow-[0_0_10px_rgba(6,182,212,0.5)] z-10">
+                    <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 italic tracking-tighter filter drop-shadow-[0_0_15px_rgba(6,182,212,0.5)] z-10 transform -skew-x-6">
                         SWIPE FIGHT
                     </h1>
-                    <p className="text-cyan-500 font-bold uppercase tracking-[0.5em] text-xs mt-2 z-10">Math Arena Championship</p>
+                    <p className="text-cyan-500 font-bold uppercase tracking-[0.5em] text-xs mt-2 z-10 animate-pulse">Math Arena Championship</p>
                 </div>
 
                 <div className="w-full max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
 
                     {/* SETTINGS CARD */}
-                    <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-700/50 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
+                    <div className="bg-slate-900/50 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
                         <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                             <span className="text-xl">⚙️</span> Match Config
@@ -400,7 +401,7 @@ export default function SwipeFight({ sessionId, onBack }) { // Renamed component
                                     <button
                                         key={g}
                                         onClick={() => updateSetting('grade', g)}
-                                        className={`p-3 rounded-xl font-black border-2 transition-all relative overflow-hidden ${localGradeSettings === g
+                                        className={`p-3 rounded-xl font-black border transition-all relative overflow-hidden ${localGradeSettings === g
                                             ? `bg-slate-800 border-cyan-500 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)] scale-[1.02]`
                                             : 'bg-slate-950 border-slate-800 text-slate-600 hover:border-slate-700'
                                             }`}
@@ -420,7 +421,7 @@ export default function SwipeFight({ sessionId, onBack }) { // Renamed component
                                     <button
                                         key={d}
                                         onClick={() => updateSetting('duration', d)}
-                                        className={`p-3 rounded-xl font-black border-2 transition-all ${localDurationSettings === d
+                                        className={`p-3 rounded-xl font-black border transition-all ${localDurationSettings === d
                                             ? 'bg-slate-800 border-purple-500 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)] scale-[1.02]'
                                             : 'bg-slate-950 border-slate-800 text-slate-600 hover:border-slate-700'
                                             }`}
@@ -449,7 +450,7 @@ export default function SwipeFight({ sessionId, onBack }) { // Renamed component
                                 </button>
                                 <button
                                     onClick={() => handleStart('SOLO')}
-                                    className="w-full py-4 bg-slate-800 border-2 border-slate-700 hover:border-emerald-500 rounded-2xl relative overflow-hidden group shadow-lg transition-all transform hover:scale-105"
+                                    className="w-full py-4 bg-slate-800 border border-slate-700 hover:border-emerald-500 rounded-2xl relative overflow-hidden group shadow-lg transition-all transform hover:scale-105"
                                 >
                                     <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                     <div className="relative z-10 flex flex-col items-center">
@@ -459,7 +460,7 @@ export default function SwipeFight({ sessionId, onBack }) { // Renamed component
                                 </button>
                             </>
                         ) : (
-                            <div className="w-full py-8 bg-slate-900 border-2 border-slate-800 rounded-2xl flex flex-col items-center justify-center animate-pulse gap-4">
+                            <div className="w-full py-8 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center justify-center animate-pulse gap-4 shadow-xl">
                                 <div className="w-12 h-12 rounded-full border-4 border-cyan-500 border-t-transparent animate-spin"></div>
                                 <div className="text-center">
                                     <span className="text-cyan-500 font-bold uppercase tracking-widest text-sm block">Awaiting Host</span>
@@ -481,13 +482,13 @@ export default function SwipeFight({ sessionId, onBack }) { // Renamed component
                     </div>
                 </div>
 
-                <div className="mt-auto pt-8 text-center pb-4">
+                <div className="mt-auto pt-8 text-center pb-4 relative z-10">
                     <button onClick={onBack} className="text-xs font-bold text-slate-600 hover:text-white uppercase tracking-[0.2em] transition-colors py-2 px-6 rounded-full hover:bg-white/5">
                         Exit Arena
                     </button>
                 </div>
             </div >
-        );
+        )
     }
 
     // GAME OVER SCREEN

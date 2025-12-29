@@ -398,17 +398,17 @@ export default function MathInvaders({ onBack }) {
 
             {/* MENU SCREEN */}
             {hud.menu && (
-                <div className="absolute inset-0 z-30 bg-black flex flex-col items-center justify-center pointer-events-auto cursor-auto space-y-8 select-none">
+                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-auto cursor-auto space-y-8 select-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-950 via-slate-950 to-black">
 
-                    {/* Retro Grid Background */}
-                    <div className="absolute inset-0 bg-[linear-gradient(rgba(168,85,247,0.2)_1px,transparent_1px),linear-gradient(90deg,rgba(168,85,247,0.2)_1px,transparent_1px)] bg-[size:50px_50px] [perspective:500px] [transform:rotateX(60deg)_translateY(-100px)_scale(2)] opacity-30 origin-top pointer-events-none animate-pulse"></div>
+                    {/* Background Grid */}
+                    <div className="absolute inset-0 bg-[linear-gradient(rgba(147,51,234,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(147,51,234,0.1)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)] opacity-30 pointer-events-none"></div>
 
                     <div className="relative z-10 flex flex-col items-center animate-in zoom-in duration-500">
-                        <span className="text-[100px] leading-none mb-4 animate-bounce">👾</span>
-                        <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-t from-purple-600 to-pink-400 tracking-tighter filter drop-shadow-[0_5px_0_rgba(147,51,234,1)] mb-2 italic transform -skew-x-12">
+                        <span className="text-8xl leading-none mb-4 animate-bounce drop-shadow-[0_0_15px_rgba(168,85,247,0.5)]">👾</span>
+                        <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-t from-purple-600 to-pink-400 tracking-tighter filter drop-shadow-[0_0_20px_rgba(147,51,234,0.5)] mb-2 italic transform -skew-x-6">
                             MATH INVADERS
                         </h1>
-                        <p className="text-pink-500 font-mono font-bold tracking-widest text-lg animate-pulse">INSERT COIN TO START</p>
+                        <p className="text-pink-400 font-mono font-bold tracking-[0.5em] text-sm animate-pulse uppercase">Defender of the Grid</p>
                     </div>
 
                     <div className="flex flex-col gap-4 relative z-10 w-full max-w-xs">
@@ -421,15 +421,20 @@ export default function MathInvaders({ onBack }) {
                                 gameState.current.invaders = [];
                                 setHud(h => ({ ...h, menu: false, timeLeft: 30, score: 0 }));
                             }}
-                            className="w-full py-4 bg-purple-600 hover:bg-purple-500 text-white font-black text-xl rounded shadow-[0_5px_0_rgb(107,33,168)] active:shadow-none active:translate-y-[5px] transition-all uppercase tracking-widest border-2 border-purple-400"
+                            className="w-full group relative overflow-hidden bg-purple-600 hover:bg-purple-500 text-white font-black text-xl rounded-xl py-6 shadow-[0_0_30px_rgba(147,51,234,0.3)] transition-all transform hover:scale-105 active:scale-95"
                         >
-                            Start Mission
+                            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 transform skew-y-12"></div>
+                            <span className="relative z-10 uppercase tracking-widest flex items-center justify-center gap-2">
+                                <span>Start Mission</span>
+                                <span className="text-2xl animate-pulse">🚀</span>
+                            </span>
                         </button>
+
                         <button
                             onClick={onBack}
-                            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-bold rounded uppercase tracking-widest border-2 border-slate-700 hover:border-white transition-colors"
+                            className="w-full py-4 text-xs font-bold text-slate-500 hover:text-white uppercase tracking-[0.2em] transition-colors hover:bg-white/5 rounded-xl border border-transparent hover:border-white/10"
                         >
-                            Exit Game
+                            Abort Game
                         </button>
                     </div>
 
