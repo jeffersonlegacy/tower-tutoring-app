@@ -294,8 +294,9 @@ export default function AirHockey({ sessionId, onBack }) {
             <div className="w-full flex justify-between items-center p-3 bg-slate-800 border-b border-white/5 z-10">
                 <button
                     onClick={() => {
-                        if (isHost) updateState({ status: 'MENU', hostScore: 0, clientScore: 0 });
-                        else onBack();
+                        // Force reset for anyone
+                        updateState({ status: 'MENU', hostScore: 0, clientScore: 0 });
+                        onBack();
                     }}
                     className="text-xs text-slate-400 hover:text-white"
                 >

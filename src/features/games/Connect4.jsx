@@ -587,19 +587,19 @@ export default function Connect4({ sessionId, onBack }) {
                                 {gameState.winner === 'draw' ? 'STALEMATE' : `${gameState.winner === 'red' ? 'RED' : 'YELLOW'} WINS`}
                             </h2>
                             {isHost && (
-                                <div className="w-full space-y-2">
-                                    <button onClick={handleReset} className="w-full py-3 bg-white text-black rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-400 hover:text-white transition-all transform hover:scale-105">
-                                        PLAY AGAIN
-                                    </button>
-                                    <button
-                                        onClick={() => updateState({ status: 'MENU', board: Array(ROWS * COLS).fill(null), winner: null })}
-                                        className="w-full py-3 bg-slate-800 text-slate-400 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-700 hover:text-white transition-all"
-                                    >
-                                        MAIN MENU
-                                    </button>
-                                </div>
+                                <button onClick={handleReset} className="w-full py-3 bg-white text-black rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-400 hover:text-white transition-all transform hover:scale-105 mb-2">
+                                    PLAY AGAIN
+                                </button>
                             )}
-                            {!isHost && <div className="text-xs text-slate-500">Waiting for Host...</div>}
+
+                            <button
+                                onClick={() => updateState({ status: 'MENU', board: Array(ROWS * COLS).fill(null), winner: null })}
+                                className="w-full py-3 bg-slate-800 text-slate-400 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-700 hover:text-white transition-all"
+                            >
+                                MAIN MENU
+                            </button>
+
+                            {!isHost && <div className="text-xs text-slate-500 mt-2">Waiting for Host to Restart...</div>}
                         </div>
                     </div>
                 )}
