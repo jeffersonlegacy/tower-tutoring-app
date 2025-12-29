@@ -5,20 +5,22 @@ import HomeworkTray from "../features/session/HomeworkTray";
 import { useParams } from "react-router-dom";
 import { useHomeworkUpload } from "../hooks/useHomeworkUpload";
 import BrainBreak from "../features/games/BrainBreak";
-import GeminiChat from "../features/chat/GeminiChat"; // We might need to embed this or use a simplified version
-import Calculator from "../features/tools/Calculator"; // Same
+import GeminiChat from "../features/chat/GeminiChat";
+import MathTools from "../features/tools/MathTools";
+import MindHiveInterface from "../features/session/MindHiveInterface";
 
 export default function Session() {
     const { sessionId } = useParams();
     const [maintenanceMode, setMaintenanceMode] = useState({ enabled: false, message: '' });
     const { uploadFile, uploading } = useHomeworkUpload(sessionId);
     const [isDragging, setIsDragging] = useState(false);
+    const [sessionEnded, setSessionEnded] = useState(false);
 
     // Sidebar Mode: 'homework' | 'arcade' | 'ai' | 'tools'
     const [sidebarMode, setSidebarMode] = useState('homework');
 
     // Main Tab Mode (Mobile Only): 'board' | 'sidebar'
-    const [mainTab, setMainTab] = useState('board');
+    const [mainTab, setMainTab] = useState('sidebar');
 
     useEffect(() => {
         const fetchConfig = async () => {
@@ -75,6 +77,11 @@ export default function Session() {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
+            {/* End Session Interface Overlay */}
+            {sessionEnded && (
+                <MindHiveInterface onHome={() => window.location.href = '/'} />
+            )}
+
             {/* Mobile Tab Switcher (Visible only on small screens) */}
             {/* Hiding this when on 'board' to give full screen real estate, accessible via a small floating toggle instead */}
             <div className={`md:hidden flex items-center bg-slate-800 border-b border-slate-700 shrink-0 z-30 ${mainTab === 'board' ? 'hidden' : 'flex'}`}>
@@ -82,13 +89,13 @@ export default function Session() {
                     onClick={() => setMainTab('board')}
                     className={`flex-1 p-3 text-sm font-bold uppercase tracking-widest transition-all ${mainTab === 'board' ? 'text-blue-400 bg-slate-900 border-b-2 border-blue-500' : 'text-slate-500'}`}
                 >
-                    Board
+                    Whiteboard
                 </button>
                 <button
                     onClick={() => setMainTab('sidebar')}
-                    className={`flex-1 p-3 text-sm font-bold uppercase tracking-widest transition-all ${mainTab === 'sidebar' ? 'text-pink-400 bg-slate-900 border-b-2 border-pink-500' : 'text-slate-500'}`}
+                    className={`flex-1 p-3 text-sm font-bold uppercase tracking-widest transition-all ${mainTab === 'sidebar' ? 'text-purple-400 bg-slate-900 border-b-2 border-purple-500' : 'text-slate-500'}`}
                 >
-                    Tools
+                    Backpack
                 </button>
             </div>
 
@@ -135,19 +142,35 @@ export default function Session() {
                             onClick={() => setSidebarMode('homework')}
                             className={`flex-1 p-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'homework' ? 'text-white bg-slate-800 border-b-2 border-cyan-500' : 'text-slate-500 hover:text-slate-300'}`}
                         >
-                            Files
+                            Upload
                         </button>
                         <button
                             onClick={() => setSidebarMode('ai')}
                             className={`flex-1 p-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'ai' ? 'text-white bg-slate-800 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}
                         >
-                            Mind Hive
+                            Jefferson Intelligence
                         </button>
                         <button
                             onClick={() => setSidebarMode('arcade')}
                             className={`flex-1 p-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'arcade' ? 'text-white bg-slate-800 border-b-2 border-pink-500' : 'text-slate-500 hover:text-slate-300'}`}
                         >
-                            Arcade
+                            Brain Break
+                        </button>
+                        <button
+                            onClick={() => setSidebarMode('tools')}
+                            className={`flex-1 p-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'tools' ? 'text-white bg-slate-800 border-b-2 border-orange-500' : 'text-slate-500 hover:text-slate-300'}`}
+                        >
+                            Tools
+                        </button>
+                    </div>
+
+                    {/* End Session Button */}
+                    <div className="p-2 border-b border-slate-700 bg-slate-900 flex justify-center">
+                        <button
+                            onClick={() => setSessionEnded(true)}
+                            className="w-full py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/50 rounded text-xs font-bold uppercase tracking-widest transition-all"
+                        >
+                            End Session
                         </button>
                     </div>
 
@@ -157,10 +180,13 @@ export default function Session() {
                             <HomeworkTray sessionId={sessionId} />
                         )}
                         {sidebarMode === 'ai' && (
-                            <GeminiChat sessionId={sessionId} />
+                            <GeminiChat sessionId={sessionId} mode="fullscreen" />
                         )}
                         {sidebarMode === 'arcade' && (
                             <BrainBreak sessionId={sessionId} onClose={() => setSidebarMode('homework')} />
+                        )}
+                        {sidebarMode === 'tools' && (
+                            <MathTools />
                         )}
                     </div>
 

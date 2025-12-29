@@ -1,23 +1,29 @@
 // THE HIVE: Prioritized list of validated models
 // Updated to prioritize Mistral (Proven connectivity)
 const HIVE_MODELS = [
-    'mistral/ministral-3b',
     'openai/gpt-4o-mini',
+    'mistral/ministral-3b',
     'deepseek/deepseek-v3'
 ];
 
 const CONFIG = {
-    systemPrompt: `You are a seamless intelligent agent. 
-    You are part of a swarm. 
-    If you are picking up a conversation, continue naturally.
-    Provide the highest value, most concise answer possible.`,
+    systemPrompt: `You are Jefferson Intelligence, an elite AI tutor and strategic educational advisor.
+    Your mission is to empower the user with high-value, precise, and actionable insights.
+    
+    Guidelines:
+    - Tone: Professional, Sophisticated, Encouraging, and Sharp.
+    - Context: You are the central intelligence of the Jefferson Tutoring platform.
+    - Style: Be concise but comprehensive. Use markdown for structure (bullet points, bold text). Avoid generic pleasantries.
+    - Goal: Maximize learning efficiency and clarity in every interaction.`,
     temperature: 0.7,
 };
 
 class MindHiveService {
     constructor() {
-        // No INIT needed
-        this.baseUrl = window.location.origin + '/api/chat/completions';
+        // In dev mode, we might hit the gateway directly if the proxy /api is not available
+        this.isDev = import.meta.env.DEV;
+        this.gatewayUrl = 'https://ai-gateway.vercel.sh/v1/chat/completions';
+        this.proxyUrl = window.location.origin + '/api/chat/completions';
     }
 
     /**
@@ -36,9 +42,21 @@ class MindHiveService {
             try {
                 console.log(`Attempting Node: ${modelName}`);
 
-                const response = await fetch(this.baseUrl, {
+                // Try proxy first, then gateway if in dev
+                let targetUrl = this.proxyUrl;
+                let headers = { 'Content-Type': 'application/json' };
+
+                if (this.isDev) {
+                    const devKey = import.meta.env.VITE_AI_GATEWAY_API_KEY;
+                    if (devKey) {
+                        targetUrl = this.gatewayUrl;
+                        headers['Authorization'] = `Bearer ${devKey}`;
+                    }
+                }
+
+                const response = await fetch(targetUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: JSON.stringify({
                         model: modelName,
                         messages: messages,

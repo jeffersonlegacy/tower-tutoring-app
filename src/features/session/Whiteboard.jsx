@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useMemo, memo } from 'react';
 
-export default function Whiteboard({ sessionId }) {
+const Whiteboard = memo(({ sessionId }) => {
   // We use the cracker0dks/whiteboard engine for professional features (undo/redo, images, cursors)
   // We point to a hosted instance (cloud13.de is a demo instance).
   // In production, you would point this to your own hosted instance of cracker0dks/whiteboard.
 
-  const whiteboardBaseUrl = "https://cloud13.de/testwhiteboard/";
-  const whiteboardUrl = `${whiteboardBaseUrl}?whiteboardid=${encodeURIComponent(sessionId)}&username=User_${Math.floor(Math.random() * 9000) + 1000}`;
+  const whiteboardUrl = useMemo(() => {
+    const whiteboardBaseUrl = "https://cloud13.de/testwhiteboard/";
+    // eslint-disable-next-line react-hooks/purity
+    const randomId = Math.floor(Math.random() * 9000) + 1000;
+    return `${whiteboardBaseUrl}?whiteboardid=${encodeURIComponent(sessionId)}&username=User_${randomId}`;
+  }, [sessionId]);
 
   return (
     <div className="w-full h-full bg-slate-900 relative overflow-hidden flex flex-col">
@@ -41,4 +45,6 @@ export default function Whiteboard({ sessionId }) {
       </div>
     </div>
   );
-}
+});
+
+export default Whiteboard;

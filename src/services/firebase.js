@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getDatabase } from "firebase/database";
 import { getStorage } from "firebase/storage";
 import { getAuth, signInAnonymously } from "firebase/auth";
 import { getAnalytics } from "firebase/analytics";
@@ -11,22 +12,25 @@ const firebaseConfig = {
   storageBucket: "towertutoring-e48ac.firebasestorage.app",
   messagingSenderId: "962909548649",
   appId: "1:962909548649:web:8be51e20d7f6c852c172f8",
-  measurementId: "G-GLYM0J95KZ"
+  measurementId: "G-GLYM0J95KZ",
+  databaseURL: "https://towertutoring-e48ac-default-rtdb.firebaseio.com"
 };
 
-let app, db, storage, auth, analytics;
+let app, db, rtdb, storage, auth, analytics;
 
 try {
   app = initializeApp(firebaseConfig);
   // Critical: Access the named Firestore-Native database
   db = getFirestore(app, "towertutoring");
+  // Initialize Realtime Database
+  rtdb = getDatabase(app);
   storage = getStorage(app);
   auth = getAuth(app);
   analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
   console.log("Firebase Initialized Successfully");
 
-  // Sign in anonymously for Storage/Firestore access
+  // Sign in anonymously for Storage/Firestore/RTDB access
   signInAnonymously(auth).then(() => {
     console.log("Signed in anonymously");
   }).catch((error) => {
@@ -36,5 +40,5 @@ try {
   console.error("CRITICAL: Firebase Initialization Failed", error);
 }
 
-export { app, db, storage, auth, analytics };
+export { app, db, rtdb, storage, auth, analytics };
 export default app;

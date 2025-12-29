@@ -32,17 +32,40 @@ export default function VideoChat({ sessionId }) {
                     <span className="text-[8px] uppercase tracking-wider text-slate-500">
                         {roomName}
                     </span>
+                    {/* Fullscreen Toggle */}
+                    <button
+                        onClick={() => {
+                            const el = document.getElementById('video-container');
+                            if (!document.fullscreenElement) {
+                                el.requestFullscreen().catch(err => console.log(err));
+                            } else {
+                                document.exitFullscreen();
+                            }
+                        }}
+                        className="ml-2 text-slate-400 hover:text-white"
+                        title="Toggle Fullscreen"
+                    >
+                        ⛶
+                    </button>
                 </div>
             </div>
 
             {/* Iframe Embed */}
-            <div className="flex-1 w-full h-full bg-black relative">
+            <div id="video-container" className="flex-1 w-full h-full bg-black relative group">
                 <iframe
                     src={videoUrl}
                     className="w-full h-full border-0 absolute inset-0"
                     allow="camera; microphone; display-capture; autoplay; clipboard-write; clipboard-read; fullscreen"
                     title="MiroTalk Video"
                 />
+
+                {/* Exit Fullscreen Overlay Button (Visible only in FS) */}
+                <button
+                    className="hidden group-fullscreen:flex absolute top-4 right-4 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-full shadow-lg z-50 items-center gap-2 font-bold text-sm transition-transform hover:scale-105"
+                    onClick={() => document.exitFullscreen()}
+                >
+                    ✕ Exit Full Screen
+                </button>
             </div>
         </div>
     );
