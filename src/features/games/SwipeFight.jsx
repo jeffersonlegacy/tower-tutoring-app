@@ -141,6 +141,11 @@ export default function SwipeFight({ sessionId, onBack }) { // Renamed component
         INITIAL_STATE
     );
 
+    // Safety check for gameState
+    const safeSettings = gameState?.settings || INITIAL_STATE.settings;
+    const safeMatchHistory = Array.isArray(gameState?.matchHistory) ? gameState.matchHistory : [];
+
+
     // --- SWIPE MECHANICS HOOKS ---
     const [dragX, setDragX] = useState(0);
     const isDragging = useRef(false);
@@ -158,11 +163,11 @@ export default function SwipeFight({ sessionId, onBack }) { // Renamed component
 
     // Keep Local Settings Screen in sync with Remote if Client
     useEffect(() => {
-        if (gameState?.settings) {
-            setLocalGradeSettings(gameState.settings.grade);
-            setLocalDurationSettings(gameState.settings.duration);
+        if (safeSettings) {
+            setLocalGradeSettings(safeSettings.grade);
+            setLocalDurationSettings(safeSettings.duration);
         }
-    }, [gameState?.settings]);
+    }, [safeSettings?.grade, safeSettings?.duration]);
 
     // --- GAME LOOP & TIMER ---
     useEffect(() => {
@@ -181,17 +186,16 @@ export default function SwipeFight({ sessionId, onBack }) { // Renamed component
                         if (cScore > hScore) winner = 'client';
 
                         const newMatch = {
-                            id: (gameState.matchHistory?.length || 0) + 1,
+                            id: (safeMatchHistory.length || 0) + 1,
                             hostScore: hScore,
                             clientScore: cScore,
                             winner: winner,
                             timestamp: Date.now()
                         };
 
-                        const currentHistory = Array.isArray(gameState.matchHistory) ? gameState.matchHistory : [];
                         updateState({
                             status: 'finished',
-                            matchHistory: [...currentHistory, newMatch]
+                            matchHistory: [...safeMatchHistory, newMatch]
                         });
                     }
                 }
@@ -308,7 +312,7 @@ export default function SwipeFight({ sessionId, onBack }) { // Renamed component
         if (isHost) {
             updateState({
                 settings: {
-                    ...gameState.settings,
+                    ...safeSettings,
                     [key]: value
                 }
             });
