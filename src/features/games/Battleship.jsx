@@ -110,11 +110,11 @@ export default function Battleship({ sessionId, onBack }) {
 
     // Refactored Fire Logic to reuse for AI
     const handleFire = (r, c, targetPlayerIndex) => {
-        const targetBoard = gameState.boards[targetPlayerIndex];
+        const targetBoard = gameState?.boards?.[targetPlayerIndex] || Array(100).fill(0);
         const targetIndex = r * BOARD_SIZE + c;
         if (targetBoard[targetIndex] !== 0) return;
 
-        const oppShips = gameState.ships[targetPlayerIndex];
+        const oppShips = gameState?.ships?.[targetPlayerIndex] || [];
         let hitShip = null;
         let hitResult = 'MISS';
 
@@ -380,7 +380,7 @@ export default function Battleship({ sessionId, onBack }) {
                             </button>
                         )}
                     </div>
-                    {renderGrid(gameState.boards[myPlayerIndex], (gameState.phase === 'SETUP' ? myShips : gameState.ships[myPlayerIndex]), true)}
+                    {renderGrid(gameState.boards?.[myPlayerIndex], (gameState.phase === 'SETUP' ? myShips : gameState.ships?.[myPlayerIndex]), true)}
 
                     {/* Setup Controls */}
                     {gameState.phase === 'SETUP' && !gameState.ready[myPlayerIndex] && (
@@ -426,7 +426,7 @@ export default function Battleship({ sessionId, onBack }) {
                         <span className="font-bold text-red-400">ENEMY WATERS</span>
                         <span className="text-xs text-slate-500 animate-pulse">RADAR ONLINE</span>
                     </div>
-                    {renderGrid(gameState.boards[oppPlayerIndex], [], false)}
+                    {renderGrid(gameState.boards?.[oppPlayerIndex], [], false)}
 
                     <div className="mt-4 p-4 bg-black/30 rounded text-xs font-mono text-slate-400 h-32 overflow-y-auto border border-white/5">
                         <div className="mb-2 text-white border-b border-white/10 pb-1">COMBAT LOG</div>

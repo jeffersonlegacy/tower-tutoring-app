@@ -44,8 +44,8 @@ export default function AirHockey({ sessionId, onBack }) {
         if (gameState.status === 'PLAYING') {
             // If PvP Client, sync Puck from Host
             if (gameState.mode === 'PVP' && !isHost) {
-                localState.current.puck.x = gameState.puck.x;
-                localState.current.puck.y = gameState.puck.y;
+                localState.current.puck.x = gameState.puck?.x || 200;
+                localState.current.puck.y = gameState.puck?.y || 300;
                 // Sync opponent paddle (Host's is '0')
                 localState.current.oppPaddle.x = gameState.pddl?.[0]?.x || 200;
                 localState.current.oppPaddle.y = gameState.pddl?.[0]?.y || 550;
