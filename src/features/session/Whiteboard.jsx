@@ -1,43 +1,34 @@
-import React, { useMemo, memo } from 'react';
+import React, { memo, useState, useCallback } from 'react';
+import { Tldraw } from '@tldraw/tldraw';
+import '@tldraw/tldraw/tldraw.css';
+import { useWhiteboardSync } from '../../hooks/useWhiteboardSync';
 
 const Whiteboard = memo(({ sessionId }) => {
-  // We use the cracker0dks/whiteboard engine for professional features (undo/redo, images, cursors)
-  // We point to a hosted instance (cloud13.de is a demo instance).
-  // In production, you would point this to your own hosted instance of cracker0dks/whiteboard.
+  // We need a way to pass the editor instance to the sync hook
+  const [editor, setEditor] = useState(null);
 
-  const whiteboardUrl = useMemo(() => {
-    const whiteboardBaseUrl = "https://cloud13.de/testwhiteboard/";
-    // eslint-disable-next-line react-hooks/purity
-    const randomId = Math.floor(Math.random() * 9000) + 1000;
-    return `${whiteboardBaseUrl}?whiteboardid=${encodeURIComponent(sessionId)}&username=User_${randomId}`;
-  }, [sessionId]);
+  // Initialize Sync when editor is ready
+  useWhiteboardSync(editor, sessionId);
+
+  const handleMount = useCallback((editorInstance) => {
+    setEditor(editorInstance);
+  }, []);
 
   return (
     <div className="w-full h-full bg-slate-900 relative overflow-hidden flex flex-col">
-      {/* 
-        CRACKER0DKS WHITEBOARD INTEGRATION
-        - Source: https://github.com/cracker0dks/whiteboard
-        
-        MOBILE SCALING HACK:
-        The native UI of this whiteboard is not mobile-responsive (buttons stack 4 rows deep).
-        We force a "Tablet/Desktop" viewport on mobile by making the container 200% wide
-        and scaling it down by 0.5. This forces the toolbar into a single row.
-      */}
-      <div className="w-[200%] h-[200%] md:w-full md:h-full origin-top-left transform scale-50 md:scale-100 md:transform-none bg-white">
-        <iframe
-          src={whiteboardUrl}
-          className="w-full h-full border-none"
-          title="Collaborative Whiteboard"
-          allow="camera; microphone; clipboard-read; clipboard-write; display-capture"
+      <div className="w-full h-full tldraw__editor">
+        <Tldraw
+          onMount={handleMount}
+          persistenceKey={`tower-whiteboard-${sessionId}`}
+          hideUi={false}
         />
       </div>
 
-      {/* Contextual Banner for Pro Engine */}
-      {/* Contextual Banner for Pro Engine (Hidden on mobile to save vertical space) */}
-      <div className="hidden md:flex absolute bottom-0 left-0 right-0 bg-slate-950/80 backdrop-blur-sm border-t border-white/5 px-3 py-1.5 justify-between items-center z-20">
+      {/* Contextual Banner */}
+      <div className="hidden md:flex absolute bottom-0 left-0 right-0 bg-slate-950/80 backdrop-blur-sm border-t border-white/5 px-3 py-1.5 justify-between items-center z-20 pointer-events-none">
         <div className="flex items-center gap-2">
-          <span className="text-[9px] font-black text-blue-400 tracking-tighter">ENGINE: CRACKER0DKS v2.0</span>
-          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_5px_#3b82f6] animate-pulse"></div>
+          <span className="text-[9px] font-black text-purple-400 tracking-tighter">ENGINE: TLDRAWSYNC v1.0</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_5px_#a855f7] animate-pulse"></div>
         </div>
         <div className="flex items-center gap-2 text-[8px] text-slate-500 font-bold uppercase tracking-widest">
           ID: {sessionId}
