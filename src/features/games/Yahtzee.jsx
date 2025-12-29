@@ -79,22 +79,28 @@ export default function Yahtzee({ sessionId, onBack }) {
     const [viewingPlayerId, setViewingPlayerId] = useState(null); // To view opponent scorecards
 
     // --- SAFE DATA HANDLING (CRASH FIX) ---
+    // Ensure playersList is always an array
     const playersList = Array.isArray(gameState?.players)
         ? gameState.players
         : Object.values(gameState?.players || {}).filter(p => !!p);
 
-    const safeScores = gameState?.scores || {};
+    // Ensure safeScores is always an object, even if gameState.scores is null/undefined
+    const safeScores = (gameState?.scores && typeof gameState.scores === 'object') ? gameState.scores : {};
     const safeDice = Array.isArray(gameState?.dice) ? gameState.dice : Array(5).fill({ value: 1, held: false });
 
     // Current Active Player Logic
-    const activePlayerIndex = (gameState?.turnIndex) % (playersList.length || 1);
+    const activePlayerIndex = (typeof gameState?.turnIndex === 'number')
+        ? (gameState.turnIndex % (playersList.length || 1))
+        : 0;
+
     const activePlayer = playersList[activePlayerIndex];
     const isMyTurn = activePlayer?.id === playerId && gameState?.status === 'PLAYING';
 
     const myPlayer = playersList.find(p => p.id === playerId);
 
     // Who we are looking at (default to self, or active player if spectating)
-    const targetPlayerId = viewingPlayerId || (playersList.find(p => p.id === playerId) ? playerId : activePlayer?.id);
+    // CRITICAL FIX: Ensure targetPlayerId is valid or fallback safely
+    const targetPlayerId = viewingPlayerId || (myPlayer ? playerId : (activePlayer?.id || null));
     const targetPlayer = playersList.find(p => p.id === targetPlayerId);
 
     // --- ACTIONS ---
@@ -285,7 +291,8 @@ export default function Yahtzee({ sessionId, onBack }) {
     // --- GAMEPLAY SCORECARD RENDERER ---
 
     // Helpers for scorecard
-    const pScores = safeScores[targetPlayerId] || {};
+    // CRITICAL FIX: safeScores is guaranteed object, but targetPlayerId might be null
+    const pScores = (targetPlayerId && safeScores[targetPlayerId]) || {};
     const getScore = (cid) => pScores[cid] !== undefined ? pScores[cid] : null;
 
     // Calculate Potentials (only for me)
