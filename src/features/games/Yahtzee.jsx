@@ -211,7 +211,20 @@ export default function Yahtzee({ sessionId, onBack }) {
                 winner={isWinner}
                 score={myTotal}
                 onRestart={() => isHost && handleStart()}
-                onExit={onBack}
+                onExit={() => {
+                    if (isHost) {
+                        updateState({
+                            status: 'LOBBY',
+                            scores: {},
+                            turnIndex: 0,
+                            round: 1,
+                            dice: Array(5).fill({ value: 1, held: false }),
+                            rollCount: 0
+                        });
+                    } else {
+                        onBack();
+                    }
+                }}
                 isHost={isHost}
             />
         );

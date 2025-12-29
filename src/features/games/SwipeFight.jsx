@@ -523,8 +523,20 @@ export default function SwipeFight({ sessionId, onBack }) { // Renamed component
                     </button>
                 )}
 
-                <button onClick={onBack} className="mt-8 text-xs font-bold text-slate-600 hover:text-white uppercase tracking-widest">
-                    Return to Lobby
+                <button
+                    onClick={() => {
+                        if (isHost) {
+                            updateState({
+                                status: 'waiting',
+                                hostScore: 0,
+                                clientScore: 0,
+                                matchHistory: gameState.matchHistory // keep history
+                            });
+                        }
+                    }}
+                    className="mt-8 text-xs font-bold text-slate-600 hover:text-white uppercase tracking-widest transition-colors"
+                >
+                    {isHost ? "Return to Lobby" : "Waiting for Host..."}
                 </button>
             </div>
         );

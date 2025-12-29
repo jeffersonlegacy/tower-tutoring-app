@@ -471,12 +471,24 @@ export default function MathInvaders({ onBack }) {
                         TIME'S UP!
                     </h1>
                     <div className="text-2xl font-mono text-white mb-8">FINAL SCORE: {hud.score}</div>
-                    <button
-                        onClick={onBack}
-                        className="px-8 py-4 bg-white text-black font-bold rounded hover:scale-105 transition-transform"
-                    >
-                        RETURN TO BASE
-                    </button>
+                    <div className="flex gap-4">
+                        <button
+                            onClick={() => {
+                                gameState.current.invaders = [];
+                                gameState.current.problem = null;
+                                setHud(h => ({ ...h, menu: true, timeLeft: 30, score: 0, gameOver: false }));
+                            }}
+                            className="px-8 py-4 bg-purple-600 text-white font-bold rounded hover:scale-105 transition-transform uppercase tracking-widest shadow-lg"
+                        >
+                            Restart Mission
+                        </button>
+                        <button
+                            onClick={onBack}
+                            className="px-8 py-4 bg-white text-black font-bold rounded hover:scale-105 transition-transform uppercase tracking-widest"
+                        >
+                            Return to Base
+                        </button>
+                    </div>
                     <div className="mt-4 text-slate-500 text-sm">Mission Complete</div>
                 </div>
             )}

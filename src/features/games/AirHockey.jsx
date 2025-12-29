@@ -292,7 +292,15 @@ export default function AirHockey({ sessionId, onBack }) {
 
             {/* Header */}
             <div className="w-full flex justify-between items-center p-3 bg-slate-800 border-b border-white/5 z-10">
-                <button onClick={onBack} className="text-xs text-slate-400 hover:text-white">EXIT</button>
+                <button
+                    onClick={() => {
+                        if (isHost) updateState({ status: 'MENU', hostScore: 0, clientScore: 0 });
+                        else onBack();
+                    }}
+                    className="text-xs text-slate-400 hover:text-white"
+                >
+                    EXIT
+                </button>
                 <div className="flex gap-8 text-2xl font-black italic text-white shadow-black drop-shadow-lg">
                     <span className="text-emerald-400">{myScore}</span>
                     <span className="text-slate-600">-</span>
