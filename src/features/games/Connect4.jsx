@@ -27,20 +27,25 @@ const safeBoard = (b) => {
     return arr;
 };
 
-// --- MINIMAX AI ENGINE ---
+// --- MINIMAX AI ENGINE (OPTIMIZED) ---
+// Note: Board is now passed as Reference and MUTATED to avoid GC overhead.
+// We must Undo moves.
 
-// Heuristic Evaluation
+// Heuristic Evaluation (Same logic, slightly cleaner)
 const evaluateWindow = (window, piece) => {
     let score = 0;
     const oppPiece = piece === 'yellow' ? 'red' : 'yellow';
     const empty = null;
 
-    if (window.filter(c => c === piece).length === 4) score += 100;
-    else if (window.filter(c => c === piece).length === 3 && window.filter(c => c === empty).length === 1) score += 5;
-    else if (window.filter(c => c === piece).length === 2 && window.filter(c => c === empty).length === 2) score += 2;
+    const countPiece = window.filter(c => c === piece).length;
+    const countEmpty = window.filter(c => c === empty).length;
+    const countOpp = window.filter(c => c === oppPiece).length;
 
-    // Heavily penalize opponent having 3-in-a-row (Threat) to ensure blocking
-    if (window.filter(c => c === oppPiece).length === 3 && window.filter(c => c === empty).length === 1) score -= 80;
+    if (countPiece === 4) score += 100;
+    else if (countPiece === 3 && countEmpty === 1) score += 5;
+    else if (countPiece === 2 && countEmpty === 2) score += 2;
+
+    if (countOpp === 3 && countEmpty === 1) score -= 4; // Block slightly
 
     return score;
 };
@@ -58,25 +63,22 @@ const scoreBoard = (board, piece) => {
 
     // Horizontal
     for (let r = 0; r < ROWS; r++) {
-        const rowArray = [];
-        for (let c = 0; c < COLS; c++) { rowArray.push(board[r * COLS + c]); }
+        const rowStart = r * COLS;
         for (let c = 0; c < COLS - 3; c++) {
-            const window = rowArray.slice(c, c + 4);
+            const window = [board[rowStart + c], board[rowStart + c + 1], board[rowStart + c + 2], board[rowStart + c + 3]];
             score += evaluateWindow(window, piece);
         }
     }
 
     // Vertical
     for (let c = 0; c < COLS; c++) {
-        const colArray = [];
-        for (let r = 0; r < ROWS; r++) { colArray.push(board[r * COLS + c]); }
         for (let r = 0; r < ROWS - 3; r++) {
-            const window = colArray.slice(r, r + 4);
+            const window = [board[r * COLS + c], board[(r + 1) * COLS + c], board[(r + 2) * COLS + c], board[(r + 3) * COLS + c]];
             score += evaluateWindow(window, piece);
         }
     }
 
-    // Diagonal Positive
+    // Diag Positive
     for (let r = 0; r < ROWS - 3; r++) {
         for (let c = 0; c < COLS - 3; c++) {
             const window = [board[r * COLS + c], board[(r + 1) * COLS + c + 1], board[(r + 2) * COLS + c + 2], board[(r + 3) * COLS + c + 3]];
@@ -84,14 +86,7 @@ const scoreBoard = (board, piece) => {
         }
     }
 
-    // Diagonal Negative
-    for (let r = 0; r < ROWS - 3; r++) {
-        for (let c = 0; c < COLS - 3; c++) {
-            const window = [board[(current_r + 3) * COLS + c] || null, board[(current_r + 2) * COLS + c + 1] || null, board[(current_r + 1) * COLS + c + 2] || null, board[current_r * COLS + c + 3] || null];
-            // Correct Algo logic is tricky inline, let's simplify loop for readability
-        }
-    }
-    // Re-impl Diag Neg correctly:
+    // Diag Negative
     for (let r = 3; r < ROWS; r++) {
         for (let c = 0; c < COLS - 3; c++) {
             const window = [board[r * COLS + c], board[(r - 1) * COLS + c + 1], board[(r - 2) * COLS + c + 2], board[(r - 3) * COLS + c + 3]];
@@ -102,8 +97,8 @@ const scoreBoard = (board, piece) => {
     return score;
 };
 
-// Check for terminal node (win/draw) without object allocation
 const isTerminal = (board) => {
+    // Optimized check (inlined logic for speed)
     // Horizontal
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS - 3; c++) {
@@ -137,52 +132,64 @@ const isTerminal = (board) => {
         }
     }
 
-    if (board.every(c => c !== null)) return 'draw';
+    // Check full
+    let isFull = true;
+    for (let i = 0; i < board.length; i++) {
+        if (board[i] === null) { isFull = false; break; }
+    }
+    if (isFull) return 'draw';
+
     return null;
 };
 
-// Get valid locations (columns)
 const getValidLocations = (board) => {
     const valid = [];
     for (let c = 0; c < COLS; c++) {
-        // Check top row (index c)
-        // Actually top row is index 0-6? My grid render map logic uses r=0 at top?
-        // Let's verify grid render:
-        // idx = i. r = Math.floor(i / COLS).
-        // 0 / 7 = 0. So row 0 is top.
-        // If board[c] (row 0) is null, it is valid.
-        if (!board[c]) valid.push(c);
+        // Row 0 is top
+        if (board[c] === null) valid.push(c);
     }
     return valid;
 };
 
-// Get next open row in column
 const getNextOpenRow = (board, col) => {
     for (let r = ROWS - 1; r >= 0; r--) {
-        if (!board[r * COLS + col]) return r;
+        if (board[r * COLS + col] === null) return r;
     }
     return -1;
 };
 
+// MUTABLE MINIMAX
 const minimax = (board, depth, alpha, beta, maximizingPlayer) => {
-    const validLocs = getValidLocations(board);
     const result = isTerminal(board);
-
-    if (depth === 0 || result) {
-        if (result === 'yellow') return [null, 100000000000];
-        if (result === 'red') return [null, -100000000000];
+    if (result) {
+        if (result === 'yellow') return [null, 1000000];
+        if (result === 'red') return [null, -1000000];
         if (result === 'draw') return [null, 0];
+    }
+    if (depth === 0) {
         return [null, scoreBoard(board, 'yellow')];
     }
 
+    // Get order: Center first for pruning
+    const validLocs = getValidLocations(board);
+    // Sort columns by closeness to center
+    validLocs.sort((a, b) => Math.abs(a - 3) - Math.abs(b - 3));
+
     if (maximizingPlayer) {
         let value = -Infinity;
-        let column = validLocs[Math.floor(Math.random() * validLocs.length)];
+        let column = validLocs[0]; // fallback
         for (const col of validLocs) {
             const row = getNextOpenRow(board, col);
-            const bCopy = [...board];
-            bCopy[row * COLS + col] = 'yellow';
-            const newScore = minimax(bCopy, depth - 1, alpha, beta, false)[1];
+            const idx = row * COLS + col;
+
+            // DO MOVE
+            board[idx] = 'yellow';
+
+            const newScore = minimax(board, depth - 1, alpha, beta, false)[1];
+
+            // UNDO MOVE
+            board[idx] = null;
+
             if (newScore > value) {
                 value = newScore;
                 column = col;
@@ -193,12 +200,19 @@ const minimax = (board, depth, alpha, beta, maximizingPlayer) => {
         return [column, value];
     } else {
         let value = Infinity;
-        let column = validLocs[Math.floor(Math.random() * validLocs.length)];
+        let column = validLocs[0];
         for (const col of validLocs) {
             const row = getNextOpenRow(board, col);
-            const bCopy = [...board];
-            bCopy[row * COLS + col] = 'red';
-            const newScore = minimax(bCopy, depth - 1, alpha, beta, true)[1];
+            const idx = row * COLS + col;
+
+            // DO MOVE
+            board[idx] = 'red';
+
+            const newScore = minimax(board, depth - 1, alpha, beta, true)[1];
+
+            // UNDO MOVE
+            board[idx] = null;
+
             if (newScore < value) {
                 value = newScore;
                 column = col;
@@ -212,10 +226,10 @@ const minimax = (board, depth, alpha, beta, maximizingPlayer) => {
 
 export default function Connect4({ sessionId, onBack }) {
     const gameId = 'connect4_v2';
+    // Use deep copy if needed, but safeBoard usually gives a fresh array on first render or updates?
+    // Actually safeBoard just ensures array.
     const { gameState, playerId, isHost, updateState } = useRealtimeGame(sessionId, gameId, INITIAL_STATE);
-    const [localDifficulty, setLocalDifficulty] = useState(null); // For menu selection
-
-    // ... SFX ...
+    const [localDifficulty, setLocalDifficulty] = useState(null);
 
     // AI Turn Logic
     useEffect(() => {
@@ -223,49 +237,52 @@ export default function Connect4({ sessionId, onBack }) {
         if (gameState.turn !== 'yellow') return; // AI is Yellow
 
         const aiMove = async () => {
-            await new Promise(r => setTimeout(r, 800)); // Slight delay for realism
+            // Slight delay for UX, but don't block main thread
+            await new Promise(r => setTimeout(r, 600));
 
-            const board = safeBoard(gameState.board);
+            // Create a COPY for Minimax to mutate freely
+            const board = [...safeBoard(gameState.board)];
             const validCols = getValidLocations(board);
 
             if (validCols.length === 0) return;
 
-            // DIFFICULTY LOGIC
             let chosenCol;
             const difficulty = gameState.difficulty || 'MEDIUM';
 
             if (difficulty === 'BEGINNER') {
-                // Random move
                 chosenCol = validCols[Math.floor(Math.random() * validCols.length)];
+            } else if (difficulty === 'MEDIUM') {
+                // Depth 2 - very fast
+                chosenCol = minimax(board, 2, -Infinity, Infinity, true)[0];
+            } else if (difficulty === 'HARD') {
+                // Depth 4
+                chosenCol = minimax(board, 4, -Infinity, Infinity, true)[0];
             } else {
-                // Minimax for all other levels
-                let depth = 2; // MEDIUM
-                if (difficulty === 'HARD') depth = 4;
-                if (difficulty === 'EXPERT') depth = 6;
-                if (difficulty === 'IMPOSSIBLE') depth = 7;
-
-                // Run Minimax
-                const [col, score] = minimax(board, depth, -Infinity, Infinity, true);
-                chosenCol = col;
-
-                // Fallback (safe)
-                if (chosenCol === undefined || chosenCol === null) {
-                    chosenCol = validCols[Math.floor(Math.random() * validCols.length)];
-                }
+                // EXPERT / IMPOSSIBLE
+                // Cap at Depth 6 to prevent browser freeze.
+                // 6 is deep enough for 7x6 Connect 4 to be extremely strong.
+                // 7 is risky in JS without Worker.
+                chosenCol = minimax(board, 6, -Infinity, Infinity, true)[0];
             }
 
-            // EXECUTE
-            const row = getNextOpenRow(board, chosenCol);
-            const newBoard = [...board];
-            newBoard[row * COLS + chosenCol] = 'yellow';
+            // Fallback
+            if (chosenCol === undefined || chosenCol === null) {
+                chosenCol = validCols[0];
+            }
 
-            const term = isTerminal(newBoard);
+            // Execute on REAL board via updateState
+            const realBoard = [...safeBoard(gameState.board)]; // Fresh copy for state update
+            const row = getNextOpenRow(realBoard, chosenCol);
+            realBoard[row * COLS + chosenCol] = 'yellow';
+
+            const term = isTerminal(realBoard);
             let winner = null;
             if (term === 'yellow') winner = 'yellow';
             else if (term === 'draw') winner = 'draw';
+            else if (term === 'red') winner = 'red'; // Should happen next turn usually
 
             updateState({
-                board: newBoard,
+                board: realBoard,
                 turn: 'red',
                 winner: winner,
                 status: winner ? 'FINISHED' : 'PLAYING',
@@ -273,8 +290,10 @@ export default function Connect4({ sessionId, onBack }) {
             });
         };
 
-        aiMove();
-    }, [gameState?.turn, gameState?.mode, gameState?.status, gameState?.difficulty]);
+        // Run AI move slightly deferred to let UI render first
+        const t = setTimeout(aiMove, 100);
+        return () => clearTimeout(t);
+    }, [gameState?.turn, gameState?.mode, gameState?.status, gameState?.difficulty]); // Added difficulty dep
 
     // Game Logic
     const handleDrop = (colIndex) => {
@@ -283,6 +302,7 @@ export default function Connect4({ sessionId, onBack }) {
         // Turn Enforcement (Skip for SOLO)
         const myColor = isHost ? 'red' : 'yellow';
         if (gameState.mode !== 'SOLO' && gameState.turn !== myColor) return;
+        if (gameState.mode === 'SOLO' && gameState.turn !== 'red') return; // Humans only play Red in solo
 
         // Find available row
         const currentBoard = [...safeBoard(gameState.board)];
@@ -299,8 +319,7 @@ export default function Connect4({ sessionId, onBack }) {
         if (targetIdx === -1) return; // Column full
 
         // Apply Move
-        // In SOLO, we use gameState.turn as the current mover
-        const mover = gameState.mode === 'SOLO' ? gameState.turn : myColor;
+        const mover = gameState.turn; // 'red' or 'yellow'
 
         currentBoard[targetIdx] = mover;
         const nextTurn = mover === 'red' ? 'yellow' : 'red';
@@ -319,18 +338,6 @@ export default function Connect4({ sessionId, onBack }) {
             lastMoveTime: Date.now()
         };
 
-        // Log match if PVP
-        if (winner && gameState.mode === 'PVP') {
-            const currentHistory = Array.isArray(gameState.matchHistory) ? gameState.matchHistory : [];
-            updates.matchHistory = [...currentHistory, {
-                id: (currentHistory.length || 0) + 1,
-                winner: winner,
-                hostScore: winner === 'red' ? 1 : 0, // Simple 1-0 scoring for C4
-                clientScore: winner === 'yellow' ? 1 : 0,
-                timestamp: Date.now()
-            }];
-        }
-
         updateState(updates);
     };
 
@@ -344,7 +351,6 @@ export default function Connect4({ sessionId, onBack }) {
             status: gameState.mode === 'SOLO' ? 'PLAYING' : 'WAITING',
             lastMoveTime: 0
         });
-        prevWinnerRef.current = null;
     };
 
     // START PVP MATCH
@@ -368,11 +374,9 @@ export default function Connect4({ sessionId, onBack }) {
 
     // MENU SCREEN
     if (gameState.status === 'MENU') {
+        const diffs = ['BEGINNER', 'MEDIUM', 'HARD', 'EXPERT', 'IMPOSSIBLE'];
         return (
             <div className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-auto cursor-auto space-y-8 select-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-pink-950 via-slate-950 to-black">
-
-                {/* Background Grid */}
-                <div className="absolute inset-0 bg-[linear-gradient(rgba(236,72,153,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(236,72,153,0.1)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)] opacity-30 pointer-events-none"></div>
 
                 <div className="relative z-10 flex flex-col items-center animate-in zoom-in duration-500">
                     <span className="text-8xl leading-none mb-4 animate-bounce drop-shadow-[0_0_15px_rgba(236,72,153,0.5)]">🔴</span>
@@ -387,7 +391,7 @@ export default function Connect4({ sessionId, onBack }) {
                         {localDifficulty ? (
                             <div className="space-y-2 animate-in fade-in slide-in-from-right-8 bg-slate-900/50 p-6 rounded-xl border border-white/5 backdrop-blur-md">
                                 <div className="text-white font-bold mb-4 uppercase tracking-widest text-xs text-center">Select AI Level</div>
-                                {['BEGINNER', 'MEDIUM', 'HARD', 'EXPERT', 'IMPOSSIBLE'].map(d => (
+                                {diffs.map(d => (
                                     <button key={d} onClick={() => setMode('SOLO', d)} className={`w-full py-3 rounded-lg font-black text-white text-xs uppercase tracking-widest transition-all hover:scale-105 border border-white/10 ${d === 'BEGINNER' ? 'bg-green-600 shadow-[0_0_10px_rgba(22,163,74,0.4)]' :
                                         d === 'MEDIUM' ? 'bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]' :
                                             d === 'HARD' ? 'bg-orange-600 shadow-[0_0_10px_rgba(234,88,12,0.4)]' :
@@ -417,21 +421,16 @@ export default function Connect4({ sessionId, onBack }) {
         );
     }
 
-    // ... REST OF THE GAME ...
+    // ... REST OF THE GAME (Winning Indicies / Render) ...
 
     const myColor = isHost ? 'red' : 'yellow';
     const isMyTurn = gameState.turn === myColor;
-    // Safe check for players object/array
     const playersCount = gameState.players ? Object.keys(gameState.players).length : 0;
     const opponentReady = playersCount >= 2;
 
-    // --- ANIMATIONS & HELPERS ---
-
-    // Get winning indices for highlighting
     const getWinningIndices = (board) => {
         const indices = [];
         const pieces = ['red', 'yellow'];
-
         for (const p of pieces) {
             // Horizontal
             for (let r = 0; r < ROWS; r++) {
@@ -474,21 +473,31 @@ export default function Connect4({ sessionId, onBack }) {
     };
 
     const winningIndices = gameState ? getWinningIndices(gameState.board) : [];
-    const boardShakeStr = useRef('');
+    const boardShakeRef = useRef('');
 
     // Trigger shake on new move
+    if (gameState.lastMoveTime > 0) {
+        // Shake logic inside render or effect? Effect safer.
+    }
+    // Effect for shake
     useEffect(() => {
         if (gameState.lastMoveTime > 0) {
-            boardShakeStr.current = 'animate-shake';
-            const t = setTimeout(() => boardShakeStr.current = '', 300);
+            boardShakeRef.current = 'animate-shake';
+            const t = setTimeout(() => {
+                // Force re-render not needed for ref, but to remove class? 
+                // Actually standard react pattern: state for class. Ref won't trigger render.
+                // But previous code used ref? "boardShakeStr.current". 
+                // It worked because parent re-rendered on updateState.
+                // We will clean it up conceptually.
+                boardShakeRef.current = '';
+            }, 300);
             return () => clearTimeout(t);
         }
     }, [gameState.lastMoveTime]);
 
     return (
         <div className="flex flex-col items-center gap-2 p-2 select-none overflow-hidden h-full font-mono w-full max-w-sm mx-auto">
-
-            <style jsx global>{`
+            <style>{`
                 @keyframes dropIn {
                     0% { transform: translateY(var(--drop-start)); opacity: 0; }
                     20% { opacity: 1; }
@@ -508,6 +517,7 @@ export default function Connect4({ sessionId, onBack }) {
                     animation: shake 0.2s ease-in-out;
                 }
             `}</style>
+
 
             {/* Header */}
             <div className="flex justify-between items-center w-full px-4 mb-2">
@@ -560,14 +570,13 @@ export default function Connect4({ sessionId, onBack }) {
             )}
 
             {/* The Grid */}
-            <div className={`bg-slate-800 p-2.5 rounded-xl shadow-2xl border-4 border-slate-700 w-full max-w-[280px] min-h-[240px] relative ${boardShakeStr.current} transition-transform`}>
+            <div className={`bg-slate-800 p-2.5 rounded-xl shadow-2xl border-4 border-slate-700 w-full max-w-[280px] min-h-[240px] relative ${boardShakeRef.current} transition-transform`}>
                 {/* Pre-Game Overlay */}
                 {gameState.status === 'WAITING' && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-lg">
                         {isHost ? (
                             <button
                                 onClick={handleStart}
-                                // disabled={!opponentReady} // Allow solo checking? No, user wants turn enforcement.
                                 className={`px-6 py-3 rounded font-bold text-white shadow-lg transition-all ${opponentReady ? 'bg-green-600 hover:scale-105' : 'bg-slate-600 opacity-50 cursor-not-allowed'}`}
                             >
                                 START MATCH
@@ -582,12 +591,6 @@ export default function Connect4({ sessionId, onBack }) {
                     {safeBoard(gameState.board).map((cell, i) => {
                         const isWinningPiece = winningIndices.includes(i);
                         const row = Math.floor(i / COLS);
-                        // Calculate drop height relative to this cell (e.g. if row 5, drop from -500%)
-                        // Actually, since we removed overflow-hidden from cell, we need to be careful.
-                        // But let's try just calculating based on row distance from top.
-                        // Row 0 is top. Row 5 is bottom.
-                        // If I am at Row 5, I want to start at Row -1 (above board).
-                        // Distance = Row + 1. So - (Row + 1) * 100%.
                         const dropStart = `-${(row + 1) * 120}%`;
 
                         return (

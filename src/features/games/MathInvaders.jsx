@@ -11,7 +11,10 @@ const DIFFICULTIES = {
 const generateProblem = (difficulty) => {
     let a, b, op, answer, decoys = [];
 
-    if (difficulty === DIFFICULTIES.BEGINNER) {
+    // Safety checks
+    const level = difficulty || DIFFICULTIES.BEGINNER;
+
+    if (level === DIFFICULTIES.BEGINNER) {
         op = Math.random() > 0.5 ? '+' : '-';
         a = Math.floor(Math.random() * 20) + 1;
         b = Math.floor(Math.random() * 10) + 1;
@@ -25,8 +28,9 @@ const generateProblem = (difficulty) => {
     } else {
         // Intermediate+ (Multiplication)
         op = 'x';
-        a = Math.floor(Math.random() * 11) + 2;
-        b = Math.floor(Math.random() * 11) + 2;
+        const max = level === DIFFICULTIES.EXPERT ? 15 : 11;
+        a = Math.floor(Math.random() * max) + 2;
+        b = Math.floor(Math.random() * max) + 2;
         answer = a * b;
     }
 
@@ -39,7 +43,8 @@ const generateProblem = (difficulty) => {
     ];
 
     // Select unique decoys
-    while (decoys.length < 5) { // We need decent pool
+    let attempts = 0;
+    while (decoys.length < 5 && attempts < 50) { // Safety break
         const d = potentialDecoys[Math.floor(Math.random() * potentialDecoys.length)];
         if (d !== answer && d >= 0 && !decoys.includes(d)) {
             decoys.push(d);
@@ -49,6 +54,12 @@ const generateProblem = (difficulty) => {
             let r = Math.floor(Math.random() * 50);
             if (r !== answer && !decoys.includes(r)) decoys.push(r);
         }
+        attempts++;
+    }
+
+    // Fallback if loop failed
+    while (decoys.length < 5) {
+        decoys.push(answer + decoys.length + 1);
     }
 
     return {
@@ -66,7 +77,8 @@ export default function MathInvaders({ onBack }) {
         timeLeft: 30,
         equation: "READY?",
         gameOver: false,
-        menu: true // Start in Menu
+        menu: true,
+        difficulty: 'BEGINNER' // Default UI state
     });
     const requestRef = useRef();
 
@@ -83,8 +95,8 @@ export default function MathInvaders({ onBack }) {
         score: 0,
         timeLeft: 30, // seconds
         lastTimeCheck: Date.now(),
-        level: 1,
-        active: true,
+        level: 1, // 1=Beg, 2=Int, 3=Exp
+        active: false, // Start inactive to prevent freeze
         combo: 0
     });
 
@@ -95,6 +107,7 @@ export default function MathInvaders({ onBack }) {
 
         // Handle Resize
         const resize = () => {
+            if (!canvas || !canvas.parentElement) return;
             canvas.width = canvas.parentElement.clientWidth;
             canvas.height = canvas.parentElement.clientHeight;
             gameState.current.player.y = canvas.height - 80;
@@ -107,7 +120,17 @@ export default function MathInvaders({ onBack }) {
         const handleInput = (e) => {
             if (!gameState.current.active) return;
             const rect = canvas.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+
+            // Fix "reading '0'" error: Ensure touches array exists and has items
+            let clientX;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+            } else if (e.clientX !== undefined) {
+                clientX = e.clientX;
+            } else {
+                return; // Invalid event
+            }
+
             const x = clientX - rect.left;
 
             // Smoother clamping
@@ -117,30 +140,13 @@ export default function MathInvaders({ onBack }) {
         canvas.addEventListener('mousemove', handleInput);
         canvas.addEventListener('touchmove', handleInput, { passive: false });
 
-        // --- INIT LEVEL ---
-        const startLevel = () => {
-            // ensure menu off
-            setHud(h => ({ ...h, menu: false, timeLeft: 30, score: 0, gameOver: false }));
-
-            const state = gameState.current;
-            state.active = true;
-            state.score = 0;
-            state.timeLeft = 30; // Reset time
-            state.texts = []; // Clear texts
-            state.problem = generateProblem(state.level === 1 ? DIFFICULTIES.BEGINNER : DIFFICULTIES.INTERMEDIATE);
-
-            // HUD update handled above or here redundant but safe
-            setHud(prev => ({ ...prev, equation: state.problem.equation, menu: false, timeLeft: 30, score: 0 }));
-
-            spawnInvaders();
-            state.lastTimeCheck = Date.now(); // Reset timer delta
-        };
-
 
         // --- SPAWN LOGIC (SWARM ENTRANCE) ---
         const spawnInvaders = () => {
             const state = gameState.current;
             state.invaders = [];
+
+            if (!state.problem) return; // Safety
 
             const cols = 5;
             const startX = (canvas.width - (cols * 60)) / 2;
@@ -199,6 +205,14 @@ export default function MathInvaders({ onBack }) {
             }
         };
 
+        const createFloatingText = (x, y, text, color) => {
+            gameState.current.texts.push({
+                x, y, text, color,
+                vy: -2,
+                life: 1.0
+            });
+        };
+
         const updateParticles = (ctx) => {
             const state = gameState.current;
             for (let i = state.particles.length - 1; i >= 0; i--) {
@@ -223,7 +237,15 @@ export default function MathInvaders({ onBack }) {
 
         // --- LOOP ---
         const update = () => {
-            if (!gameState.current.active) return;
+            if (!gameState.current.active) {
+                // Keep loop running but minimal for menu bg if needed, or just pause
+                // drawing background prevents trail artifacts
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                requestRef.current = requestAnimationFrame(update);
+                return;
+            }
+
             const state = gameState.current;
             const now = Date.now();
 
@@ -236,7 +258,8 @@ export default function MathInvaders({ onBack }) {
                 if (state.timeLeft <= 0) {
                     state.active = false;
                     setHud(h => ({ ...h, gameOver: true, timeLeft: 0 }));
-                    return;
+
+                    // Don't return here, let one last frame draw
                 }
             }
             state.frame++;
@@ -285,10 +308,12 @@ export default function MathInvaders({ onBack }) {
             }
 
             // 4. Invaders (Swarm Logic)
-            if (state.invaders.length === 0 && state.problem) {
-                // handled by external level check if needed
+            if (state.invaders.length === 0 && !state.problem) {
+                // Should have problem by now if active
             } else if (!state.problem) {
-                startLevel();
+                // Auto-generate if missing (failsafe)
+                state.problem = generateProblem(state.level);
+                spawnInvaders();
             }
 
             state.invaders.forEach(inv => {
@@ -314,12 +339,8 @@ export default function MathInvaders({ onBack }) {
 
                 } else {
                     // Hovering Bob
-                    inv.finalY = inv.targetY + Math.sin(state.frame * 0.05) * 10;
-                    // Draw uses current inv.y, so we update it?
-                    // Wait, previous code used inv.finalY for drawing. 
-                    // Let's standardise on inv.y being the "center" and we draw with offset is safer.
-                    // Actually, let's just make inv.y the definitive position.
                     inv.y = inv.targetY + Math.sin(state.frame * 0.05) * 10;
+                    inv.finalY = inv.y; // Ensure sync
                 }
 
                 // Draw Invader
@@ -340,19 +361,16 @@ export default function MathInvaders({ onBack }) {
             // Render Particles
             updateParticles(ctx);
 
-            // 5. Collision (Existing logic...)
-
-
             // 5. Collision Detection
             state.bullets.forEach((b, bIdx) => {
                 state.invaders.forEach((inv, iIdx) => {
                     // Simple Box/Point Collision
                     if (b.x > inv.x - 25 && b.x < inv.x + 25 &&
-                        b.y > inv.finalY - 25 && b.y < inv.finalY + 25) {
+                        b.y > inv.y - 25 && b.y < inv.y + 25) { // Use inv.y
 
                         // Collision!
                         state.bullets.splice(bIdx, 1);
-                        createExplosion(inv.x, inv.finalY, inv.isTarget ? '#00ff00' : '#ff0000');
+                        createExplosion(inv.x, inv.y, inv.isTarget ? '#00ff00' : '#ff0000');
 
                         if (inv.isTarget) {
                             // CORRECT!
@@ -362,10 +380,10 @@ export default function MathInvaders({ onBack }) {
                             state.score += points;
                             state.combo++;
 
-                            createFloatingText(inv.x, inv.finalY, `+${points}`, '#4ade80'); // Green
+                            createFloatingText(inv.x, inv.y, `+${points}`, '#4ade80'); // Green
 
                             // Trigger Next Question
-                            state.problem = generateProblem(state.level === 1 ? DIFFICULTIES.BEGINNER : DIFFICULTIES.INTERMEDIATE);
+                            state.problem = generateProblem(state.level);
                             setHud(h => ({
                                 ...h,
                                 score: state.score,
@@ -380,7 +398,7 @@ export default function MathInvaders({ onBack }) {
                             state.score = Math.max(0, state.score - penalty);
                             setHud(h => ({ ...h, score: state.score }));
 
-                            createFloatingText(inv.x, inv.finalY, `-${penalty}`, '#ef4444'); // Red
+                            createFloatingText(inv.x, inv.y, `-${penalty}`, '#ef4444'); // Red
 
                             // Screen Shake
                             canvas.style.transform = `translate(${Math.random() * 10 - 5}px, ${Math.random() * 10 - 5}px)`;
@@ -389,25 +407,6 @@ export default function MathInvaders({ onBack }) {
                     }
                 });
             });
-
-            // 6. Particles
-            for (let i = state.particles.length - 1; i >= 0; i--) {
-                const p = state.particles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-                p.life -= 0.05;
-                p.vy += 0.5; // Gravity
-
-                if (p.life <= 0) {
-                    state.particles.splice(i, 1);
-                    continue;
-                }
-
-                ctx.globalAlpha = p.life;
-                ctx.fillStyle = p.color;
-                ctx.fillRect(p.x, p.y, 3, 3);
-                ctx.globalAlpha = 1.0;
-            }
 
             // 7. Floating Texts
             for (let i = state.texts.length - 1; i >= 0; i--) {
@@ -442,6 +441,43 @@ export default function MathInvaders({ onBack }) {
         };
     }, []);
 
+    // --- HELPER: START GAME FROM MENU ---
+    const startGame = () => {
+        let diffLevel = DIFFICULTIES.BEGINNER;
+        if (hud.difficulty === 'INTERMEDIATE') diffLevel = DIFFICULTIES.INTERMEDIATE;
+        if (hud.difficulty === 'EXPERT') diffLevel = DIFFICULTIES.EXPERT;
+
+        gameState.current.level = diffLevel;
+        gameState.current.active = true;
+        gameState.current.score = 0;
+        gameState.current.timeLeft = 30;
+        gameState.current.invaders = [];
+        gameState.current.problem = generateProblem(diffLevel);
+        gameState.current.lastTimeCheck = Date.now();
+
+        // Explicitly call spawn logic logic via a reset flag or similar? 
+        // Actually the game loop checks `if (!state.invaders... && !state.problem)`
+        // But we just set state.problem. So loop needs to know to spawn.
+        // Let's manually trigger spawn in the loop by clearing invaders (done above)
+        // And relying on the loop's `if (invaders.length === 0)` block?
+        // Wait, loop has `if (invaders.length === 0)` logic?
+        // Ah, loop logic: `if (state.invaders.length === 0 && !state.problem)`.
+        // We set state.problem. So invalid.
+        // We need the loop to spawn if we have a problem but no invaders.
+        // Let's rely on the fact that `spawnInvaders` was defined inside useEffect and not accessible here easily without ref logic.
+        // Workaround: Set problem to null? No.
+        // BETTER: Move spawnInvaders to a ref or just let loop handle "have problem, no invaders" -> spawn.
+        // Let's look at loop: "if (state.invaders.length === 0 && !state.problem) { startLevel() }".
+        // What if we have problem?
+        // We need to add "if (state.invaders.length === 0 && state.problem) spawnInvaders()". 
+        // BUT spawnInvaders is inside closure. 
+        // To fix this cleanly: I will reset problem to null here, and let the loop generate it.
+
+        gameState.current.problem = null; // Loop will see active=true, problem=null -> generate & spawn.
+
+        setHud(h => ({ ...h, menu: false, timeLeft: 30, score: 0, gameOver: false, equation: "GET READY" }));
+    };
+
     // --- RENDER ---
     return (
         <div className="w-full h-full relative bg-slate-900 overflow-hidden cursor-none touch-none">
@@ -450,30 +486,31 @@ export default function MathInvaders({ onBack }) {
             {hud.menu && (
                 <div className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-auto cursor-auto space-y-8 select-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-950 via-slate-950 to-black">
 
-                    {/* Background Grid */}
-                    <div className="absolute inset-0 bg-[linear-gradient(rgba(147,51,234,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(147,51,234,0.1)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)] opacity-30 pointer-events-none"></div>
-
                     <div className="relative z-10 flex flex-col items-center animate-in zoom-in duration-500">
                         <span className="text-8xl leading-none mb-4 animate-bounce drop-shadow-[0_0_15px_rgba(168,85,247,0.5)]">👾</span>
                         <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-t from-purple-600 to-pink-400 tracking-tighter filter drop-shadow-[0_0_20px_rgba(147,51,234,0.5)] mb-2 italic transform -skew-x-6">
                             MATH INVADERS
                         </h1>
-                        <p className="text-pink-400 font-mono font-bold tracking-[0.5em] text-sm animate-pulse uppercase">Defender of the Grid</p>
+                    </div>
+
+                    {/* DIFFICULTY SELECTOR */}
+                    <div className="flex gap-4 mb-4 z-20">
+                        {['BEGINNER', 'INTERMEDIATE', 'EXPERT'].map(d => (
+                            <button
+                                key={d}
+                                onClick={() => setHud(h => ({ ...h, difficulty: d }))}
+                                className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-widest border transition-all ${hud.difficulty === d ? 'bg-purple-600 border-purple-400 scale-110 shadow-lg' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'}`}
+                            >
+                                {d}
+                            </button>
+                        ))}
                     </div>
 
                     <div className="flex flex-col gap-4 relative z-10 w-full max-w-xs">
                         <button
-                            onClick={() => {
-                                gameState.current.problem = null;
-                                gameState.current.score = 0;
-                                gameState.current.timeLeft = 30;
-                                gameState.current.active = true;
-                                gameState.current.invaders = [];
-                                setHud(h => ({ ...h, menu: false, timeLeft: 30, score: 0 }));
-                            }}
+                            onClick={startGame}
                             className="w-full group relative overflow-hidden bg-purple-600 hover:bg-purple-500 text-white font-black text-xl rounded-xl py-6 shadow-[0_0_30px_rgba(147,51,234,0.3)] transition-all transform hover:scale-105 active:scale-95"
                         >
-                            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 transform skew-y-12"></div>
                             <span className="relative z-10 uppercase tracking-widest flex items-center justify-center gap-2">
                                 <span>Start Mission</span>
                                 <span className="text-2xl animate-pulse">🚀</span>
@@ -486,10 +523,6 @@ export default function MathInvaders({ onBack }) {
                         >
                             Abort Game
                         </button>
-                    </div>
-
-                    <div className="absolute bottom-8 text-[10px] text-purple-500/50 font-mono tracking-widest uppercase">
-                        High Score: {localStorage.getItem('math_invaders_hs') || 0}
                     </div>
                 </div>
             )}
@@ -504,7 +537,6 @@ export default function MathInvaders({ onBack }) {
                 </div>
                 <div className="text-right">
                     <div className="text-2xl font-mono text-cyan-400">SCORE: {hud.score}</div>
-                    {/* Time Display */}
                     <div className={`text-xl font-bold font-mono mt-1 ${hud.timeLeft <= 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
                         TIME: {hud.timeLeft}s
                     </div>
@@ -521,17 +553,13 @@ export default function MathInvaders({ onBack }) {
                     title="MISSION COMPLETE"
                     icon="🚀"
                     score={hud.score}
-                    onRestart={() => {
-                        gameState.current.invaders = [];
-                        gameState.current.problem = null;
-                        setHud(h => ({ ...h, menu: true, timeLeft: 30, score: 0, gameOver: false }));
-                    }}
+                    onRestart={() => setHud(h => ({ ...h, menu: true, gameOver: false }))}
                     onExit={onBack}
                 />
             )}
 
             {/* EXIT BUTTON (If not game over) */}
-            {!hud.gameOver && (
+            {!hud.gameOver && !hud.menu && (
                 <button
                     onClick={onBack}
                     className="absolute top-4 left-4 z-20 text-slate-500 hover:text-white pointer-events-auto"

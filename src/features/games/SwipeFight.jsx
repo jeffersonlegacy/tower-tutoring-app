@@ -440,23 +440,42 @@ export default function SwipeFight({ sessionId, onBack }) {
     };
 
 
-    // --- SWIPE HANDLERS ---
+    // --- SAFE INPUT HANDLERS (Fixes the crash) ---
+    // Helper to safely get X coordinate from Mouse OR Touch events
+    const getClientX = (e) => {
+        // Check for touch first
+        if (e.touches && e.touches.length > 0) {
+            return e.touches[0].clientX;
+        }
+        // Fallback to mouse
+        if (e.clientX !== undefined) {
+            return e.clientX;
+        }
+        return 0; // Fallback safety
+    };
+
     const handlePointerDown = (e) => {
         if (isInputLocked) return;
-        isDragging.current = true;
-        startX.current = e.clientX || e.touches?.[0].clientX;
+        isDragging.current = true; // Start drag
+        startX.current = getClientX(e);
     };
+
     const handlePointerMove = (e) => {
         if (!isDragging.current || isInputLocked) return;
-        const currentX = e.clientX || e.touches?.[0].clientX;
+
+        const currentX = getClientX(e);
         setDragX(currentX - startX.current);
     };
+
     const handlePointerUp = () => {
         if (!isDragging.current) return;
         isDragging.current = false;
-        if (dragX > 100) handleAnswer(true);
-        else if (dragX < -100) handleAnswer(false);
-        setDragX(0);
+
+        // Threshold for swipe action
+        if (dragX > 100) handleAnswer(true);       // Swiped Right
+        else if (dragX < -100) handleAnswer(false); // Swiped Left
+
+        setDragX(0); // Reset card position
     };
 
     const cardTransform = {
@@ -470,8 +489,15 @@ export default function SwipeFight({ sessionId, onBack }) {
     return (
         <div
             className={`flex flex-col h-full bg-slate-900 relative overflow-hidden select-none ${feedback === 'incorrect' ? 'incorrect-shake' : ''}`}
-            onMouseMove={handlePointerMove} onMouseUp={handlePointerUp} onMouseLeave={handlePointerUp}
-            onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}
+            // ATTACH ALL HANDLERS (Start, Move, End)
+            onMouseDown={handlePointerDown}
+            onMouseMove={handlePointerMove}
+            onMouseUp={handlePointerUp}
+            onMouseLeave={handlePointerUp}
+
+            onTouchStart={handlePointerDown}
+            onTouchMove={handlePointerMove}
+            onTouchEnd={handlePointerUp}
         >
             <style>{visualStyles}</style>
 
