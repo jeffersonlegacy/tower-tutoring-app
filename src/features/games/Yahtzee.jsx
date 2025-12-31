@@ -104,6 +104,7 @@ export default function Yahtzee({ sessionId, onBack }) {
 
     const activePlayer = playersList[activePlayerIndex];
     const isMyTurn = activePlayer?.id === playerId && gameState?.status === 'PLAYING';
+    const isBotTurn = activePlayer?.isBot && gameState?.status === 'PLAYING';
 
     const myPlayer = playersList.find(p => p.id === playerId);
 
@@ -111,6 +112,116 @@ export default function Yahtzee({ sessionId, onBack }) {
     // CRITICAL FIX: Ensure targetPlayerId is valid or fallback safely
     const targetPlayerId = viewingPlayerId || (myPlayer ? playerId : (activePlayer?.id || null));
     const targetPlayer = playersList.find(p => p.id === targetPlayerId);
+
+    // --- CPU TURN LOGIC ---
+    useEffect(() => {
+        if (!isBotTurn || rolling) return;
+
+        const botId = activePlayer?.id;
+        const botScores = safeScores[botId] || {};
+
+        // Helper to find best available category
+        const findBestCategory = (diceVals) => {
+            let bestCat = null;
+            let bestScore = -1;
+
+            CATEGORIES.forEach(cat => {
+                if (botScores[cat.id] !== undefined) return; // Already filled
+                const score = calculateScore(diceVals, cat.id);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestCat = cat.id;
+                }
+            });
+
+            // If no good score, pick first available (even if 0)
+            if (bestCat === null) {
+                for (const cat of CATEGORIES) {
+                    if (botScores[cat.id] === undefined) {
+                        bestCat = cat.id;
+                        break;
+                    }
+                }
+            }
+
+            return bestCat;
+        };
+
+        // Execute CPU turn
+        const executeBotTurn = async () => {
+            // Roll 1
+            setRolling(true);
+            await new Promise(r => setTimeout(r, 800));
+            let dice = safeDice.map(() => ({ value: rollDie(), held: false }));
+            updateState({ dice, rollCount: 1 });
+            setRolling(false);
+
+            // Roll 2 (with some held dice)
+            await new Promise(r => setTimeout(r, 1000));
+            setRolling(true);
+            await new Promise(r => setTimeout(r, 600));
+            // Simple strategy: hold high values
+            dice = dice.map(d => ({
+                ...d,
+                held: d.value >= 4 || Math.random() > 0.5
+            }));
+            dice = dice.map(d => d.held ? d : { ...d, value: rollDie() });
+            updateState({ dice, rollCount: 2 });
+            setRolling(false);
+
+            // Roll 3
+            await new Promise(r => setTimeout(r, 1000));
+            setRolling(true);
+            await new Promise(r => setTimeout(r, 600));
+            dice = dice.map(d => d.held ? d : { ...d, value: rollDie() });
+            updateState({ dice, rollCount: 3 });
+            setRolling(false);
+
+            // Select best category
+            await new Promise(r => setTimeout(r, 1000));
+            const diceVals = dice.map(d => d.value);
+            const bestCat = findBestCategory(diceVals);
+
+            if (bestCat) {
+                const score = calculateScore(diceVals, bestCat);
+                const newScores = { ...safeScores, [botId]: { ...botScores, [bestCat]: score } };
+
+                let nextTurn = gameState.turnIndex + 1;
+                let nextRound = gameState.round;
+                let nextStatus = gameState.status;
+                let winner = null;
+
+                if (nextTurn >= playersList.length) {
+                    nextTurn = 0;
+                    nextRound++;
+                }
+
+                const MAX_ROUNDS = gameState.mode === 'BLITZ' ? 3 : 13;
+                if (nextRound > MAX_ROUNDS) {
+                    nextStatus = 'FINISHED';
+                    let maxScore = -1;
+                    playersList.forEach(p => {
+                        const s = newScores[p.id] || {};
+                        const total = Object.values(s).reduce((a, b) => a + b, 0);
+                        if (total > maxScore) { maxScore = total; winner = p.id; }
+                    });
+                }
+
+                updateState({
+                    scores: newScores,
+                    turnIndex: nextTurn,
+                    round: nextRound,
+                    status: nextStatus,
+                    winner: winner,
+                    rollCount: 0,
+                    dice: Array(5).fill({ value: 1, held: false })
+                });
+            }
+        };
+
+        const timeout = setTimeout(executeBotTurn, 500);
+        return () => clearTimeout(timeout);
+    }, [isBotTurn, gameState?.turnIndex, gameState?.status]);
 
     // --- ACTIONS ---
 
