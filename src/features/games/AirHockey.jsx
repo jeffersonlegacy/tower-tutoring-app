@@ -256,21 +256,39 @@ export default function AirHockey({ sessionId, onBack }) {
         if (dist < PADDLE_RADIUS + PUCK_RADIUS) {
             const angle = Math.atan2(dy, dx);
             const force = 15;
+
+            // Set velocity away from paddle
             puck.vx = Math.cos(angle) * force;
             puck.vy = Math.sin(angle) * force;
 
-            // Unstick
-            const overlap = (PADDLE_RADIUS + PUCK_RADIUS) - dist;
-            puck.x += Math.cos(angle) * overlap;
-            puck.y += Math.sin(angle) * overlap;
+            // Stronger unstick - push puck completely outside paddle radius with buffer
+            const minDist = PADDLE_RADIUS + PUCK_RADIUS + 2; // +2 buffer
+            const overlap = minDist - dist;
+            if (overlap > 0) {
+                puck.x = paddle.x + Math.cos(angle) * minDist;
+                puck.y = paddle.y + Math.sin(angle) * minDist;
+            }
+
+            // Ensure minimum velocity to prevent sticking
+            const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+            if (speed < 10) {
+                const boost = 12 / speed;
+                puck.vx *= boost;
+                puck.vy *= boost;
+            }
         }
     };
 
     const scorePoint = (scorer) => {
-        if (!isHost && gameState.mode === 'PVP') return; // Only host updates score in PvP
+        if (!isHost && gameState?.mode === 'PVP') return; // Only host updates score in PvP
+        if (!gameState) return; // Safety check
 
-        const newHostScore = (gameState.hostScore || 0) + (scorer === 'host' ? 1 : 0);
-        const newClientScore = (gameState.clientScore || 0) + (scorer === 'client' ? 1 : 0);
+        const currentHostScore = gameState.hostScore || 0;
+        const currentClientScore = gameState.clientScore || 0;
+        const newHostScore = currentHostScore + (scorer === 'host' ? 1 : 0);
+        const newClientScore = currentClientScore + (scorer === 'client' ? 1 : 0);
+
+        console.log(`[AIR HOCKEY] Score: ${scorer} scored! ${currentHostScore} -> ${newHostScore} (host), ${currentClientScore} -> ${newClientScore} (client)`);
 
         const updates = {
             hostScore: newHostScore,
