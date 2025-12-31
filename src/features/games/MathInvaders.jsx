@@ -308,11 +308,14 @@ export default function MathInvaders({ onBack }) {
             }
 
             // 4. Invaders (Swarm Logic)
-            if (state.invaders.length === 0 && !state.problem) {
-                // Should have problem by now if active
-            } else if (!state.problem) {
-                // Auto-generate if missing (failsafe)
-                state.problem = generateProblem(state.level);
+            // FIX: Spawn invaders when we have none
+            if (state.invaders.length === 0) {
+                // Generate problem if missing
+                if (!state.problem) {
+                    state.problem = generateProblem(state.level);
+                    setHud(h => ({ ...h, equation: state.problem.equation }));
+                }
+                // Spawn invaders for current problem
                 spawnInvaders();
             }
 
