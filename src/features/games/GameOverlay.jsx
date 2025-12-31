@@ -23,10 +23,10 @@ export default function GameOverlay({ children, title, onClose }) {
 
             <div
                 className={`
-                    w-full sm:max-w-5xl h-[95vh] sm:h-auto sm:max-h-[90vh] 
+                    w-full h-full sm:w-[95vw] sm:h-[95vh] sm:max-w-6xl
                     bg-gradient-to-b from-slate-900 to-slate-950 
                     border border-white/10 sm:border-2 sm:border-slate-700 
-                    rounded-t-3xl sm:rounded-3xl shadow-2xl 
+                    sm:rounded-3xl shadow-2xl 
                     flex flex-col overflow-hidden relative
                     transition-all duration-300 ease-out
                     ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-full sm:translate-y-8 opacity-0'}
