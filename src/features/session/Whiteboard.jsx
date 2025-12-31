@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { Tldraw } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import { useWhiteboardSync } from '../../hooks/useWhiteboardSync';

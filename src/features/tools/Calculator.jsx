@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 export default function Calculator() {
     const [display, setDisplay] = useState('0');
@@ -10,7 +10,6 @@ export default function Calculator() {
             try {
                 // Safe evaluation limited to math chars
                 if (/[^0-9+\-*/().]/.test(display)) return;
-                // eslint-disable-next-line
                 // Safe alternative to eval
                 const safeEval = new Function('return ' + display);
                 setDisplay(String(safeEval()));

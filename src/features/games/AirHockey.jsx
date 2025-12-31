@@ -523,8 +523,18 @@ export default function AirHockey({ sessionId, onBack }) {
                     height={TABLE_HEIGHT}
                     className="max-w-full max-h-full aspect-[2/3] shadow-2xl border-x-8 border-slate-800"
                     onMouseMove={e => handleInput(e.clientX, e.clientY)}
-                    onTouchMove={e => { e.preventDefault(); handleInput(e.touches[0].clientX, e.touches[0].clientY); }}
-                    onTouchStart={e => { e.preventDefault(); handleInput(e.touches[0].clientX, e.touches[0].clientY); }}
+                    onTouchMove={e => {
+                        e.preventDefault();
+                        if (e.touches && e.touches.length > 0) {
+                            handleInput(e.touches[0].clientX, e.touches[0].clientY);
+                        }
+                    }}
+                    onTouchStart={e => {
+                        e.preventDefault();
+                        if (e.touches && e.touches.length > 0) {
+                            handleInput(e.touches[0].clientX, e.touches[0].clientY);
+                        }
+                    }}
                 />
             </div>
 

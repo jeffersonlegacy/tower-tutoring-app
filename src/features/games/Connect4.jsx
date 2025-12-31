@@ -291,9 +291,19 @@ export default function Connect4({ sessionId, onBack }) {
         };
 
         // Run AI move slightly deferred to let UI render first
-        const t = setTimeout(aiMove, 100);
-        return () => clearTimeout(t);
-    }, [gameState?.turn, gameState?.mode, gameState?.status, gameState?.difficulty]); // Added difficulty dep
+        const moveTimer = setTimeout(aiMove, 100);
+        return () => {
+            clearTimeout(moveTimer);
+            isMounted.current = false;
+        };
+    }, [gameState?.turn, gameState?.mode, gameState?.status, gameState?.difficulty]);
+
+    // Mount tracking
+    const isMounted = useRef(true);
+    useEffect(() => {
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
+    }, []);
 
     // Game Logic
     const handleDrop = (colIndex) => {

@@ -2,19 +2,127 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOWER TUTORING - PREMIUM DESIGN SYSTEM
+   A masterpiece-level UI foundation with jaw-dropping aesthetics
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* --- BASE ENHANCEMENTS --- */
+@layer base {
+    html {
+        scroll-behavior: smooth;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    ::selection {
+        background: rgba(6, 182, 212, 0.3);
+        color: white;
+    }
+
+    /* Premium Scrollbar */
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: rgba(100, 116, 139, 0.4);
+        border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(100, 116, 139, 0.6);
+    }
+}
+
+/* --- UTILITY CLASSES --- */
 @layer utilities {
+
+    /* Floating Animation */
     .animate-float {
         animation: float 6s ease-in-out infinite;
     }
 
+    /* Slow Pulse */
     .animate-pulse-slow {
         animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
 
+    /* Spin Slow (for rotating rings) */
+    .animate-spin-slow {
+        animation: spin 20s linear infinite;
+    }
+
+    .animate-reverse-spin {
+        animation: spin 25s linear infinite reverse;
+    }
+
+    /* Glow Pulse Effect */
+    .animate-glow-pulse {
+        animation: glow-pulse 2s ease-in-out infinite;
+    }
+
+    /* Shimmer Effect */
+    .animate-shimmer {
+        animation: shimmer 2s linear infinite;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+        background-size: 200% 100%;
+    }
+
+    /* Spring Bounce */
+    .animate-spring {
+        animation: spring 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* Slide Animations */
+    .animate-slide-up {
+        animation: slide-up 0.4s ease-out;
+    }
+
+    .animate-slide-down {
+        animation: slide-down 0.4s ease-out;
+    }
+
+    /* --- GLASSMORPHISM PANELS --- */
     .glass-panel {
         @apply bg-slate-900/40 backdrop-blur-xl border border-white/10 shadow-2xl;
     }
 
+    .glass-panel-cyan {
+        @apply bg-cyan-950/30 backdrop-blur-xl border border-cyan-500/20 shadow-[0_0_30px_rgba(6, 182, 212, 0.1)];
+    }
+
+    .glass-panel-purple {
+        @apply bg-purple-950/30 backdrop-blur-xl border border-purple-500/20 shadow-[0_0_30px_rgba(168, 85, 247, 0.1)];
+    }
+
+    .glass-panel-emerald {
+        @apply bg-emerald-950/30 backdrop-blur-xl border border-emerald-500/20 shadow-[0_0_30px_rgba(52, 211, 153, 0.1)];
+    }
+
+    /* --- GLOW EFFECTS --- */
+    .glow-cyan {
+        box-shadow: 0 0 20px rgba(6, 182, 212, 0.3), 0 0 40px rgba(6, 182, 212, 0.1);
+    }
+
+    .glow-purple {
+        box-shadow: 0 0 20px rgba(168, 85, 247, 0.3), 0 0 40px rgba(168, 85, 247, 0.1);
+    }
+
+    .glow-emerald {
+        box-shadow: 0 0 20px rgba(52, 211, 153, 0.3), 0 0 40px rgba(52, 211, 153, 0.1);
+    }
+
+    .glow-pink {
+        box-shadow: 0 0 20px rgba(236, 72, 153, 0.3), 0 0 40px rgba(236, 72, 153, 0.1);
+    }
+
+    /* --- BACKGROUND PATTERNS --- */
     .bg-logo-pattern {
         position: relative;
     }
@@ -34,7 +142,43 @@
     .animate-slide {
         animation: slide 60s linear infinite;
     }
+
+    /* Grid Pattern Overlay */
+    .bg-grid-pattern {
+        background-image:
+            linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+    }
+
+    /* Dotted Pattern */
+    .bg-dotted {
+        background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+        background-size: 20px 20px;
+    }
+
+    /* --- TEXT EFFECTS --- */
+    .text-glow-cyan {
+        text-shadow: 0 0 10px rgba(6, 182, 212, 0.5), 0 0 20px rgba(6, 182, 212, 0.3);
+    }
+
+    .text-glow-purple {
+        text-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
+    }
+
+    /* --- 3D TILT PERSPECTIVE --- */
+    .perspective-1000 {
+        perspective: 1000px;
+    }
+
+    .preserve-3d {
+        transform-style: preserve-3d;
+    }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   KEYFRAME ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 @keyframes float {
 
@@ -56,4 +200,108 @@
     100% {
         background-position: 100% 100%;
     }
+}
+
+@keyframes glow-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+        opacity: 1;
+    }
+
+    50% {
+        box-shadow: 0 0 40px rgba(6, 182, 212, 0.6);
+        opacity: 0.8;
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+@keyframes spring {
+    0% {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes slide-up {
+    0% {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slide-down {
+    0% {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Breathing glow for emblems */
+@keyframes breathe {
+
+    0%,
+    100% {
+        box-shadow: 0 0 30px rgba(6, 182, 212, 0.2);
+        transform: scale(1);
+    }
+
+    50% {
+        box-shadow: 0 0 60px rgba(6, 182, 212, 0.4);
+        transform: scale(1.02);
+    }
+}
+
+.animate-breathe {
+    animation: breathe 4s ease-in-out infinite;
+}
+
+/* Stagger animation delays for lists */
+.stagger-1 {
+    animation-delay: 0.1s;
+}
+
+.stagger-2 {
+    animation-delay: 0.2s;
+}
+
+.stagger-3 {
+    animation-delay: 0.3s;
+}
+
+.stagger-4 {
+    animation-delay: 0.4s;
+}
+
+.stagger-5 {
+    animation-delay: 0.5s;
 }

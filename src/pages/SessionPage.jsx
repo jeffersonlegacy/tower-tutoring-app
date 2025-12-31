@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Whiteboard from "../features/session/Whiteboard";
 import VideoChat from "../features/session/VideoChat";
 import HomeworkTray from "../features/session/HomeworkTray";
@@ -12,7 +12,7 @@ import MindHiveInterface from "../features/session/MindHiveInterface";
 export default function Session() {
     const { sessionId } = useParams();
     const [maintenanceMode, setMaintenanceMode] = useState({ enabled: false, message: '' });
-    const { uploadFile, uploading } = useHomeworkUpload(sessionId);
+    const { uploadFile } = useHomeworkUpload(sessionId);
     const [isDragging, setIsDragging] = useState(false);
     const [sessionEnded, setSessionEnded] = useState(false);
 

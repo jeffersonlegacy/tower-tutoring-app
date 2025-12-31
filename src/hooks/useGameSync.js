@@ -19,6 +19,7 @@ export function useGameSync(sessionId, gameId, initialState) {
 
     // Refs to avoid closure staleness in throttled functions
     const gameStateRef = useRef(initialState);
+    const initialStateRef = useRef(initialState);
     const isHostRef = useRef(false);
 
     // Generate a semi-persistent player ID for this session loaded
@@ -45,7 +46,7 @@ export function useGameSync(sessionId, gameId, initialState) {
                     // No game exists? I am the HOST.
                     console.log("[GameSync] initializing as HOST");
                     await setDoc(gameDocRef, {
-                        ...initialState,
+                        ...initialStateRef.current,
                         hostId: playerId,
                         players: [playerId],
                         lastUpdated: Date.now()
@@ -89,13 +90,7 @@ export function useGameSync(sessionId, gameId, initialState) {
                 // If I AM the host, I might still want to listen for the OTHER player's inputs 
                 // (but for this simple implementation, we might just merge states)
 
-                setGameState(prev => {
-                    // Basic merge: In a real game, would be more complex authoritative reconciliation.
-                    // For Air Hockey:
-                    // Host cares about Client's Paddle Position.
-                    // Client cares about EVERYTHING (Puck + Host Paddle).
-                    return data;
-                });
+                setGameState(data);
                 gameStateRef.current = data;
             }
         });

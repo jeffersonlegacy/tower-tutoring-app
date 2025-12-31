@@ -25,11 +25,9 @@ export function useRealtimeGame(sessionId, gameId, initialState) {
     const [isHost, setIsHost] = useState(() => !rtdb);
     const [isOffline, setIsOffline] = useState(() => !rtdb);
 
-    // Refs for throttled functions
+    // Refs
     const gameStateRef = useRef(initialState);
-
-
-
+    const initialStateRef = useRef(initialState); // Stable ref for initial state
 
     // 2. Subscribe (Enhanced with Timeout)
     useEffect(() => {
@@ -45,7 +43,7 @@ export function useRealtimeGame(sessionId, gameId, initialState) {
             setIsOffline(true);
             setIsHost(true); // You are always host in offline mode
             setGameState({
-                ...initialState,
+                ...initialStateRef.current,
                 players: { [playerId]: { id: playerId, role: 'host' } },
                 mode: 'SOLO' // Force solo mode usually, but keep flexible
             });
@@ -70,7 +68,7 @@ export function useRealtimeGame(sessionId, gameId, initialState) {
                 if (!snapshot.exists()) {
                     console.log("[RTDB] Initializing as HOST");
                     const startState = {
-                        ...initialState,
+                        ...initialStateRef.current,
                         hostId: playerId,
                         players: { [playerId]: { id: playerId, role: 'host' } },
                         lastUpdated: Date.now()
@@ -110,7 +108,7 @@ export function useRealtimeGame(sessionId, gameId, initialState) {
             clearTimeout(connectionTimeout);
             unsubscribe();
         };
-    }, [sessionId, gameId, playerId, initialState]);
+    }, [sessionId, gameId, playerId]); // Removed initialState dependency
 
     // 3. Update Function (Dual Mode)
     const updateState = (updates) => {

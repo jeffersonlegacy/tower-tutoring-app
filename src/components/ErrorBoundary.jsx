@@ -1,9 +1,13 @@
-import React from 'react';
+import { Component } from 'react';
 
-export default class ErrorBoundary extends React.Component {
+/**
+ * ErrorBoundary - Graceful error handling for React components
+ * Prevents white screen of death with a premium fallback UI
+ */
+export default class ErrorBoundary extends Component {
     constructor(props) {
         super(props);
-        this.state = { hasError: false, error: null, errorInfo: null };
+        this.state = { hasError: false, error: null };
     }
 
     static getDerivedStateFromError(error) {
@@ -11,25 +15,66 @@ export default class ErrorBoundary extends React.Component {
     }
 
     componentDidCatch(error, errorInfo) {
-        console.error("Uncaught Error:", error, errorInfo);
-        this.setState({ errorInfo });
+        console.error('ErrorBoundary caught:', error, errorInfo);
     }
+
+    handleRetry = () => {
+        this.setState({ hasError: false, error: null });
+    };
 
     render() {
         if (this.state.hasError) {
             return (
-                <div className="min-h-screen bg-red-900 text-white p-8 flex flex-col items-center justify-center">
-                    <h1 className="text-3xl font-bold mb-4">Something went wrong.</h1>
-                    <div className="bg-black p-4 rounded text-sm font-mono overflow-auto max-w-2xl">
-                        <p className="text-red-400 mb-2">{this.state.error && this.state.error.toString()}</p>
-                        <pre className="text-slate-400">{this.state.errorInfo && this.state.errorInfo.componentStack}</pre>
+                <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden">
+                    {/* Background glow */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-red-500/10 rounded-full blur-[150px] pointer-events-none" />
+
+                    <div className="max-w-md w-full text-center relative z-10 animate-spring">
+                        {/* Icon */}
+                        <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/30 flex items-center justify-center shadow-[0_0_40px_rgba(239,68,68,0.2)] animate-pulse-slow">
+                            <span className="text-5xl">⚠️</span>
+                        </div>
+
+                        {/* Title */}
+                        <h1 className="text-2xl font-black text-white mb-2">
+                            Something Went Wrong
+                        </h1>
+
+                        {/* Message */}
+                        <p className="text-slate-400 mb-6 text-sm leading-relaxed">
+                            Don&apos;t worry, your work is safe. The system encountered an unexpected issue.
+                        </p>
+
+                        {/* Error Details (dev only) */}
+                        {import.meta.env.DEV && this.state.error && (
+                            <div className="mb-6 p-4 bg-slate-900/80 border border-red-500/20 rounded-xl text-left overflow-auto max-h-32 backdrop-blur-sm">
+                                <code className="text-xs text-red-400 font-mono">
+                                    {this.state.error.toString()}
+                                </code>
+                            </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex gap-3 justify-center">
+                            <button
+                                onClick={this.handleRetry}
+                                className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-cyan-500/25 text-sm uppercase tracking-wider active:scale-95"
+                            >
+                                Try Again
+                            </button>
+                            <button
+                                onClick={() => window.location.href = '/'}
+                                className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all text-sm uppercase tracking-wider border border-white/10 active:scale-95"
+                            >
+                                Go Home
+                            </button>
+                        </div>
+
+                        {/* Footer */}
+                        <p className="mt-8 text-[10px] text-slate-600 uppercase tracking-widest">
+                            Tower Tutoring // Error Recovery System
+                        </p>
                     </div>
-                    <button
-                        onClick={() => window.location.reload()}
-                        className="mt-6 px-6 py-2 bg-white text-red-900 font-bold rounded hover:bg-gray-200"
-                    >
-                        Reload Page
-                    </button>
                 </div>
             );
         }
@@ -37,3 +82,4 @@ export default class ErrorBoundary extends React.Component {
         return this.props.children;
     }
 }
+

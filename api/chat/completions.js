@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     try {
         // Forward the request to Vercel AI Gateway
         // We use the same API Key (server-side environment variable), with a fallback for immediate success
-        const apiKey = process.env.VITE_AI_GATEWAY_API_KEY || 'vck_8YdzdU64Ctl0OcTBz6Adxlmo7avofmbrywJSq26ad5Z5fuDjEn21maTJ';
+        const apiKey = process.env.VITE_AI_GATEWAY_API_KEY;
 
         if (!apiKey) {
             return res.status(500).json({ error: 'Missing API configuration' });

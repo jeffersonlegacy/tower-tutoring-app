@@ -116,7 +116,7 @@ class MindHiveService {
                                     hasContent = true;
                                     onChunk(content);
                                 }
-                            } catch (e) {
+                            } catch {
                                 // ignore parse errors for partial chunks
                             }
                         }
