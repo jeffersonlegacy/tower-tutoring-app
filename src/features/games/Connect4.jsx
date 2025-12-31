@@ -21,7 +21,10 @@ const safeBoard = (b) => {
     const arr = Array(ROWS * COLS).fill(null);
     if (b && typeof b === 'object') {
         Object.keys(b).forEach(k => {
-            arr[k] = b[k];
+            const idx = parseInt(k);
+            if (!isNaN(idx) && idx >= 0 && idx < arr.length) {
+                arr[idx] = b[k];
+            }
         });
     }
     return arr;
@@ -98,44 +101,45 @@ const scoreBoard = (board, piece) => {
 };
 
 const isTerminal = (board) => {
+    const b = safeBoard(board);
     // Optimized check (inlined logic for speed)
     // Horizontal
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS - 3; c++) {
             const idx = r * COLS + c;
-            const p = board[idx];
-            if (p && p === board[idx + 1] && p === board[idx + 2] && p === board[idx + 3]) return p;
+            const p = b[idx];
+            if (p && p === b[idx + 1] && p === b[idx + 2] && p === b[idx + 3]) return p;
         }
     }
     // Vertical
     for (let r = 0; r < ROWS - 3; r++) {
         for (let c = 0; c < COLS; c++) {
             const idx = r * COLS + c;
-            const p = board[idx];
-            if (p && p === board[idx + COLS] && p === board[idx + COLS * 2] && p === board[idx + COLS * 3]) return p;
+            const p = b[idx];
+            if (p && p === b[idx + COLS] && p === b[idx + COLS * 2] && p === b[idx + COLS * 3]) return p;
         }
     }
     // Diag Pos
     for (let r = 0; r < ROWS - 3; r++) {
         for (let c = 0; c < COLS - 3; c++) {
             const idx = r * COLS + c;
-            const p = board[idx];
-            if (p && p === board[idx + COLS + 1] && p === board[idx + COLS * 2 + 2] && p === board[idx + COLS * 3 + 3]) return p;
+            const p = b[idx];
+            if (p && p === b[idx + COLS + 1] && p === b[idx + COLS * 2 + 2] && p === b[idx + COLS * 3 + 3]) return p;
         }
     }
     // Diag Neg
     for (let r = 3; r < ROWS; r++) {
         for (let c = 0; c < COLS - 3; c++) {
             const idx = r * COLS + c;
-            const p = board[idx];
-            if (p && p === board[idx - COLS + 1] && p === board[idx - COLS * 2 + 2] && p === board[idx - COLS * 3 + 3]) return p;
+            const p = b[idx];
+            if (p && p === b[idx - COLS + 1] && p === b[idx - COLS * 2 + 2] && p === b[idx - COLS * 3 + 3]) return p;
         }
     }
 
     // Check full
     let isFull = true;
-    for (let i = 0; i < board.length; i++) {
-        if (board[i] === null) { isFull = false; break; }
+    for (let i = 0; i < b.length; i++) {
+        if (b[i] === null) { isFull = false; break; }
     }
     if (isFull) return 'draw';
 
@@ -143,52 +147,54 @@ const isTerminal = (board) => {
 };
 
 const getValidLocations = (board) => {
+    const b = safeBoard(board);
     const valid = [];
     for (let c = 0; c < COLS; c++) {
         // Row 0 is top
-        if (board[c] === null) valid.push(c);
+        if (b[c] === null) valid.push(c);
     }
     return valid;
 };
 
 const getNextOpenRow = (board, col) => {
+    if (col === null || col === undefined) return -1;
+    const b = safeBoard(board);
     for (let r = ROWS - 1; r >= 0; r--) {
-        if (board[r * COLS + col] === null) return r;
+        if (b[r * COLS + col] === null) return r;
     }
     return -1;
 };
 
 // MUTABLE MINIMAX
 const minimax = (board, depth, alpha, beta, maximizingPlayer) => {
-    const result = isTerminal(board);
+    const b = safeBoard(board);
+    const result = isTerminal(b);
     if (result) {
         if (result === 'yellow') return [null, 1000000];
         if (result === 'red') return [null, -1000000];
         if (result === 'draw') return [null, 0];
     }
     if (depth === 0) {
-        return [null, scoreBoard(board, 'yellow')];
+        return [null, scoreBoard(b, 'yellow')];
     }
 
-    // Get order: Center first for pruning
-    const validLocs = getValidLocations(board);
-    // Sort columns by closeness to center
+    const validLocs = getValidLocations(b);
+    if (validLocs.length === 0) return [null, 0];
+
     validLocs.sort((a, b) => Math.abs(a - 3) - Math.abs(b - 3));
 
     if (maximizingPlayer) {
         let value = -Infinity;
-        let column = validLocs[0]; // fallback
+        let column = validLocs[0];
         for (const col of validLocs) {
-            const row = getNextOpenRow(board, col);
+            const row = getNextOpenRow(b, col);
+            if (row === -1) continue;
             const idx = row * COLS + col;
 
-            // DO MOVE
-            board[idx] = 'yellow';
-
-            const newScore = minimax(board, depth - 1, alpha, beta, false)[1];
-
-            // UNDO MOVE
-            board[idx] = null;
+            b[idx] = 'yellow';
+            const res = minimax(b, depth - 1, alpha, beta, false);
+            const newScore = res ? res[1] : 0;
+            b[idx] = null;
 
             if (newScore > value) {
                 value = newScore;
@@ -202,16 +208,14 @@ const minimax = (board, depth, alpha, beta, maximizingPlayer) => {
         let value = Infinity;
         let column = validLocs[0];
         for (const col of validLocs) {
-            const row = getNextOpenRow(board, col);
+            const row = getNextOpenRow(b, col);
+            if (row === -1) continue;
             const idx = row * COLS + col;
 
-            // DO MOVE
-            board[idx] = 'red';
-
-            const newScore = minimax(board, depth - 1, alpha, beta, true)[1];
-
-            // UNDO MOVE
-            board[idx] = null;
+            b[idx] = 'red';
+            const res = minimax(b, depth - 1, alpha, beta, true);
+            const newScore = res ? res[1] : 0;
+            b[idx] = null;
 
             if (newScore < value) {
                 value = newScore;
@@ -270,9 +274,13 @@ export default function Connect4({ sessionId, onBack }) {
                 chosenCol = validCols[0];
             }
 
+            if (chosenCol === undefined || chosenCol === null) return; // Still no move?
+
             // Execute on REAL board via updateState
             const realBoard = [...safeBoard(gameState.board)]; // Fresh copy for state update
             const row = getNextOpenRow(realBoard, chosenCol);
+            if (row === -1) return; // Column full?
+
             realBoard[row * COLS + chosenCol] = 'yellow';
 
             const term = isTerminal(realBoard);
@@ -290,12 +298,8 @@ export default function Connect4({ sessionId, onBack }) {
             });
         };
 
-        // Run AI move slightly deferred to let UI render first
         const moveTimer = setTimeout(aiMove, 100);
-        return () => {
-            clearTimeout(moveTimer);
-            isMounted.current = false;
-        };
+        return () => clearTimeout(moveTimer);
     }, [gameState?.turn, gameState?.mode, gameState?.status, gameState?.difficulty]);
 
     // Mount tracking
@@ -439,6 +443,7 @@ export default function Connect4({ sessionId, onBack }) {
     const opponentReady = playersCount >= 2;
 
     const getWinningIndices = (board) => {
+        const b = safeBoard(board);
         const indices = [];
         const pieces = ['red', 'yellow'];
         for (const p of pieces) {
@@ -446,7 +451,7 @@ export default function Connect4({ sessionId, onBack }) {
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS - 3; c++) {
                     const idx = r * COLS + c;
-                    if (board[idx] === p && board[idx + 1] === p && board[idx + 2] === p && board[idx + 3] === p) {
+                    if (b[idx] === p && b[idx + 1] === p && b[idx + 2] === p && b[idx + 3] === p) {
                         indices.push(idx, idx + 1, idx + 2, idx + 3);
                     }
                 }
@@ -455,7 +460,7 @@ export default function Connect4({ sessionId, onBack }) {
             for (let r = 0; r < ROWS - 3; r++) {
                 for (let c = 0; c < COLS; c++) {
                     const idx = r * COLS + c;
-                    if (board[idx] === p && board[idx + COLS] === p && board[idx + COLS * 2] === p && board[idx + COLS * 3] === p) {
+                    if (b[idx] === p && b[idx + COLS] === p && b[idx + COLS * 2] === p && b[idx + COLS * 3] === p) {
                         indices.push(idx, idx + COLS, idx + COLS * 2, idx + COLS * 3);
                     }
                 }
@@ -464,7 +469,7 @@ export default function Connect4({ sessionId, onBack }) {
             for (let r = 0; r < ROWS - 3; r++) {
                 for (let c = 0; c < COLS - 3; c++) {
                     const idx = r * COLS + c;
-                    if (board[idx] === p && board[idx + COLS + 1] === p && board[idx + COLS * 2 + 2] === p && board[idx + COLS * 3 + 3] === p) {
+                    if (b[idx] === p && b[idx + COLS + 1] === p && b[idx + COLS * 2 + 2] === p && b[idx + COLS * 3 + 3] === p) {
                         indices.push(idx, idx + COLS + 1, idx + COLS * 2 + 2, idx + COLS * 3 + 3);
                     }
                 }
@@ -473,7 +478,7 @@ export default function Connect4({ sessionId, onBack }) {
             for (let r = 3; r < ROWS; r++) {
                 for (let c = 0; c < COLS - 3; c++) {
                     const idx = r * COLS + c;
-                    if (board[idx] === p && board[idx - COLS + 1] === p && board[idx - COLS * 2 + 2] === p && board[idx - COLS * 3 + 3] === p) {
+                    if (b[idx] === p && b[idx - COLS + 1] === p && b[idx - COLS * 2 + 2] === p && b[idx - COLS * 3 + 3] === p) {
                         indices.push(idx, idx - COLS + 1, idx - COLS * 2 + 2, idx - COLS * 3 + 3);
                     }
                 }
