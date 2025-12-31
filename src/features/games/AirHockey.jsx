@@ -30,6 +30,8 @@ export default function AirHockey({ sessionId, onBack }) {
     const { gameState, playerId, isHost, updateState } = useRealtimeGame(sessionId, gameId, INITIAL_STATE);
 
     const [localMode, setLocalMode] = useState('MENU'); // Local view state tracking
+    const [scoreFlash, setScoreFlash] = useState(null); // 'me' | 'opp' | null
+    const [screenShake, setScreenShake] = useState(false);
 
     // Local physics state for smooth predictive rendering
     const localState = useRef({
@@ -38,7 +40,8 @@ export default function AirHockey({ sessionId, onBack }) {
         oppPaddle: { x: 200, y: 50 },
         lastUpdate: 0,
         sparks: [],
-        trail: []
+        trail: [],
+        goalExplosion: null
     });
 
     // --- SYNC LOOP ---
@@ -124,9 +127,8 @@ export default function AirHockey({ sessionId, onBack }) {
                 if (s.puck.x > leftPost && s.puck.x < rightPost) {
                     // TOP GOAL (User Scores)
                     scorePoint(isHost ? 'host' : 'client');
+                    triggerGoalEffect('me', s.puck.x, PUCK_RADIUS);
                     resetPuck(s);
-                    confetti({ particleCount: 30, spread: 60, origin: { y: 0.2 }, colors: ['#34d399'] });
-                    sfx.current.goal.play().catch(() => { });
                 } else {
                     s.puck.y = PUCK_RADIUS; s.puck.vy *= -0.8;
                     sfx.current.hit.play().catch(() => { });
@@ -137,8 +139,8 @@ export default function AirHockey({ sessionId, onBack }) {
                 if (s.puck.x > leftPost && s.puck.x < rightPost) {
                     // BOTTOM GOAL (Opp/AI Scores)
                     scorePoint(isHost ? 'client' : 'host');
+                    triggerGoalEffect('opp', s.puck.x, TABLE_HEIGHT - PUCK_RADIUS);
                     resetPuck(s);
-                    sfx.current.goal.play().catch(() => { });
                 } else {
                     s.puck.y = TABLE_HEIGHT - PUCK_RADIUS; s.puck.vy *= -0.8;
                     sfx.current.hit.play().catch(() => { });
@@ -314,6 +316,41 @@ export default function AirHockey({ sessionId, onBack }) {
         }
     };
 
+    const triggerGoalEffect = (who, x, y) => {
+        // Screen shake
+        setScreenShake(true);
+        setTimeout(() => setScreenShake(false), 300);
+
+        // Score flash
+        setScoreFlash(who);
+        setTimeout(() => setScoreFlash(null), 800);
+
+        // Play sound
+        sfx.current.goal.play().catch(() => { });
+
+        // Confetti burst
+        const isMyGoal = who === 'me';
+        confetti({
+            particleCount: isMyGoal ? 100 : 30,
+            spread: isMyGoal ? 90 : 50,
+            origin: { x: x / TABLE_WIDTH, y: isMyGoal ? 0.1 : 0.9 },
+            colors: isMyGoal ? ['#34d399', '#22d3ee', '#fbbf24'] : ['#ef4444', '#f97316']
+        });
+
+        // Create goal explosion sparks
+        for (let i = 0; i < 20; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 5 + 2;
+            localState.current.sparks.push({
+                x, y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 1.5,
+                color: isMyGoal ? '#34d399' : '#ef4444'
+            });
+        }
+    };
+
     // --- INPUT HANDLERS ---
     const handleInput = (clientX, clientY) => {
         if (gameState?.status !== 'PLAYING') return;
@@ -425,27 +462,54 @@ export default function AirHockey({ sessionId, onBack }) {
     const oppScore = isHost ? gameState.clientScore : gameState.hostScore;
 
     return (
-        <div className="flex flex-col items-center h-full bg-slate-900 border-2 border-slate-700 rounded-xl overflow-hidden relative touch-none select-none">
+        <div className={`flex flex-col items-center h-full bg-slate-900 border-2 border-slate-700 rounded-xl overflow-hidden relative touch-none select-none transition-transform ${screenShake ? 'animate-shake' : ''}`}
+            style={screenShake ? { animation: 'shake 0.3s ease-in-out' } : {}}
+        >
+            {/* Goal Flash Overlay */}
+            {scoreFlash && (
+                <div className={`absolute inset-0 z-50 pointer-events-none ${scoreFlash === 'me' ? 'bg-emerald-500/30' : 'bg-red-500/30'} animate-pulse`} />
+            )}
 
-            {/* Header */}
-            <div className="w-full flex justify-between items-center p-3 bg-slate-800 border-b border-white/5 z-10">
+            {/* Header - Enhanced Scoreboard */}
+            <div className="w-full flex justify-between items-center p-3 bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 border-b border-white/10 z-10">
                 <button
                     onClick={() => {
-                        // Force reset for anyone
                         updateState({ status: 'MENU', hostScore: 0, clientScore: 0 });
                         onBack();
                     }}
-                    className="text-xs text-slate-400 hover:text-white"
+                    className="text-xs text-slate-400 hover:text-white font-bold uppercase tracking-wider"
                 >
                     EXIT
                 </button>
-                <div className="flex gap-8 text-2xl font-black italic text-white shadow-black drop-shadow-lg">
-                    <span className="text-emerald-400">{myScore}</span>
-                    <span className="text-slate-600">-</span>
-                    <span className="text-pink-400">{oppScore}</span>
+
+                {/* Scoreboard */}
+                <div className="flex items-center gap-4">
+                    <div className={`flex flex-col items-center transition-all duration-300 ${scoreFlash === 'me' ? 'scale-125' : ''}`}>
+                        <span className={`text-3xl font-black text-emerald-400 ${scoreFlash === 'me' ? 'animate-bounce text-emerald-300' : ''}`}
+                            style={{ textShadow: '0 0 20px rgba(52,211,153,0.5)' }}
+                        >
+                            {myScore}
+                        </span>
+                        <span className="text-[8px] text-emerald-600 font-bold uppercase">YOU</span>
+                    </div>
+
+                    <div className="flex flex-col items-center">
+                        <span className="text-slate-600 text-xl font-bold">VS</span>
+                        <span className="text-[8px] text-slate-700 font-bold">FIRST TO {WIN_SCORE}</span>
+                    </div>
+
+                    <div className={`flex flex-col items-center transition-all duration-300 ${scoreFlash === 'opp' ? 'scale-125' : ''}`}>
+                        <span className={`text-3xl font-black text-pink-400 ${scoreFlash === 'opp' ? 'animate-bounce text-pink-300' : ''}`}
+                            style={{ textShadow: '0 0 20px rgba(236,72,153,0.5)' }}
+                        >
+                            {oppScore}
+                        </span>
+                        <span className="text-[8px] text-pink-600 font-bold uppercase">{gameState.mode === 'AI' ? 'CPU' : 'OPP'}</span>
+                    </div>
                 </div>
+
                 <div className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">
-                    {gameState.mode === 'AI' ? 'CPU TRAINING' : 'LIVE MATCH'}
+                    {gameState.mode === 'AI' ? '🤖 CPU' : '⚡ LIVE'}
                 </div>
             </div>
 
