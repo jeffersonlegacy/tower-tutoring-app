@@ -3,6 +3,7 @@ import { db, storage } from '../../services/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { useHomeworkUpload } from '../../hooks/useHomeworkUpload';
+import { mindHive } from '../../services/MindHiveService';
 
 export default function HomeworkTray({ sessionId }) {
     const [files, setFiles] = useState([]);
@@ -39,6 +40,43 @@ export default function HomeworkTray({ sessionId }) {
             await deleteObject(storageRef);
         } catch (error) {
             console.error("Delete failed", error);
+        }
+    };
+
+    // AI Analysis Logic
+    const [analysisResult, setAnalysisResult] = useState(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    const handleAnalyze = async (file) => {
+        setAnalysisResult("");
+        setIsAnalyzing(true);
+        // Import service dynamically if not top-level, or assume it's available. 
+        // We need 'mindHive' from services.
+        // Since I can't easily add import to top file in this block, I'll rely on global availability or Fix import next.
+        // Actually best to add import in a separate tool call if needed, but 'mindHive' is exported.
+        // Wait, I need to add the import to the top of the file. 
+        // I will do that in a separate replacement or assume previous imports.
+        // Ah, looking at previous file content, mindHive wasn't imported. I need to import it.
+
+        try {
+            // using mindHive service
+
+            let fullText = "";
+            await mindHive.streamResponse(
+                "Analyze this homework image. Identify the subject, the key problem, and provide a step-by-step solution guide. Do not give the direct answer immediately, but explain the method.",
+                [], // No history needed
+                (chunk) => {
+                    fullText += chunk;
+                    setAnalysisResult(fullText);
+                },
+                null,
+                [file.url] // Pass image URL
+            );
+        } catch (err) {
+            setAnalysisResult("Error analyzing document. Please try again.");
+            console.error(err);
+        } finally {
+            setIsAnalyzing(false);
         }
     };
 
@@ -87,7 +125,17 @@ export default function HomeworkTray({ sessionId }) {
                         </div>
 
                         {/* Actions Overlay */}
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800/90 rounded px-1">
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800/90 rounded px-1 shadow-xl">
+                            {/* AI Analyze Button (Images Only) */}
+                            {file.type.includes('image') && (
+                                <button
+                                    onClick={() => handleAnalyze(file)}
+                                    className="p-1 hover:text-cyan-400 text-slate-400"
+                                    title="Analyze with AI"
+                                >
+                                    🧠
+                                </button>
+                            )}
                             <a
                                 href={file.url}
                                 target="_blank"
@@ -108,6 +156,36 @@ export default function HomeworkTray({ sessionId }) {
                     </div>
                 ))}
             </div>
+
+            {/* Analysis Modal */}
+            {analysisResult && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-slate-900 border border-cyan-500/30 w-full max-w-lg max-h-[80vh] flex flex-col rounded-xl shadow-[0_0_50px_rgba(6,182,212,0.2)] animate-in fade-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-slate-950/50 rounded-t-xl">
+                            <div className="flex items-center gap-2">
+                                <span className="text-lg">🧠</span>
+                                <h3 className="font-bold text-cyan-400 uppercase tracking-widest text-xs">AI Homework Analysis</h3>
+                            </div>
+                            <button onClick={() => setAnalysisResult(null)} className="text-slate-500 hover:text-white">✕</button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6 text-sm text-slate-300 leading-relaxed font-mono">
+                            {isAnalyzing ? (
+                                <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                                    <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                                    <p className="text-cyan-500/80 animate-pulse text-xs uppercase tracking-widest">Scanning Document...</p>
+                                </div>
+                            ) : (
+                                <div className="markdown-body">
+                                    {analysisResult}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-3 border-t border-white/10 bg-slate-950/30 text-center">
+                            <span className="text-[9px] text-slate-600 uppercase tracking-widest">Powered by Jefferson Intelligence Vision</span>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

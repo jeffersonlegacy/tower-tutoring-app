@@ -6,7 +6,9 @@ export default function GameEndOverlay({
     isDraw = false,
     score,
     onRestart,
-    onExit
+    onExit,
+    title, // [NEW] Custom title override
+    icon // [NEW] Custom icon override
 }) {
     // Trigger confetti on mount if winner
     React.useEffect(() => {
@@ -37,14 +39,14 @@ export default function GameEndOverlay({
         <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center animate-in fade-in duration-500">
             {/* Visual Icon */}
             <div className="text-[120px] mb-4 animate-bounce">
-                {isDraw ? '🤝' : (winner ? '👑' : '😢')}
+                {icon || (isDraw ? '🤝' : (winner ? '👑' : '😢'))}
             </div>
 
             {/* Title */}
             <h1 className={`text-6xl font-black italic tracking-tighter mb-2 bg-clip-text text-transparent ${isDraw ? 'bg-gradient-to-r from-slate-400 to-white' :
-                    (winner ? 'bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-200' : 'bg-gradient-to-r from-blue-400 to-indigo-500')
+                (winner ? 'bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-200' : 'bg-gradient-to-r from-blue-400 to-indigo-500')
                 } filter drop-shadow-[0_4px_0_rgba(0,0,0,0.5)]`}>
-                {isDraw ? 'DRAW GAME' : (winner ? 'VICTORY!' : 'DEFEAT')}
+                {title || (isDraw ? 'DRAW GAME' : (winner ? 'VICTORY!' : 'DEFEAT'))}
             </h1>
 
             {/* Score Display (Optional) */}

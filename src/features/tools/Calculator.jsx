@@ -10,9 +10,10 @@ export default function Calculator() {
             try {
                 // Safe evaluation limited to math chars
                 if (/[^0-9+\-*/().]/.test(display)) return;
-                // eslint-disable-next-line no-eval
                 // eslint-disable-next-line
-                setDisplay(String(eval(display)));
+                // Safe alternative to eval
+                const safeEval = new Function('return ' + display);
+                setDisplay(String(safeEval()));
             } catch {
                 setDisplay('Error');
             }

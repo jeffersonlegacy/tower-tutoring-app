@@ -78,11 +78,20 @@ export default function Yahtzee({ sessionId, onBack }) {
     const [rolling, setRolling] = useState(false);
     const [viewingPlayerId, setViewingPlayerId] = useState(null); // To view opponent scorecards
 
+    // --- LOADING GUARD ---
+    if (!gameState) {
+        return <div className="flex items-center justify-center h-full bg-slate-900 text-yellow-500 font-bold animate-pulse uppercase tracking-widest">Loading Game Tables...</div>;
+    }
+
     // --- SAFE DATA HANDLING (CRASH FIX) ---
     // Ensure playersList is always an array
-    const playersList = Array.isArray(gameState?.players)
+    const playersList = (Array.isArray(gameState?.players)
         ? gameState.players
-        : Object.values(gameState?.players || {}).filter(p => !!p);
+        : Object.values(gameState?.players || {}).filter(p => !!p)
+    ).map(p => ({
+        ...p,
+        name: p.name || `Player ${String(p.id).slice(0, 4)}`
+    }));
 
     // Ensure safeScores is always an object, even if gameState.scores is null/undefined
     const safeScores = (gameState?.scores && typeof gameState.scores === 'object') ? gameState.scores : {};

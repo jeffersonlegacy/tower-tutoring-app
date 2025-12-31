@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import GameEndOverlay from './GameEndOverlay';
 
 // --- MATH LOGIC ---
 const DIFFICULTIES = {
@@ -135,88 +136,116 @@ export default function MathInvaders({ onBack }) {
             state.lastTimeCheck = Date.now(); // Reset timer delta
         };
 
+
+        // --- SPAWN LOGIC (SWARM ENTRANCE) ---
         const spawnInvaders = () => {
             const state = gameState.current;
             state.invaders = [];
 
             const cols = 5;
-            const startX = (canvas.width - (cols * 60)) / 2; // Center grid
-
-            // Always ensure one Correct Answer
+            const startX = (canvas.width - (cols * 60)) / 2;
             const targetIndex = Math.floor(Math.random() * cols);
 
             for (let i = 0; i < cols; i++) {
                 const isTarget = i === targetIndex;
                 const val = isTarget ? state.problem.answer : state.problem.decoys[i % state.problem.decoys.length];
-
-                // Randomized Bonus for correct answer (10-50 pts extra)
                 const bonus = Math.floor(Math.random() * 5) * 10 + 10;
 
+                // Spiral/Swarm Start Positions
+                const side = i % 2 === 0 ? -1 : 1;
+                const spawnX = (canvas.width / 2) + (side * canvas.width);
+                const spawnY = -200 - (i * 100);
+
                 state.invaders.push({
-                    x: startX + (i * 60),
-                    y: -100, // Drop in
-                    targetY: 100, // Final grid Y
+                    x: spawnX,
+                    y: spawnY,
+                    targetX: startX + (i * 60), // Final Grid X
+                    targetY: 100, // Final Grid Y
                     w: 40,
                     h: 40,
                     val: val,
                     isTarget: isTarget,
                     bonus: bonus,
-                    // FIX: Uniform color (Cyberpunk Purple) so player MUST do math
-                    hue: 280
+                    hue: 280,
+                    state: 'flying_in', // flying_in, hovering, divine
+                    flyProgress: 0
                 });
             }
         };
 
-        // --- EXPLOSION ---
+        // --- EXPLOSION SYSTEM ---
         const createExplosion = (x, y, color) => {
-            for (let i = 0; i < 15; i++) {
+            // Screen Shake (Simple)
+            if (canvasRef.current) {
+                canvasRef.current.style.transform = `translate(${Math.random() * 10 - 5}px, ${Math.random() * 10 - 5}px)`;
+                setTimeout(() => {
+                    if (canvasRef.current) canvasRef.current.style.transform = 'none';
+                }, 50);
+            }
+
+            // Particles
+            for (let i = 0; i < 25; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 5 + 2;
                 gameState.current.particles.push({
                     x, y,
-                    vx: (Math.random() - 0.5) * 10,
-                    vy: (Math.random() - 0.5) * 10,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
                     life: 1.0,
-                    color: color
+                    decay: Math.random() * 0.03 + 0.01,
+                    color: color,
+                    size: Math.random() * 3 + 1
                 });
             }
         };
 
-        // --- FLOATING TEXT ---
-        const createFloatingText = (x, y, text, color) => {
-            gameState.current.texts.push({
-                x, y, text, color,
-                life: 1.0,
-                vy: -2 // Float up
-            });
+        const updateParticles = (ctx) => {
+            const state = gameState.current;
+            for (let i = state.particles.length - 1; i >= 0; i--) {
+                const p = state.particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= p.decay;
+
+                if (p.life <= 0) {
+                    state.particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
         };
 
         // --- LOOP ---
         const update = () => {
             if (!gameState.current.active) return;
-
             const state = gameState.current;
             const now = Date.now();
 
-            // TIMER LOGIC
+            // TIMER
             const dt = now - state.lastTimeCheck;
             if (dt >= 1000) {
                 state.timeLeft -= 1;
                 state.lastTimeCheck = now;
                 setHud(h => ({ ...h, timeLeft: state.timeLeft }));
-
                 if (state.timeLeft <= 0) {
                     state.active = false;
                     setHud(h => ({ ...h, gameOver: true, timeLeft: 0 }));
-                    return; // Stop update
+                    return;
                 }
             }
-
             state.frame++;
 
             // 1. Clear
-            ctx.fillStyle = '#0f172a'; // Slate-900
+            ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Grid Background Effect
+            // Grid
             ctx.strokeStyle = 'rgba(6, 182, 212, 0.1)';
             ctx.lineWidth = 1;
             const timeOffset = (state.frame * 2) % 40;
@@ -227,71 +256,92 @@ export default function MathInvaders({ onBack }) {
                 ctx.stroke();
             }
 
-            // 2. Player (Ship)
+            // 2. Player
             ctx.shadowBlur = 20;
-            ctx.shadowColor = '#06b6d4'; // Cyan glow
+            ctx.shadowColor = '#06b6d4';
             ctx.fillStyle = '#06b6d4';
-
             const px = state.player.x;
             const py = state.player.y;
-
-            // Draw Triangle Ship
             ctx.beginPath();
             ctx.moveTo(px, py - 20);
             ctx.lineTo(px - 15, py + 15);
-            ctx.lineTo(px, py + 5); // Engine notch
+            ctx.lineTo(px, py + 5);
             ctx.lineTo(px + 15, py + 15);
             ctx.closePath();
             ctx.fill();
 
-            // 3. Bullets (Auto Fire)
-            if (now - state.lastFired > 200) { // Fire rate
+            // 3. Bullets
+            if (now - state.lastFired > 200) {
                 state.bullets.push({ x: px, y: py - 20 });
                 state.lastFired = now;
             }
-
-            ctx.shadowColor = '#f472b6'; // Pink bullets
+            ctx.shadowColor = '#f472b6';
             ctx.fillStyle = '#f472b6';
-
-            // Update & Draw Bullets
             for (let i = state.bullets.length - 1; i >= 0; i--) {
                 const b = state.bullets[i];
-                b.y -= 15; // Speed
+                b.y -= 15;
                 ctx.fillRect(b.x - 2, b.y, 4, 15);
-
                 if (b.y < -20) state.bullets.splice(i, 1);
             }
 
-            // 4. Invaders
+            // 4. Invaders (Swarm Logic)
             if (state.invaders.length === 0 && state.problem) {
-                // Should not happen unless level transition, handled elsewhere?
+                // handled by external level check if needed
             } else if (!state.problem) {
                 startLevel();
             }
 
-            // Move Invaders
             state.invaders.forEach(inv => {
-                // Ease to targetY
-                if (inv.y < inv.targetY) inv.y += 5;
+                if (inv.state === 'flying_in') {
+                    // Cubic Ease-Out
+                    inv.flyProgress += 0.02;
+                    if (inv.flyProgress >= 1) {
+                        inv.flyProgress = 1;
+                        inv.state = 'hovering';
+                    }
+                    const t = inv.flyProgress;
+                    const ease = 1 - Math.pow(1 - t, 3);
 
-                // Bobbing motion
-                inv.finalY = inv.targetY + Math.sin(state.frame * 0.05) * 10;
+                    inv.x = inv.x + (inv.targetX - inv.x) * 0.1; // Simple lerp for smoothness
+                    inv.y = inv.y + (inv.targetY - inv.y) * 0.1;
 
-                // Draw
+                    // Snap when close
+                    if (Math.abs(inv.x - inv.targetX) < 1 && Math.abs(inv.y - inv.targetY) < 1) {
+                        inv.state = 'hovering';
+                        inv.x = inv.targetX;
+                        inv.y = inv.targetY;
+                    }
+
+                } else {
+                    // Hovering Bob
+                    inv.finalY = inv.targetY + Math.sin(state.frame * 0.05) * 10;
+                    // Draw uses current inv.y, so we update it?
+                    // Wait, previous code used inv.finalY for drawing. 
+                    // Let's standardise on inv.y being the "center" and we draw with offset is safer.
+                    // Actually, let's just make inv.y the definitive position.
+                    inv.y = inv.targetY + Math.sin(state.frame * 0.05) * 10;
+                }
+
+                // Draw Invader
                 ctx.shadowBlur = 15;
                 ctx.shadowColor = `hsl(${inv.hue}, 100%, 50%)`;
                 ctx.strokeStyle = `hsl(${inv.hue}, 100%, 70%)`;
                 ctx.lineWidth = 2;
-                ctx.strokeRect(inv.x - 20, inv.finalY - 20, 40, 40);
+                ctx.strokeRect(inv.x - 20, inv.y - 20, 40, 40);
 
-                // Text
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = '#fff';
                 ctx.font = 'bold 20px monospace';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(inv.val, inv.x, inv.finalY);
+                ctx.fillText(inv.val, inv.x, inv.y);
             });
+
+            // Render Particles
+            updateParticles(ctx);
+
+            // 5. Collision (Existing logic...)
+
 
             // 5. Collision Detection
             state.bullets.forEach((b, bIdx) => {
@@ -466,31 +516,18 @@ export default function MathInvaders({ onBack }) {
 
             {/* GAMEOVER OVERLAY */}
             {hud.gameOver && (
-                <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20 pointer-events-auto cursor-auto">
-                    <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-pink-600 mb-4 animate-bounce">
-                        TIME'S UP!
-                    </h1>
-                    <div className="text-2xl font-mono text-white mb-8">FINAL SCORE: {hud.score}</div>
-                    <div className="flex gap-4">
-                        <button
-                            onClick={() => {
-                                gameState.current.invaders = [];
-                                gameState.current.problem = null;
-                                setHud(h => ({ ...h, menu: true, timeLeft: 30, score: 0, gameOver: false }));
-                            }}
-                            className="px-8 py-4 bg-purple-600 text-white font-bold rounded hover:scale-105 transition-transform uppercase tracking-widest shadow-lg"
-                        >
-                            Restart Mission
-                        </button>
-                        <button
-                            onClick={onBack}
-                            className="px-8 py-4 bg-white text-black font-bold rounded hover:scale-105 transition-transform uppercase tracking-widest"
-                        >
-                            Return to Base
-                        </button>
-                    </div>
-                    <div className="mt-4 text-slate-500 text-sm">Mission Complete</div>
-                </div>
+                <GameEndOverlay
+                    winner={true}
+                    title="MISSION COMPLETE"
+                    icon="🚀"
+                    score={hud.score}
+                    onRestart={() => {
+                        gameState.current.invaders = [];
+                        gameState.current.problem = null;
+                        setHud(h => ({ ...h, menu: true, timeLeft: 30, score: 0, gameOver: false }));
+                    }}
+                    onExit={onBack}
+                />
             )}
 
             {/* EXIT BUTTON (If not game over) */}

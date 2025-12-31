@@ -17,12 +17,12 @@ export function useWhiteboardSync(editor, sessionId) {
 
         const initLoad = async () => {
             try {
-                console.log("WhiteboardSync: Fetching initial state...");
+                // console.log("WhiteboardSync: Fetching initial state...");
                 const snapshot = await getDoc(docRef);
                 if (snapshot.exists()) {
                     const data = snapshot.data();
                     if (data.records) {
-                        console.log("WhiteboardSync: Found remote records. Loading...");
+                        // console.log("WhiteboardSync: Found remote records. Loading...");
                         isRemoteUpdate.current = true;
                         editor.store.loadSnapshot({
                             document: { id: 'td-document', records: data.records },
@@ -68,7 +68,7 @@ export function useWhiteboardSync(editor, sessionId) {
 
                 lastSerialized.current = serialized;
                 try {
-                    console.log("WhiteboardSync: Syncing local changes to Firestore...");
+                    // console.log("WhiteboardSync: Syncing local changes to Firestore...");
                     await updateDoc(docRef, { records });
                 } catch (err) {
                     console.error("WhiteboardSync: Update Error:", err);

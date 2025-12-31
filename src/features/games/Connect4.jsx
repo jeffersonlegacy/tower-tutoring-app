@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRealtimeGame } from '../../hooks/useRealtimeGame';
+import GameEndOverlay from './GameEndOverlay';
 import confetti from 'canvas-confetti';
 
 const ROWS = 6;
@@ -38,7 +39,8 @@ const evaluateWindow = (window, piece) => {
     else if (window.filter(c => c === piece).length === 3 && window.filter(c => c === empty).length === 1) score += 5;
     else if (window.filter(c => c === piece).length === 2 && window.filter(c => c === empty).length === 2) score += 2;
 
-    if (window.filter(c => c === oppPiece).length === 3 && window.filter(c => c === empty).length === 1) score -= 4;
+    // Heavily penalize opponent having 3-in-a-row (Threat) to ensure blocking
+    if (window.filter(c => c === oppPiece).length === 3 && window.filter(c => c === empty).length === 1) score -= 80;
 
     return score;
 };
@@ -235,89 +237,21 @@ export default function Connect4({ sessionId, onBack }) {
             if (difficulty === 'BEGINNER') {
                 // Random move
                 chosenCol = validCols[Math.floor(Math.random() * validCols.length)];
-            }
-            else if (difficulty === 'MEDIUM') {
-                // Win if possible, otherwise random. NO BLOCKING.
-                // Actually, let's make it smarter: Block if possible, but miss some.
-                // Standard: Win > Block > Random.
-                // To separate Medium from Hard, Medium can fail to block 30% of time?
-                // Let's stick to user request: Medium. Simple Win > Random.
+            } else {
+                // Minimax for all other levels
+                let depth = 2; // MEDIUM
+                if (difficulty === 'HARD') depth = 4;
+                if (difficulty === 'EXPERT') depth = 6;
+                if (difficulty === 'IMPOSSIBLE') depth = 7;
 
-                // Check WIN
-                let winFound = false;
-                for (const col of validCols) {
-                    const row = getNextOpenRow(board, col);
-                    const bCopy = [...board];
-                    bCopy[row * COLS + col] = 'yellow';
-                    if (isTerminal(bCopy) === 'yellow') {
-                        chosenCol = col;
-                        winFound = true;
-                        break;
-                    }
-                }
+                // Run Minimax
+                const [col, score] = minimax(board, depth, -Infinity, Infinity, true);
+                chosenCol = col;
 
-                if (!winFound) {
-                    // Check BLOCK (50% chance to notice)
-                    if (Math.random() > 0.5) {
-                        for (const col of validCols) {
-                            const row = getNextOpenRow(board, col);
-                            const bCopy = [...board];
-                            bCopy[row * COLS + col] = 'red';
-                            if (isTerminal(bCopy) === 'red') {
-                                chosenCol = col;
-                                winFound = true; // effectively handled
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (!winFound && chosenCol === undefined) {
+                // Fallback (safe)
+                if (chosenCol === undefined || chosenCol === null) {
                     chosenCol = validCols[Math.floor(Math.random() * validCols.length)];
                 }
-            }
-            else if (difficulty === 'HARD') {
-                // Win > Block > Center > Random
-                let moveFound = false;
-
-                // 1. Win
-                for (const col of validCols) {
-                    const row = getNextOpenRow(board, col);
-                    const bCopy = [...board];
-                    bCopy[row * COLS + col] = 'yellow';
-                    if (isTerminal(bCopy) === 'yellow') { chosenCol = col; moveFound = true; break; }
-                }
-
-                // 2. Block
-                if (!moveFound) {
-                    for (const col of validCols) {
-                        const row = getNextOpenRow(board, col);
-                        const bCopy = [...board];
-                        bCopy[row * COLS + col] = 'red';
-                        if (isTerminal(bCopy) === 'red') { chosenCol = col; moveFound = true; break; }
-                    }
-                }
-
-                // 3. Minimax Depth 2 (Lookahead)
-                if (!moveFound) {
-                    const [col, score] = minimax(board, 2, -Infinity, Infinity, true);
-                    chosenCol = col;
-                }
-            }
-            else if (difficulty === 'EXPERT') {
-                // Minimax Depth 4
-                const [col, score] = minimax(board, 4, -Infinity, Infinity, true);
-                chosenCol = col;
-            }
-            else if (difficulty === 'IMPOSSIBLE') {
-                // Minimax Depth 6
-                // Warning: Might be slow in JS.
-                const [col, score] = minimax(board, 6, -Infinity, Infinity, true);
-                chosenCol = col;
-            }
-
-            if (chosenCol === undefined || chosenCol === null) {
-                chosenCol = validCols[Math.floor(Math.random() * validCols.length)];
             }
 
             // EXECUTE
@@ -491,8 +425,89 @@ export default function Connect4({ sessionId, onBack }) {
     const playersCount = gameState.players ? Object.keys(gameState.players).length : 0;
     const opponentReady = playersCount >= 2;
 
+    // --- ANIMATIONS & HELPERS ---
+
+    // Get winning indices for highlighting
+    const getWinningIndices = (board) => {
+        const indices = [];
+        const pieces = ['red', 'yellow'];
+
+        for (const p of pieces) {
+            // Horizontal
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    const idx = r * COLS + c;
+                    if (board[idx] === p && board[idx + 1] === p && board[idx + 2] === p && board[idx + 3] === p) {
+                        indices.push(idx, idx + 1, idx + 2, idx + 3);
+                    }
+                }
+            }
+            // Vertical
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const idx = r * COLS + c;
+                    if (board[idx] === p && board[idx + COLS] === p && board[idx + COLS * 2] === p && board[idx + COLS * 3] === p) {
+                        indices.push(idx, idx + COLS, idx + COLS * 2, idx + COLS * 3);
+                    }
+                }
+            }
+            // Diag Pos
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    const idx = r * COLS + c;
+                    if (board[idx] === p && board[idx + COLS + 1] === p && board[idx + COLS * 2 + 2] === p && board[idx + COLS * 3 + 3] === p) {
+                        indices.push(idx, idx + COLS + 1, idx + COLS * 2 + 2, idx + COLS * 3 + 3);
+                    }
+                }
+            }
+            // Diag Neg
+            for (let r = 3; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    const idx = r * COLS + c;
+                    if (board[idx] === p && board[idx - COLS + 1] === p && board[idx - COLS * 2 + 2] === p && board[idx - COLS * 3 + 3] === p) {
+                        indices.push(idx, idx - COLS + 1, idx - COLS * 2 + 2, idx - COLS * 3 + 3);
+                    }
+                }
+            }
+        }
+        return [...new Set(indices)];
+    };
+
+    const winningIndices = gameState ? getWinningIndices(gameState.board) : [];
+    const boardShakeStr = useRef('');
+
+    // Trigger shake on new move
+    useEffect(() => {
+        if (gameState.lastMoveTime > 0) {
+            boardShakeStr.current = 'animate-shake';
+            const t = setTimeout(() => boardShakeStr.current = '', 300);
+            return () => clearTimeout(t);
+        }
+    }, [gameState.lastMoveTime]);
+
     return (
         <div className="flex flex-col items-center gap-2 p-2 select-none overflow-hidden h-full font-mono w-full max-w-sm mx-auto">
+
+            <style jsx global>{`
+                @keyframes dropIn {
+                    0% { transform: translateY(var(--drop-start)); opacity: 0; }
+                    20% { opacity: 1; }
+                    60% { transform: translateY(0); }
+                    80% { transform: translateY(-10%); }
+                    100% { transform: translateY(0); }
+                }
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    25% { transform: translateX(-2px) rotate(-1deg); }
+                    75% { transform: translateX(2px) rotate(1deg); }
+                }
+                .animate-drop {
+                    animation: dropIn 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+                }
+                .animate-shake {
+                    animation: shake 0.2s ease-in-out;
+                }
+            `}</style>
 
             {/* Header */}
             <div className="flex justify-between items-center w-full px-4 mb-2">
@@ -545,7 +560,7 @@ export default function Connect4({ sessionId, onBack }) {
             )}
 
             {/* The Grid */}
-            <div className="bg-slate-800 p-2.5 rounded-xl shadow-2xl border-4 border-slate-700 w-full max-w-[280px] min-h-[240px] relative">
+            <div className={`bg-slate-800 p-2.5 rounded-xl shadow-2xl border-4 border-slate-700 w-full max-w-[280px] min-h-[240px] relative ${boardShakeStr.current} transition-transform`}>
                 {/* Pre-Game Overlay */}
                 {gameState.status === 'WAITING' && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-lg">
@@ -564,44 +579,49 @@ export default function Connect4({ sessionId, onBack }) {
                 )}
 
                 <div className="grid grid-cols-7 gap-1.5">
-                    {safeBoard(gameState.board).map((cell, i) => (
-                        <div
-                            key={i}
-                            className="aspect-square rounded-full border border-slate-900/50 flex items-center justify-center bg-slate-950 overflow-hidden relative shadow-inner"
-                        >
-                            {cell && (
-                                <div className={`w-[85%] h-[85%] rounded-full shadow-lg ${cell === 'red'
-                                    ? 'bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_8px_#ec4899]'
-                                    : 'bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_8px_#facc15]'
-                                    } animate-in zoom-in duration-300`} />
-                            )}
-                        </div>
-                    ))}
+                    {safeBoard(gameState.board).map((cell, i) => {
+                        const isWinningPiece = winningIndices.includes(i);
+                        const row = Math.floor(i / COLS);
+                        // Calculate drop height relative to this cell (e.g. if row 5, drop from -500%)
+                        // Actually, since we removed overflow-hidden from cell, we need to be careful.
+                        // But let's try just calculating based on row distance from top.
+                        // Row 0 is top. Row 5 is bottom.
+                        // If I am at Row 5, I want to start at Row -1 (above board).
+                        // Distance = Row + 1. So - (Row + 1) * 100%.
+                        const dropStart = `-${(row + 1) * 120}%`;
+
+                        return (
+                            <div
+                                key={i}
+                                className="aspect-square rounded-full border border-slate-900/50 flex items-center justify-center bg-slate-950 relative shadow-inner"
+                            >
+                                {cell && (
+                                    <div
+                                        style={{ '--drop-start': dropStart }}
+                                        className={`w-[85%] h-[85%] rounded-full shadow-lg ${cell === 'red'
+                                            ? 'bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_8px_#ec4899]'
+                                            : 'bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_8px_#facc15]'
+                                            } animate-drop ${isWinningPiece ? 'ring-4 ring-white animate-pulse brightness-125 z-10' : ''}`}
+                                    />
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
 
-                {/* Winner Overlay */}
+                {/* Standard Game End Overlay */}
                 {gameState.status === 'FINISHED' && (
-                    <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300 p-4">
-                        <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl flex flex-col items-center gap-4 shadow-2xl w-full max-w-[240px]">
-                            <h2 className={`text-2xl font-black italic tracking-tighter ${gameState.winner === 'red' ? 'text-pink-500' : gameState.winner === 'yellow' ? 'text-yellow-400' : 'text-slate-400'}`}>
-                                {gameState.winner === 'draw' ? 'STALEMATE' : `${gameState.winner === 'red' ? 'RED' : 'YELLOW'} WINS`}
-                            </h2>
-                            {isHost && (
-                                <button onClick={handleReset} className="w-full py-3 bg-white text-black rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-400 hover:text-white transition-all transform hover:scale-105 mb-2">
-                                    PLAY AGAIN
-                                </button>
-                            )}
-
-                            <button
-                                onClick={() => updateState({ status: 'MENU', board: Array(ROWS * COLS).fill(null), winner: null })}
-                                className="w-full py-3 bg-slate-800 text-slate-400 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-700 hover:text-white transition-all"
-                            >
-                                MAIN MENU
-                            </button>
-
-                            {!isHost && <div className="text-xs text-slate-500 mt-2">Waiting for Host to Restart...</div>}
-                        </div>
-                    </div>
+                    <GameEndOverlay
+                        winner={gameState.winner === 'draw' ? null : (gameState.winner === 'red' && isHost) || (gameState.winner === 'yellow' && !isHost)}
+                        isDraw={gameState.winner === 'draw'}
+                        score={gameState.winner === 'draw' ? 'DRAW' : (gameState.winner === 'red' ? 'RED WINS' : 'YELLOW WINS')}
+                        onRestart={() => isHost && handleReset()}
+                        onExit={() => {
+                            updateState({ status: 'MENU', board: Array(ROWS * COLS).fill(null), winner: null });
+                            onBack(); // Optional: Return to arcade menu
+                        }}
+                        isHost={isHost}
+                    />
                 )}
             </div>
         </div>

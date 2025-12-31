@@ -28,14 +28,27 @@ class MindHiveService {
 
     /**
      * Streams a response from the hive using direct fetch to bypass SDK complexities.
+     * Supports Multimodal Inputs (Text + Images).
      */
-    async streamResponse(prompt, history = [], onChunk, onModelChange) {
+    async streamResponse(prompt, history = [], onChunk, onModelChange, images = []) {
         console.log(`🐝 activating mind hive...`);
+
+        // Format User Message (Multimodal support)
+        let userContent = prompt;
+        if (images && images.length > 0) {
+            userContent = [
+                { type: "text", text: prompt },
+                ...images.map(url => ({
+                    type: "image_url",
+                    image_url: { url: url }
+                }))
+            ];
+        }
 
         const messages = [
             { role: 'system', content: CONFIG.systemPrompt },
             ...history.map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.text })),
-            { role: 'user', content: prompt }
+            { role: 'user', content: userContent }
         ];
 
         for (const modelName of HIVE_MODELS) {

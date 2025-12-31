@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import FeatureCard from "./components/FeatureCard";
 import towerVideo from "../../assets/TowerIntroVid.mp4";
@@ -9,14 +9,26 @@ export default function Landing() {
   const [session, setSession] = useState("");
   const navigate = useNavigate();
 
+  // Resume Logic
+  const [lastSessionId, setLastSessionId] = useState(null);
+  useEffect(() => {
+    const stored = localStorage.getItem('last_tower_session');
+    if (stored) setLastSessionId(stored);
+  }, []);
+
   const handleStart = () => {
-    if (session.trim()) {
-      navigate(`/session/${encodeURIComponent(session)}`);
-    } else {
-      // Auto-generate demo session
-      const demoId = `demo_tower_${Math.floor(Math.random() * 1000)}`;
-      navigate(`/session/${demoId}`);
+    let targetId = session.trim();
+    if (!targetId) {
+      targetId = `demo_tower_${Math.floor(Math.random() * 1000)}`;
     }
+
+    // Persist
+    localStorage.setItem('last_tower_session', targetId);
+    navigate(`/session/${encodeURIComponent(targetId)}`);
+  };
+
+  const resumeSession = () => {
+    if (lastSessionId) navigate(`/session/${encodeURIComponent(lastSessionId)}`);
   };
 
   return (
@@ -85,12 +97,30 @@ export default function Landing() {
           </p>
 
           {/* Acronym Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/80 border border-white/10 backdrop-blur-md shadow-lg hover:border-cyan-500/30 transition-colors cursor-default">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/80 border border-white/10 backdrop-blur-md shadow-lg hover:border-cyan-500/30 transition-colors cursor-default mb-8">
             <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
             <p className="text-[10px] md:text-xs text-cyan-200/80 font-mono tracking-wider">
               <span className="font-bold text-cyan-400">T</span>utoring <span className="font-bold text-cyan-400">O</span>ptimized <span className="font-bold text-cyan-400">W</span>ith <span className="font-bold text-cyan-400">E</span>lite <span className="font-bold text-cyan-400">R</span>esources
             </p>
           </div>
+
+          {/* RESUME BUTTON (If exists) */}
+          {lastSessionId && (
+            <div className="animate-in fade-in slide-in-from-top-4 duration-700 mb-6">
+              <button
+                onClick={resumeSession}
+                className="group flex items-center gap-3 px-6 py-3 bg-slate-800/80 hover:bg-slate-700 text-white rounded-full border border-cyan-500/30 hover:border-cyan-400 transition-all shadow-[0_0_20px_rgba(6,182,212,0.1)] hover:shadow-[0_0_30px_rgba(6,182,212,0.3)]"
+              >
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <div className="flex flex-col items-start">
+                  <span className="text-[10px] uppercase text-slate-400 font-bold tracking-widest">Resume Active Session</span>
+                  <span className="text-sm font-mono text-cyan-300">ID: {lastSessionId}</span>
+                </div>
+                <span className="ml-2 text-slate-400 group-hover:translate-x-1 transition-transform">→</span>
+              </button>
+            </div>
+          )}
+
         </div>
 
         {/* Access Terminal */}

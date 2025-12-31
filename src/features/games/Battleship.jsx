@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRealtimeGame } from '../../hooks/useRealtimeGame';
+import GameEndOverlay from './GameEndOverlay';
 
 // Game Constants
 const BOARD_SIZE = 10;
@@ -42,26 +43,103 @@ export default function Battleship({ sessionId, onBack }) {
     const oppPlayerIndex = isHost ? '1' : '0';
 
     // --- AI LOGIC (VS CPU) ---
+    // AI Memory for "Hunt & Target" Strategy
+    const aiMemory = React.useRef({
+        mode: 'HUNT', // 'HUNT' or 'TARGET'
+        targets: [],  // Stack of coordinates to fire at (Stack usually LIFO, but queue might be better for parity)
+        lastHit: null // Coordinate of last hit to determine neighbors
+    });
+
     useEffect(() => {
         if (gameState?.mode === 'VS_CPU' && gameState.phase === 'PLAYING' && gameState.turn === 1 && isHost) {
             // CPU TURN
             const timer = setTimeout(() => {
                 const board = gameState.boards['0'];
-                // Simple AI: Random valid shot
-                let validShots = [];
-                board.forEach((cell, i) => { if (cell === 0) validShots.push(i); });
+                const { mode, targets } = aiMemory.current;
 
-                if (validShots.length > 0) {
-                    const targetIdx = validShots[Math.floor(Math.random() * validShots.length)];
+                let targetIdx = -1;
+
+                // 1. TARGET MODE: Fire at enqueued targets
+                if (mode === 'TARGET' && targets.length > 0) {
+                    // Pop a target
+                    while (targets.length > 0) {
+                        const candidate = targets.pop();
+                        // Validation: Check if already shot
+                        if (board[candidate] === 0) {
+                            targetIdx = candidate;
+                            break;
+                        }
+                    }
+                    // If ran out of targets, revert to HUNT
+                    if (targetIdx === -1) {
+                        aiMemory.current.mode = 'HUNT';
+                    }
+                }
+
+                // 2. HUNT MODE: Checkerboard Parity Search (Most efficient)
+                if (targetIdx === -1) {
+                    const validMoves = [];
+                    board.forEach((cell, i) => {
+                        if (cell === 0) {
+                            const r = Math.floor(i / BOARD_SIZE);
+                            const c = i % BOARD_SIZE;
+                            // Parity: (r + c) is even (or odd). Covers every 2nd square.
+                            // Enough to hit smallest ship (Destroyer size 2)
+                            if ((r + c) % 2 === 0) validMoves.push(i);
+                        }
+                    });
+
+                    // If parity moves exhausted (rare endgame), take any open spot
+                    if (validMoves.length === 0) {
+                        board.forEach((cell, i) => { if (cell === 0) validMoves.push(i); });
+                    }
+
+                    if (validMoves.length > 0) {
+                        targetIdx = validMoves[Math.floor(Math.random() * validMoves.length)];
+                    }
+                }
+
+                if (targetIdx !== -1) {
                     const r = Math.floor(targetIdx / BOARD_SIZE);
                     const c = targetIdx % BOARD_SIZE;
+
+                    // PRE-CALC UPDATE for Memory (Since we don't have the result yet, we hook handleFire logic?)
+                    // Actually, handleFire needs to return result or we assume based on next render.
+                    // But 'handleFire' is async-ish state update.
+                    // Better approach: Calculate result locally to update memory *immediately* for next turn
+
+                    // Cheating peek to update memory
+                    const myShips = gameState.ships['0'];
+                    const isHit = myShips.some(s => isOverlapping(s, r, c));
+
+                    if (isHit) {
+                        aiMemory.current.mode = 'TARGET';
+                        // Add neighbors to stack: Up, Down, Left, Right
+                        const neighbors = [
+                            { r: r - 1, c }, { r: r + 1, c },
+                            { r, c: c - 1 }, { r, c: c + 1 }
+                        ];
+
+                        // Shuffle neighbors for randomness so it doesn't always look same way
+                        neighbors.sort(() => Math.random() - 0.5);
+
+                        neighbors.forEach(n => {
+                            if (n.r >= 0 && n.r < BOARD_SIZE && n.c >= 0 && n.c < BOARD_SIZE) {
+                                const idx = n.r * BOARD_SIZE + n.c;
+                                if (board[idx] === 0) { // Only add if not shot
+                                    aiMemory.current.targets.push(idx);
+                                }
+                            }
+                        });
+                    }
+
                     // Fire!
                     handleFire(r, c, 0); // CPU fires at P1 (0)
                 }
             }, 1000);
             return () => clearTimeout(timer);
         }
-    }, [gameState?.phase, gameState?.turn, gameState?.mode, isHost]);
+    }, [gameState?.phase, gameState?.turn, gameState?.mode, isHost, gameState?.boards]);
 
     const setupAI = () => {
         let aiShips = [];
@@ -305,31 +383,131 @@ export default function Battleship({ sessionId, onBack }) {
 
     // ... GAME RENDER ...
 
+    // --- ANIMATIONS & STYLES ---
+    const visualStyles = `
+        @keyframes radar {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 0.5; }
+            90% { opacity: 0.5; }
+            100% { top: 100%; opacity: 0; }
+        }
+        @keyframes explosion {
+            0% { transform: scale(0.5); opacity: 1; filter: brightness(2); }
+            50% { transform: scale(1.5); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; filter: brightness(1); }
+        }
+        @keyframes ripple {
+            0% { transform: scale(0); opacity: 0.8; border-width: 4px; }
+            100% { transform: scale(2); opacity: 0; border-width: 0px; }
+        }
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+        @keyframes sink {
+            0%, 100% { transform: scale(1) rotate(0deg); filter: grayscale(0) brightness(1); }
+            25% { transform: scale(0.9) rotate(-5deg); filter: grayscale(0.5) brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(3); }
+            50% { transform: scale(0.95) rotate(5deg); }
+            75% { transform: scale(0.9) rotate(-5deg); }
+        }
+        .radar-sweep {
+            position: absolute;
+            left: 0; right: 0;
+            height: 10px;
+            background: linear-gradient(to bottom, transparent, rgba(6,182,212,0.6), transparent);
+            box-shadow: 0 0 15px rgba(6,182,212,0.8);
+            animation: radar 3s linear infinite;
+            pointer-events: none;
+            z-index: 20;
+        }
+        .animate-explosion {
+            animation: explosion 0.4s ease-out forwards;
+        }
+        .animate-ripple::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 50%;
+            animation: ripple 0.6s ease-out forwards;
+        }
+        .animate-sink {
+            animation: sink 2s ease-in-out infinite;
+            opacity: 0.6;
+            transition: opacity 1s;
+        }
+        .scanlines {
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+        .crt-flicker {
+            animation: flicker 0.15s infinite;
+        }
+    `;
+
+    // --- GAME RENDER ---
+
     const renderGrid = (board, ships, isSelf) => {
         // Merge ships into a visual grid for display
         // If isSelf, show ships. If enemy, only show hits/misses (unless game over?)
         const safeBoard = board || Array(100).fill(0); // Defensive init against RTDB null pruning
 
         return (
-            <div className="grid grid-cols-10 gap-px bg-slate-700 border border-slate-600 w-full max-w-[400px] aspect-square shadow-2xl relative">
+            <div className="grid grid-cols-10 gap-px bg-slate-700 border border-slate-600 w-full max-w-[400px] aspect-square shadow-2xl relative overflow-hidden group">
+                {/* Radar Sweep for Enemy Grid */}
+                {!isSelf && gameState.phase === 'PLAYING' && (
+                    <div className="radar-sweep" />
+                )}
+
                 {Array(100).fill(0).map((_, i) => {
                     const r = Math.floor(i / BOARD_SIZE);
                     const c = i % BOARD_SIZE;
 
                     const cellState = safeBoard[i]; // 'HIT', 'MISS', or 0
                     let shipHere = false;
+                    let myShipObj = null;
 
-                    if (isSelf) {
-                        shipHere = (ships || myShips).some(s => isOverlapping(s, r, c));
+                    if (isSelf && ships) {
+                        myShipObj = ships.find(s => isOverlapping(s, r, c));
+                        shipHere = !!myShipObj;
+                    }
+
+                    // Enemy Sinking Logic
+                    // We don't have direct access to 'enemy ships' array in render loop easily unless we pass it.
+                    // But 'ships' arg is passed as empty [] for enemy grid in current call `renderGrid(gameState.boards?.[oppPlayerIndex], [], false)`.
+                    // We need to pass the enemy ships to know if they are sunk?
+                    // Actually, 'ships' arg for enemy is empty. We need to pass it? 
+                    // Wait, `renderGrid` call on line 507 passes `[]`. 
+                    // Let's modify the call site (lines 461 and 507) to pass the ships if possible, 
+                    // OR we just use `gameState.ships[oppPlayerIndex]` if `!isSelf`.
+
+                    let sunkShip = false;
+                    const targetShips = isSelf ? ships : (gameState.ships?.[oppPlayerIndex] || []);
+                    const foundShip = targetShips?.find(s => isOverlapping(s, r, c));
+
+                    if (foundShip && foundShip.hits >= foundShip.size) {
+                        sunkShip = true; // This ship is fully sunk
                     }
 
                     // For SETUP phase: show preview of placing ship
                     // Simplified: just click to place
 
                     let bgClass = 'bg-slate-900';
-                    if (cellState === 'HIT') bgClass = 'bg-red-500/80 animate-pulse';
-                    else if (cellState === 'MISS') bgClass = 'bg-slate-800'; // Miss
-                    else if (shipHere) bgClass = 'bg-cyan-600 border border-cyan-400/50 shadow-[0_0_10px_rgba(6,182,212,0.5)] z-10'; // Ship
+                    let content = null;
+
+                    if (cellState === 'HIT') {
+                        bgClass = sunkShip ? 'bg-red-900/50 animate-sink' : 'bg-red-500/80 animate-explosion';
+                        content = <span className="absolute inset-0 flex items-center justify-center text-xs">💥</span>;
+                    }
+                    else if (cellState === 'MISS') {
+                        bgClass = 'bg-slate-800 animate-ripple';
+                        content = <span className="absolute inset-0 flex items-center justify-center text-xs text-white/20">●</span>;
+                    }
+                    else if (shipHere) {
+                        // My Ships
+                        bgClass = sunkShip ? 'bg-red-900/50 grayscale opacity-50 border border-red-900' : 'bg-cyan-600 border border-cyan-400/50 shadow-[0_0_10px_rgba(6,182,212,0.5)] z-10';
+                    }
 
                     return (
                         <div
@@ -337,8 +515,7 @@ export default function Battleship({ sessionId, onBack }) {
                             onClick={() => handleCellClick(r, c)}
                             className={`relative w-full h-full cursor-pointer hover:bg-white/10 transition-colors ${bgClass}`}
                         >
-                            {cellState === 'HIT' && <span className="absolute inset-0 flex items-center justify-center text-xs">💥</span>}
-                            {cellState === 'MISS' && <span className="absolute inset-0 flex items-center justify-center text-xs text-white/20">●</span>}
+                            {content}
                         </div>
                     );
                 })}
@@ -349,9 +526,14 @@ export default function Battleship({ sessionId, onBack }) {
     const isMyTurn = (gameState.turn === 0 && isHost) || (gameState.turn === 1 && !isHost);
 
     return (
-        <div className="flex flex-col h-full text-white p-4 overflow-y-auto">
+        <div className="flex flex-col h-full text-white p-4 overflow-y-auto relative">
+            <style>{visualStyles}</style>
+
+            {/* CRT Overlay */}
+            <div className="absolute inset-0 pointer-events-none z-50 scanlines opacity-10"></div>
+
             {/* Header */}
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-6 relative z-10">
                 <button onClick={onBack} className="text-sm text-slate-400 hover:text-white">← BACK</button>
                 <div className="text-center">
                     <h2 className="text-2xl font-black text-white tracking-widest uppercase filter drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">BATTLESHIP</h2>
@@ -366,7 +548,7 @@ export default function Battleship({ sessionId, onBack }) {
             </div>
 
             {/* Game Area */}
-            <div className="flex flex-col md:flex-row gap-8 items-start justify-center flex-1">
+            <div className="flex flex-col md:flex-row gap-8 items-start justify-center flex-1 relative z-10">
 
                 {/* YOUR FLEET (Left) */}
                 <div className="flex-1 w-full max-w-md">
@@ -436,6 +618,19 @@ export default function Battleship({ sessionId, onBack }) {
                     </div>
                 </div>
 
+                {/* Game Over Overlay */}
+                {gameState.phase === 'GAMEOVER' && (
+                    <GameEndOverlay
+                        winner={String(gameState.winner) === myPlayerIndex}
+                        score={String(gameState.winner) === myPlayerIndex ? 'VICTORY' : 'DEFEAT'}
+                        onRestart={() => isHost && handleReset()}
+                        onExit={() => {
+                            handleReset(); // Ensure state is clean
+                            onBack();
+                        }}
+                        isHost={isHost}
+                    />
+                )}
             </div>
         </div>
     );

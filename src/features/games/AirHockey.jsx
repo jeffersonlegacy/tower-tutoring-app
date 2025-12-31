@@ -1,17 +1,20 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useRealtimeGame } from '../../hooks/useRealtimeGame';
 import confetti from 'canvas-confetti';
+import GameEndOverlay from './GameEndOverlay';
 
 const TABLE_WIDTH = 400;
 const TABLE_HEIGHT = 600;
 const PADDLE_RADIUS = 25;
 const PUCK_RADIUS = 15;
+const WIN_SCORE = 7;
 
 const INITIAL_STATE = {
     status: 'MENU', // MENU, PLAYING, FINISHED
     mode: 'AI', // AI, PVP
     hostScore: 0,
     clientScore: 0,
+    winner: null, // 'host' or 'client'
     puck: { x: 200, y: 300, vx: 0, vy: 0 },
     pddl: { // Paddles
         '0': { x: 200, y: 550 }, // Host (Red, Bottom)
@@ -33,7 +36,9 @@ export default function AirHockey({ sessionId, onBack }) {
         puck: { x: 200, y: 300, vx: 0, vy: 0 },
         myPaddle: { x: 200, y: 550 },
         oppPaddle: { x: 200, y: 50 },
-        lastUpdate: 0
+        lastUpdate: 0,
+        sparks: [],
+        trail: []
     });
 
     // --- SYNC LOOP ---
@@ -97,8 +102,18 @@ export default function AirHockey({ sessionId, onBack }) {
             s.puck.vy *= 0.99;
 
             // Walls
-            if (s.puck.x - PUCK_RADIUS < 0) { s.puck.x = PUCK_RADIUS; s.puck.vx *= -0.8; sfx.current.hit.play().catch(() => { }); }
-            if (s.puck.x + PUCK_RADIUS > TABLE_WIDTH) { s.puck.x = TABLE_WIDTH - PUCK_RADIUS; s.puck.vx *= -0.8; sfx.current.hit.play().catch(() => { }); }
+            if (s.puck.x - PUCK_RADIUS < 0) {
+                s.puck.x = PUCK_RADIUS;
+                s.puck.vx *= -0.8;
+                sfx.current.hit.play().catch(() => { });
+                createSparks(s.puck.x, s.puck.y);
+            }
+            if (s.puck.x + PUCK_RADIUS > TABLE_WIDTH) {
+                s.puck.x = TABLE_WIDTH - PUCK_RADIUS;
+                s.puck.vx *= -0.8;
+                sfx.current.hit.play().catch(() => { });
+                createSparks(s.puck.x, s.puck.y);
+            }
 
             // Goals / Top-Bottom Bounce
             const goalWidth = 120;
@@ -115,6 +130,7 @@ export default function AirHockey({ sessionId, onBack }) {
                 } else {
                     s.puck.y = PUCK_RADIUS; s.puck.vy *= -0.8;
                     sfx.current.hit.play().catch(() => { });
+                    createSparks(s.puck.x, s.puck.y);
                 }
             }
             if (s.puck.y + PUCK_RADIUS > TABLE_HEIGHT) {
@@ -126,40 +142,81 @@ export default function AirHockey({ sessionId, onBack }) {
                 } else {
                     s.puck.y = TABLE_HEIGHT - PUCK_RADIUS; s.puck.vy *= -0.8;
                     sfx.current.hit.play().catch(() => { });
+                    createSparks(s.puck.x, s.puck.y);
                 }
             }
 
-            // AI Movement (if AI mode)
+            // Trail Logic
+            if (!s.trail) s.trail = [];
+            // Push current pos
+            s.trail.push({ x: s.puck.x, y: s.puck.y, age: 0 });
+            // Limit trail length
+            if (s.trail.length > 20) s.trail.shift();
+
+
+            // AI Movement (if AI mode) - PREDICTIVE PID CONTROLLER
             if (mode === 'AI') {
-                // Improved AI Logic: Prevent getting stuck behind lines
-                const reactionSpeed = 0.08;
-                let targetX = s.puck.x;
+                // prediction logic
+                const predictX = (puck) => {
+                    // If puck moving away (dy > 0 since AI is at y=50), return null (idle)
+                    if (puck.vy >= 0) return TABLE_WIDTH / 2;
 
-                // If puck is behind AI (rare but possible), prioritize getting back to center
-                // AI defends TOP half (0 to 300)
-                if (s.puck.y < s.oppPaddle.y - 10) {
-                    // Puck passed AI! Move to center to intercept possible rebound
-                    targetX = TABLE_WIDTH / 2;
-                }
+                    // Determine frames until puck reaches AI Y plane (approx y=50)
+                    const targetY = 50;
+                    const distY = puck.y - targetY;
+                    if (distY <= 0) return puck.x;
 
-                s.oppPaddle.x += (targetX - s.oppPaddle.x) * reactionSpeed;
+                    const frames = Math.abs(distY / puck.vy);
 
-                // AI defends top half
-                // Defensive stance: Stay between puck and goal
-                // Attack stance: Move to stroke
+                    // Predict X based on frames + bounces
+                    let predX = puck.x + (puck.vx * frames);
+
+                    // Handle Wall Bounces (Simple Mirroring)
+                    // If predX is out of bounds, reflect it
+                    while (predX < 0 || predX > TABLE_WIDTH) {
+                        if (predX < 0) predX = -predX;
+                        if (predX > TABLE_WIDTH) predX = TABLE_WIDTH - (predX - TABLE_WIDTH);
+                    }
+
+                    return predX;
+                };
+
+                let targetX = predictX(s.puck);
+
+                // Add some human error/noise based on difficulty (optional, kept perfect for "Supercharge")
+                // Clamp targetX to table width
+                targetX = Math.max(PADDLE_RADIUS, Math.min(TABLE_WIDTH - PADDLE_RADIUS, targetX));
+
+                // PID Controller State (stored in s.aiPID if exists, else init)
+                if (!s.aiPID) s.aiPID = { errSum: 0, lastErr: 0 };
+
+                const Kp = 0.15; // Proportional
+                const Ki = 0.001; // Integral
+                const Kd = 0.8;  // Derivative
+
+                const error = targetX - s.oppPaddle.x;
+                s.aiPID.errSum += error;
+                const dErr = error - s.aiPID.lastErr;
+
+                const output = (Kp * error) + (Ki * s.aiPID.errSum) + (Kd * dErr);
+                s.aiPID.lastErr = error;
+
+                // Apply velocity limit for realism
+                const maxSpeed = 12;
+                const move = Math.max(-maxSpeed, Math.min(maxSpeed, output));
+
+                s.oppPaddle.x += move;
+
+                // Y-Axis Logic (Attack/Defend)
+                // If puck is close, strike! Else stay home.
                 let targetY = 50;
-
-                if (s.puck.y < 300) {
-                    // Puck in AI territory
-                    targetY = s.puck.y * 0.8; // Move towards puck but stay slightly back (goalie) or aggressive?
-                    // Let's make it aggressive but safe
-                    targetY = Math.min(250, s.puck.y); // Don't cross center line (300)
-                } else {
-                    // Puck in player territory - return to base
-                    targetY = 50;
+                if (s.puck.y < 250 && s.puck.vy < 0) {
+                    // Aggressive intercept
+                    targetY = Math.min(200, s.puck.y - 40);
                 }
 
-                s.oppPaddle.y += (targetY - s.oppPaddle.y) * reactionSpeed;
+                s.oppPaddle.y += (targetY - s.oppPaddle.y) * 0.1;
+
             }
 
             // Collisions
@@ -209,16 +266,52 @@ export default function AirHockey({ sessionId, onBack }) {
 
     const scorePoint = (scorer) => {
         if (!isHost && gameState.mode === 'PVP') return; // Only host updates score in PvP
-        // In AI mode, anyone can update locally? No, use state
+
+        const newHostScore = (gameState.hostScore || 0) + (scorer === 'host' ? 1 : 0);
+        const newClientScore = (gameState.clientScore || 0) + (scorer === 'client' ? 1 : 0);
 
         const updates = {
-            [scorer === 'host' ? 'hostScore' : 'clientScore']: (gameState[scorer === 'host' ? 'hostScore' : 'clientScore'] || 0) + 1
+            hostScore: newHostScore,
+            clientScore: newClientScore
         };
+
+        if (newHostScore >= WIN_SCORE || newClientScore >= WIN_SCORE) {
+            updates.status = 'FINISHED';
+            updates.winner = newHostScore >= WIN_SCORE ? 'host' : 'client';
+
+            // Log Match
+            if (gameState.mode === 'PVP') {
+                const currentHistory = Array.isArray(gameState.matchHistory) ? gameState.matchHistory : [];
+                updates.matchHistory = [...currentHistory, {
+                    id: (currentHistory.length || 0) + 1,
+                    winner: updates.winner,
+                    hostScore: newHostScore,
+                    clientScore: newClientScore,
+                    timestamp: Date.now()
+                }];
+            }
+        }
+
         updateState(updates);
     };
 
     const resetPuck = (s) => {
         s.puck = { x: TABLE_WIDTH / 2, y: TABLE_HEIGHT / 2, vx: 0, vy: 0 };
+        s.trail = [];
+    };
+
+    const createSparks = (x, y) => {
+        if (!localState.current.sparks) localState.current.sparks = [];
+        for (let i = 0; i < 8; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 3 + 1;
+            localState.current.sparks.push({
+                x, y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 1.0
+            });
+        }
     };
 
     // --- INPUT HANDLERS ---
@@ -260,10 +353,54 @@ export default function AirHockey({ sessionId, onBack }) {
         ctx.fillRect((TABLE_WIDTH - 120) / 2, 0, 120, 10);
         ctx.fillRect((TABLE_WIDTH - 120) / 2, TABLE_HEIGHT - 10, 120, 10);
 
+
+        // --- DRAW TRAIL ---
+        if (s.trail && s.trail.length > 1) {
+            ctx.beginPath();
+            ctx.moveTo(s.trail[0].x, s.trail[0].y);
+            for (let i = 1; i < s.trail.length; i++) {
+                // Smooth Quadratic Bezier? Or simple line.
+                // Simple line for performance
+                ctx.lineTo(s.trail[i].x, s.trail[i].y);
+            }
+
+            // Trail Gradient
+            const grad = ctx.createLinearGradient(s.trail[0].x, s.trail[0].y, s.puck.x, s.puck.y);
+            grad.addColorStop(0, 'rgba(34, 211, 238, 0)');
+            grad.addColorStop(1, 'rgba(34, 211, 238, 0.5)');
+
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = PUCK_RADIUS;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+
+            // Age trails
+            s.trail.forEach(t => t.age++);
+        }
+
         // Puck
         ctx.fillStyle = '#22d3ee'; ctx.shadowBlur = 15; ctx.shadowColor = '#22d3ee';
         ctx.beginPath(); ctx.arc(s.puck.x, s.puck.y, PUCK_RADIUS, 0, Math.PI * 2); ctx.fill();
         ctx.shadowBlur = 0;
+
+        // --- DRAW SPARKS ---
+        if (s.sparks) {
+            for (let i = s.sparks.length - 1; i >= 0; i--) {
+                const sp = s.sparks[i];
+                sp.x += sp.vx;
+                sp.y += sp.vy;
+                sp.life -= 0.05;
+                if (sp.life <= 0) {
+                    s.sparks.splice(i, 1);
+                    continue;
+                }
+                ctx.fillStyle = `rgba(255, 255, 255, ${sp.life})`;
+                ctx.beginPath();
+                ctx.arc(sp.x, sp.y, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
 
         // My Paddle (Host=Red, Client=Blue)
         // If AI mode, Player=Red, AI=Gray
@@ -311,6 +448,20 @@ export default function AirHockey({ sessionId, onBack }) {
                     {gameState.mode === 'AI' ? 'CPU TRAINING' : 'LIVE MATCH'}
                 </div>
             </div>
+
+            {/* Game Over Overlay */}
+            {gameState.status === 'FINISHED' && (
+                <GameEndOverlay
+                    winner={isHost ? gameState.winner === 'host' : gameState.winner === 'client'}
+                    score={`${gameState.hostScore} - ${gameState.clientScore}`}
+                    onRestart={() => updateState({ status: 'PLAYING', hostScore: 0, clientScore: 0, winner: null })}
+                    onExit={() => {
+                        updateState({ status: 'MENU', hostScore: 0, clientScore: 0 });
+                        onBack();
+                    }}
+                    isHost={isHost || gameState.mode === 'AI'}
+                />
+            )}
 
             {/* Menu Overlay */}
             {gameState.status === 'MENU' && (

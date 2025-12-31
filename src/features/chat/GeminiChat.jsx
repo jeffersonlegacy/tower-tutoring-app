@@ -3,10 +3,14 @@ import { mindHive } from '../../services/MindHiveService';
 import jiLogo from '../../assets/ji_logo.jpg';
 
 
-export default function GeminiChat({ mode = 'widget', onHome }) {
-    const [messages, setMessages] = useState([
+export default function GeminiChat({ mode = 'widget', onHome, externalMessages, setExternalMessages }) {
+    // If external state is provided (Lifting State Up), use it. Otherwise use local state.
+    const [localMessages, setLocalMessages] = useState([
         { role: 'model', text: 'Welcome to Jefferson Intelligence. I am your premium AI tutor. How can I assist your learning journey today?' },
     ]);
+
+    const messages = externalMessages || localMessages;
+    const setMessages = setExternalMessages || setLocalMessages;
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
