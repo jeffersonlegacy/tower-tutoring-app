@@ -21,14 +21,18 @@ export function useWhiteboardSync(editor, sessionId) {
                 const snapshot = await getDoc(docRef);
                 if (snapshot.exists()) {
                     const data = snapshot.data();
-                    if (data.records) {
+                    if (data.records && typeof data.records === 'object' && Object.keys(data.records).length > 0) {
                         // console.log("WhiteboardSync: Found remote records. Loading...");
                         isRemoteUpdate.current = true;
-                        editor.store.loadSnapshot({
-                            document: { id: 'td-document', records: data.records },
-                            schema: editor.store.schema.serialize()
-                        });
-                        lastSerialized.current = JSON.stringify(data.records);
+                        try {
+                            editor.store.loadSnapshot({
+                                document: { id: 'td-document', records: data.records },
+                                schema: editor.store.schema.serialize()
+                            });
+                            lastSerialized.current = JSON.stringify(data.records);
+                        } catch (loadErr) {
+                            console.warn("WhiteboardSync: Failed to load snapshot, resetting:", loadErr);
+                        }
                         isRemoteUpdate.current = false;
                     }
                 } else {
@@ -85,17 +89,21 @@ export function useWhiteboardSync(editor, sessionId) {
             }
 
             const data = snapshot.data();
-            if (data && data.records) {
+            if (data && data.records && typeof data.records === 'object' && Object.keys(data.records).length > 0) {
                 const serialized = JSON.stringify(data.records);
                 if (serialized === lastSerialized.current) return;
 
                 console.log("WhiteboardSync: Received remote update. Loading snapshot...");
                 lastSerialized.current = serialized;
                 isRemoteUpdate.current = true;
-                editor.store.loadSnapshot({
-                    document: { id: 'td-document', records: data.records },
-                    schema: editor.store.schema.serialize()
-                });
+                try {
+                    editor.store.loadSnapshot({
+                        document: { id: 'td-document', records: data.records },
+                        schema: editor.store.schema.serialize()
+                    });
+                } catch (loadErr) {
+                    console.warn("WhiteboardSync: Failed to load remote snapshot:", loadErr);
+                }
                 isRemoteUpdate.current = false;
             }
         }, (err) => {
