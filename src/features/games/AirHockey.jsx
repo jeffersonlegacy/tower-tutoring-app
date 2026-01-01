@@ -72,6 +72,19 @@ export default function AirHockey({ sessionId, onBack }) {
     useEffect(() => {
         if (gameState?.status !== 'PLAYING') return;
 
+        // Initialize puck with velocity when game starts
+        const s = localState.current;
+        if (s.puck.vx === 0 && s.puck.vy === 0) {
+            const startSpeed = 8;
+            const randomAngle = (Math.random() * Math.PI / 2) + Math.PI / 4;
+            const direction = Math.random() > 0.5 ? 1 : -1;
+            s.puck.x = TABLE_WIDTH / 2;
+            s.puck.y = TABLE_HEIGHT / 2;
+            s.puck.vx = Math.cos(randomAngle) * startSpeed * (Math.random() > 0.5 ? 1 : -1);
+            s.puck.vy = Math.sin(randomAngle) * startSpeed * direction;
+            s.scoringCooldown = false;
+        }
+
         let animationFrameId;
         const ctx = canvasRef.current?.getContext('2d');
 
@@ -184,11 +197,17 @@ export default function AirHockey({ sessionId, onBack }) {
                     // Predict X based on frames + bounces
                     let predX = puck.x + (puck.vx * frames);
 
-                    // Handle Wall Bounces (Simple Mirroring)
-                    // If predX is out of bounds, reflect it
-                    while (predX < 0 || predX > TABLE_WIDTH) {
+                    // Handle Wall Bounces (Simple Mirroring) with iteration limit
+                    let bounceLimit = 10;
+                    while ((predX < 0 || predX > TABLE_WIDTH) && bounceLimit > 0) {
                         if (predX < 0) predX = -predX;
                         if (predX > TABLE_WIDTH) predX = TABLE_WIDTH - (predX - TABLE_WIDTH);
+                        bounceLimit--;
+                    }
+
+                    // Fallback if still out of bounds
+                    if (predX < 0 || predX > TABLE_WIDTH || isNaN(predX)) {
+                        predX = TABLE_WIDTH / 2;
                     }
 
                     return predX;
@@ -327,7 +346,17 @@ export default function AirHockey({ sessionId, onBack }) {
     };
 
     const resetPuck = (s) => {
-        s.puck = { x: TABLE_WIDTH / 2, y: TABLE_HEIGHT / 2, vx: 0, vy: 0 };
+        // Give puck initial velocity so game isn't stuck
+        const startSpeed = 8;
+        const randomAngle = (Math.random() * Math.PI / 2) + Math.PI / 4; // 45-135 degrees
+        const direction = Math.random() > 0.5 ? 1 : -1; // Random up or down
+
+        s.puck = {
+            x: TABLE_WIDTH / 2,
+            y: TABLE_HEIGHT / 2,
+            vx: Math.cos(randomAngle) * startSpeed * (Math.random() > 0.5 ? 1 : -1),
+            vy: Math.sin(randomAngle) * startSpeed * direction
+        };
         s.trail = [];
     };
 
