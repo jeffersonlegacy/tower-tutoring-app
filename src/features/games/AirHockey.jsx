@@ -41,7 +41,8 @@ export default function AirHockey({ sessionId, onBack }) {
         lastUpdate: 0,
         sparks: [],
         trail: [],
-        goalExplosion: null
+        goalExplosion: null,
+        scoringCooldown: false // Prevents double-scoring
     });
 
     // --- SYNC LOOP ---
@@ -125,10 +126,15 @@ export default function AirHockey({ sessionId, onBack }) {
 
             if (s.puck.y - PUCK_RADIUS < 0) {
                 if (s.puck.x > leftPost && s.puck.x < rightPost) {
-                    // TOP GOAL (User Scores)
-                    scorePoint(isHost ? 'host' : 'client');
-                    triggerGoalEffect('me', s.puck.x, PUCK_RADIUS);
-                    resetPuck(s);
+                    // TOP GOAL (User Scores) - only if not on cooldown
+                    if (!s.scoringCooldown) {
+                        s.scoringCooldown = true;
+                        scorePoint(isHost ? 'host' : 'client');
+                        triggerGoalEffect('me', s.puck.x, PUCK_RADIUS);
+                        resetPuck(s);
+                        // Reset cooldown after delay
+                        setTimeout(() => { localState.current.scoringCooldown = false; }, 1000);
+                    }
                 } else {
                     s.puck.y = PUCK_RADIUS; s.puck.vy *= -0.8;
                     sfx.current.hit.play().catch(() => { });
@@ -137,10 +143,15 @@ export default function AirHockey({ sessionId, onBack }) {
             }
             if (s.puck.y + PUCK_RADIUS > TABLE_HEIGHT) {
                 if (s.puck.x > leftPost && s.puck.x < rightPost) {
-                    // BOTTOM GOAL (Opp/AI Scores)
-                    scorePoint(isHost ? 'client' : 'host');
-                    triggerGoalEffect('opp', s.puck.x, TABLE_HEIGHT - PUCK_RADIUS);
-                    resetPuck(s);
+                    // BOTTOM GOAL (Opp/AI Scores) - only if not on cooldown
+                    if (!s.scoringCooldown) {
+                        s.scoringCooldown = true;
+                        scorePoint(isHost ? 'client' : 'host');
+                        triggerGoalEffect('opp', s.puck.x, TABLE_HEIGHT - PUCK_RADIUS);
+                        resetPuck(s);
+                        // Reset cooldown after delay
+                        setTimeout(() => { localState.current.scoringCooldown = false; }, 1000);
+                    }
                 } else {
                     s.puck.y = TABLE_HEIGHT - PUCK_RADIUS; s.puck.vy *= -0.8;
                     sfx.current.hit.play().catch(() => { });
