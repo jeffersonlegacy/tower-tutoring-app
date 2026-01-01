@@ -641,6 +641,14 @@ export default function SwipeFight({ sessionId, onBack }) {
             <div className={`flex flex-col h-full relative z-10 transition-opacity duration-500 ${status === 'playing' ? 'opacity-100' : 'opacity-20 pointer-events-none blur-sm'}`}>
                 {/* HUD */}
                 <div className="flex justify-between items-start p-4 bg-gradient-to-b from-slate-900/90 to-transparent">
+                    {isHost && (
+                        <button
+                            onClick={() => updateState({ status: 'waiting', hostScore: 0, clientScore: 0 })}
+                            className="absolute top-2 left-2 text-red-400 hover:text-white text-xs font-bold z-50"
+                        >
+                            🔄 RESET
+                        </button>
+                    )}
                     <div>
                         <div className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">Score</div>
                         <div className={`text-4xl font-mono font-black text-white ${scoreAnimating ? 'score-pop' : ''}`}>{score}</div>

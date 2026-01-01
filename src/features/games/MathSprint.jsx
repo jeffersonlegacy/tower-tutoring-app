@@ -204,7 +204,12 @@ export default function MathSprint({ sessionId, onBack }) {
 
             {/* Header / Back */}
             <div className="flex justify-between items-center mb-4 relative z-20">
-                <button onClick={onBack} className="text-xs text-slate-400 hover:text-white flex items-center gap-1">← ARCADE</button>
+                <div className="flex gap-3">
+                    <button onClick={onBack} className="text-xs text-slate-400 hover:text-white flex items-center gap-1">← ARCADE</button>
+                    {gameState === 'playing' && (
+                        <button onClick={() => setGameState('config')} className="text-xs text-red-400 hover:text-white">🔄 RESET</button>
+                    )}
+                </div>
                 <div className="text-xs font-mono font-bold text-cyan-400">MATH SPRINT: {difficulty.toUpperCase()}</div>
             </div>
 

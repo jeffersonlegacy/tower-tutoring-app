@@ -483,6 +483,7 @@ export default function Yahtzee({ sessionId, onBack }) {
             <div className={`shrink-0 h-14 ${THEME.headerBg} flex items-center justify-between px-4 shadow-md z-10`}>
                 <div className="flex items-center gap-3">
                     <button onClick={onBack} className="text-white/80 hover:text-white font-bold text-xs uppercase">Exit</button>
+                    <button onClick={() => updateState({ status: 'LOBBY', scores: {}, turnIndex: 0, round: 1, dice: Array(5).fill({ value: 1, held: false }), rollCount: 0 })} className="text-red-400 hover:text-white font-bold text-xs uppercase">🔄</button>
                     <div className="flex flex-col">
                         <span className="text-white font-black italic tracking-tighter text-lg leading-none">YAHTZEE</span>
                         <span className="text-white/60 text-[10px] uppercase font-bold tracking-widest">

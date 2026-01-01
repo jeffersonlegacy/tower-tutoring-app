@@ -561,14 +561,25 @@ export default function MathInvaders({ onBack }) {
                 />
             )}
 
-            {/* EXIT BUTTON (If not game over) */}
+            {/* EXIT/RESET BUTTONS (If not game over) */}
             {!hud.gameOver && !hud.menu && (
-                <button
-                    onClick={onBack}
-                    className="absolute top-4 left-4 z-20 text-slate-500 hover:text-white pointer-events-auto"
-                >
-                    ESC
-                </button>
+                <div className="absolute top-4 left-4 z-20 flex gap-3 pointer-events-auto">
+                    <button
+                        onClick={onBack}
+                        className="text-slate-500 hover:text-white"
+                    >
+                        ESC
+                    </button>
+                    <button
+                        onClick={() => {
+                            gameState.current.active = false;
+                            setHud(h => ({ ...h, menu: true, gameOver: false, score: 0, timeLeft: 30, equation: 'READY?' }));
+                        }}
+                        className="text-red-400 hover:text-white"
+                    >
+                        🔄
+                    </button>
+                </div>
             )}
         </div>
     );

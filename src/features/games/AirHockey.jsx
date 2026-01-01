@@ -490,15 +490,23 @@ export default function AirHockey({ sessionId, onBack }) {
 
             {/* Header - Enhanced Scoreboard */}
             <div className="w-full flex justify-between items-center p-3 bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 border-b border-white/10 z-10">
-                <button
-                    onClick={() => {
-                        updateState({ status: 'MENU', hostScore: 0, clientScore: 0 });
-                        onBack();
-                    }}
-                    className="text-xs text-slate-400 hover:text-white font-bold uppercase tracking-wider"
-                >
-                    EXIT
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => {
+                            updateState({ status: 'MENU', hostScore: 0, clientScore: 0 });
+                            onBack();
+                        }}
+                        className="text-xs text-slate-400 hover:text-white font-bold uppercase tracking-wider"
+                    >
+                        EXIT
+                    </button>
+                    <button
+                        onClick={() => updateState({ status: 'MENU', hostScore: 0, clientScore: 0, winner: null })}
+                        className="text-xs text-red-400 hover:text-white font-bold"
+                    >
+                        🔄
+                    </button>
+                </div>
 
                 {/* Scoreboard */}
                 <div className="flex items-center gap-4">

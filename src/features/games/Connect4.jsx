@@ -520,7 +520,10 @@ export default function Connect4({ sessionId, onBack }) {
 
             {/* Header */}
             <div className="flex justify-between items-center w-full px-4 mb-2">
-                <button onClick={onBack} className="text-xs text-slate-400 hover:text-white">EXIT</button>
+                <div className="flex gap-2">
+                    <button onClick={onBack} className="text-xs text-slate-400 hover:text-white">EXIT</button>
+                    <button onClick={() => updateState({ status: 'MENU', board: Array(ROWS * COLS).fill(null), winner: null })} className="text-xs text-red-400 hover:text-white">🔄</button>
+                </div>
                 <div className="text-[10px] font-bold text-slate-400">
                     {gameState.status === 'WAITING' ? 'WAITING FOR PLAYERS' :
                         gameState.status === 'FINISHED' ? 'GAME OVER' : 'MATCH LIVE'}
