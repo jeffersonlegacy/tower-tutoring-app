@@ -600,7 +600,7 @@ export default function Connect4({ sessionId, onBack }) {
                     </div>
                 )}
 
-                <div className="grid grid-cols-7 gap-1.5">
+                <div className="grid grid-cols-7 grid-rows-6 gap-1.5">
                     {safeBoard(gameState.board).map((cell, i) => {
                         const isWinningPiece = winningIndices.includes(i);
                         const row = Math.floor(i / COLS);
