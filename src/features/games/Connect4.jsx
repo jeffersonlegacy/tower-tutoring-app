@@ -270,18 +270,29 @@ export default function Connect4({ sessionId, onBack }) {
             let chosenCol;
             const difficulty = gameState.difficulty || 'MEDIUM';
 
-            if (difficulty === 'BEGINNER') {
-                chosenCol = validCols[Math.floor(Math.random() * validCols.length)];
-            } else if (difficulty === 'MEDIUM') {
-                chosenCol = minimax(board, 2, -Infinity, Infinity, true)[0];
-            } else if (difficulty === 'HARD') {
-                chosenCol = minimax(board, 4, -Infinity, Infinity, true)[0];
-            } else {
-                chosenCol = minimax(board, 6, -Infinity, Infinity, true)[0];
+            try {
+                if (difficulty === 'BEGINNER') {
+                    chosenCol = validCols[Math.floor(Math.random() * validCols.length)];
+                } else if (difficulty === 'MEDIUM') {
+                    chosenCol = minimax(board, 2, -Infinity, Infinity, true)[0];
+                } else if (difficulty === 'HARD') {
+                    chosenCol = minimax(board, 3, -Infinity, Infinity, true)[0];
+                } else if (difficulty === 'EXPERT') {
+                    chosenCol = minimax(board, 4, -Infinity, Infinity, true)[0];
+                } else {
+                    // IMPOSSIBLE - depth 5 max to prevent hanging
+                    chosenCol = minimax(board, 5, -Infinity, Infinity, true)[0];
+                }
+            } catch (e) {
+                console.warn('[Connect4 AI] Minimax error, using fallback:', e);
+                chosenCol = null;
             }
 
-            if (chosenCol === undefined || chosenCol === null) {
-                chosenCol = validCols[0];
+            // Fallback: if minimax returned invalid, pick center or random
+            if (chosenCol === undefined || chosenCol === null || !validCols.includes(chosenCol)) {
+                // Prefer center columns
+                const preferredOrder = [3, 2, 4, 1, 5, 0, 6];
+                chosenCol = preferredOrder.find(c => validCols.includes(c)) || validCols[0];
             }
 
             if (chosenCol === undefined || chosenCol === null) return;
@@ -309,7 +320,7 @@ export default function Connect4({ sessionId, onBack }) {
 
         const moveTimer = setTimeout(aiMove, 100);
         return () => clearTimeout(moveTimer);
-    }, [gameState, updateState]);
+    }, [gameState?.turn, gameState?.status, gameState?.mode, updateState]);
 
     // --- LOADING GUARD (AFTER ALL HOOKS) ---
     if (!gameState) return <div className="text-white p-4 font-mono animate-pulse">Connecting to Matrix...</div>;
