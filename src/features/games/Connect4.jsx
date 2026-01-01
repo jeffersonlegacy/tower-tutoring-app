@@ -230,21 +230,38 @@ const minimax = (board, depth, alpha, beta, maximizingPlayer) => {
 
 export default function Connect4({ sessionId, onBack }) {
     const gameId = 'connect4_v2';
-    // Use deep copy if needed, but safeBoard usually gives a fresh array on first render or updates?
-    // Actually safeBoard just ensures array.
     const { gameState, playerId, isHost, updateState } = useRealtimeGame(sessionId, gameId, INITIAL_STATE);
     const [localDifficulty, setLocalDifficulty] = useState(null);
 
-    // AI Turn Logic
+    // Mount tracking - MUST BE BEFORE ANY CONDITIONAL RETURNS
+    const isMounted = useRef(true);
+    const boardShakeRef = useRef('');
+
+    // Mount effect
+    useEffect(() => {
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
+    }, []);
+
+    // Shake effect - MUST BE BEFORE ANY CONDITIONAL RETURNS
+    useEffect(() => {
+        if (gameState?.lastMoveTime > 0) {
+            boardShakeRef.current = 'animate-shake';
+            const t = setTimeout(() => {
+                boardShakeRef.current = '';
+            }, 300);
+            return () => clearTimeout(t);
+        }
+    }, [gameState?.lastMoveTime]);
+
+    // AI Turn Logic - MUST BE BEFORE ANY CONDITIONAL RETURNS
     useEffect(() => {
         if (!gameState || gameState.mode !== 'SOLO' || gameState.status !== 'PLAYING') return;
-        if (gameState.turn !== 'yellow') return; // AI is Yellow
+        if (gameState.turn !== 'yellow') return;
 
         const aiMove = async () => {
-            // Slight delay for UX, but don't block main thread
             await new Promise(r => setTimeout(r, 600));
 
-            // Create a COPY for Minimax to mutate freely
             const board = [...safeBoard(gameState.board)];
             const validCols = getValidLocations(board);
 
@@ -256,30 +273,22 @@ export default function Connect4({ sessionId, onBack }) {
             if (difficulty === 'BEGINNER') {
                 chosenCol = validCols[Math.floor(Math.random() * validCols.length)];
             } else if (difficulty === 'MEDIUM') {
-                // Depth 2 - very fast
                 chosenCol = minimax(board, 2, -Infinity, Infinity, true)[0];
             } else if (difficulty === 'HARD') {
-                // Depth 4
                 chosenCol = minimax(board, 4, -Infinity, Infinity, true)[0];
             } else {
-                // EXPERT / IMPOSSIBLE
-                // Cap at Depth 6 to prevent browser freeze.
-                // 6 is deep enough for 7x6 Connect 4 to be extremely strong.
-                // 7 is risky in JS without Worker.
                 chosenCol = minimax(board, 6, -Infinity, Infinity, true)[0];
             }
 
-            // Fallback
             if (chosenCol === undefined || chosenCol === null) {
                 chosenCol = validCols[0];
             }
 
-            if (chosenCol === undefined || chosenCol === null) return; // Still no move?
+            if (chosenCol === undefined || chosenCol === null) return;
 
-            // Execute on REAL board via updateState
-            const realBoard = [...safeBoard(gameState.board)]; // Fresh copy for state update
+            const realBoard = [...safeBoard(gameState.board)];
             const row = getNextOpenRow(realBoard, chosenCol);
-            if (row === -1) return; // Column full?
+            if (row === -1) return;
 
             realBoard[row * COLS + chosenCol] = 'yellow';
 
@@ -287,7 +296,7 @@ export default function Connect4({ sessionId, onBack }) {
             let winner = null;
             if (term === 'yellow') winner = 'yellow';
             else if (term === 'draw') winner = 'draw';
-            else if (term === 'red') winner = 'red'; // Should happen next turn usually
+            else if (term === 'red') winner = 'red';
 
             updateState({
                 board: realBoard,
@@ -300,14 +309,10 @@ export default function Connect4({ sessionId, onBack }) {
 
         const moveTimer = setTimeout(aiMove, 100);
         return () => clearTimeout(moveTimer);
-    }, [gameState?.turn, gameState?.mode, gameState?.status, gameState?.difficulty]);
+    }, [gameState, updateState]);
 
-    // Mount tracking
-    const isMounted = useRef(true);
-    useEffect(() => {
-        isMounted.current = true;
-        return () => { isMounted.current = false; };
-    }, []);
+    // --- LOADING GUARD (AFTER ALL HOOKS) ---
+    if (!gameState) return <div className="text-white p-4 font-mono animate-pulse">Connecting to Matrix...</div>;
 
     // Game Logic
     const handleDrop = (colIndex) => {
@@ -488,27 +493,6 @@ export default function Connect4({ sessionId, onBack }) {
     };
 
     const winningIndices = gameState ? getWinningIndices(gameState.board) : [];
-    const boardShakeRef = useRef('');
-
-    // Trigger shake on new move
-    if (gameState.lastMoveTime > 0) {
-        // Shake logic inside render or effect? Effect safer.
-    }
-    // Effect for shake
-    useEffect(() => {
-        if (gameState.lastMoveTime > 0) {
-            boardShakeRef.current = 'animate-shake';
-            const t = setTimeout(() => {
-                // Force re-render not needed for ref, but to remove class? 
-                // Actually standard react pattern: state for class. Ref won't trigger render.
-                // But previous code used ref? "boardShakeStr.current". 
-                // It worked because parent re-rendered on updateState.
-                // We will clean it up conceptually.
-                boardShakeRef.current = '';
-            }, 300);
-            return () => clearTimeout(t);
-        }
-    }, [gameState.lastMoveTime]);
 
     return (
         <div className="flex flex-col items-center gap-2 p-2 select-none overflow-hidden h-full font-mono w-full max-w-sm mx-auto">

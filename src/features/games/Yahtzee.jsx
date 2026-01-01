@@ -76,46 +76,11 @@ export default function Yahtzee({ sessionId, onBack }) {
     const gameId = 'yahtzee_multi_v1';
     const { gameState, playerId, isHost, updateState } = useRealtimeGame(sessionId, gameId, INITIAL_STATE);
     const [rolling, setRolling] = useState(false);
-    const [viewingPlayerId, setViewingPlayerId] = useState(null); // To view opponent scorecards
+    const [viewingPlayerId, setViewingPlayerId] = useState(null);
 
-    // --- LOADING GUARD ---
-    if (!gameState) {
-        return <div className="flex items-center justify-center h-full bg-slate-900 text-yellow-500 font-bold animate-pulse uppercase tracking-widest">Loading Game Tables...</div>;
-    }
-
-    // --- SAFE DATA HANDLING (CRASH FIX) ---
-    // Ensure playersList is always an array
-    const playersList = (Array.isArray(gameState?.players)
-        ? gameState.players
-        : Object.values(gameState?.players || {}).filter(p => !!p)
-    ).map(p => ({
-        ...p,
-        name: p.name || `Player ${String(p.id).slice(0, 4)}`
-    }));
-
-    // Ensure safeScores is always an object, even if gameState.scores is null/undefined
-    const safeScores = (gameState?.scores && typeof gameState.scores === 'object') ? gameState.scores : {};
-    const safeDice = Array.isArray(gameState?.dice) ? gameState.dice : Array(5).fill({ value: 1, held: false });
-
-    // Current Active Player Logic
-    const activePlayerIndex = (typeof gameState?.turnIndex === 'number')
-        ? (gameState.turnIndex % (playersList.length || 1))
-        : 0;
-
-    const activePlayer = playersList[activePlayerIndex];
-    const isMyTurn = activePlayer?.id === playerId && gameState?.status === 'PLAYING';
-    const isBotTurn = activePlayer?.isBot && gameState?.status === 'PLAYING';
-
-    const myPlayer = playersList.find(p => p.id === playerId);
-
-    // Who we are looking at (default to self, or active player if spectating)
-    // CRITICAL FIX: Ensure targetPlayerId is valid or fallback safely
-    const targetPlayerId = viewingPlayerId || (myPlayer ? playerId : (activePlayer?.id || null));
-    const targetPlayer = playersList.find(p => p.id === targetPlayerId);
-
-    // --- CPU TURN LOGIC ---
+    // --- CPU TURN LOGIC (MUST BE BEFORE ANY CONDITIONAL RETURNS) ---
     useEffect(() => {
-        // Compute all values inside effect to avoid stale closures
+        // Early exit if not ready - but hook is still called consistently
         if (!gameState || gameState.status !== 'PLAYING' || rolling) return;
 
         const players = Array.isArray(gameState.players)
@@ -125,7 +90,6 @@ export default function Yahtzee({ sessionId, onBack }) {
         const currentPlayerIndex = (gameState.turnIndex || 0) % (players.length || 1);
         const currentPlayer = players[currentPlayerIndex];
 
-        // Only run if current player is a bot
         if (!currentPlayer?.isBot) return;
 
         const botId = currentPlayer.id;
@@ -133,7 +97,6 @@ export default function Yahtzee({ sessionId, onBack }) {
         const botScores = scores[botId] || {};
         const dice = Array.isArray(gameState.dice) ? gameState.dice : Array(5).fill({ value: 1, held: false });
 
-        // Helper to find best available category
         const findBestCategory = (diceVals) => {
             let bestCat = null;
             let bestScore = -1;
@@ -159,7 +122,6 @@ export default function Yahtzee({ sessionId, onBack }) {
             return bestCat;
         };
 
-        // Execute CPU turn
         const executeBotTurn = async () => {
             setRolling(true);
             await new Promise(r => setTimeout(r, 800));
@@ -225,7 +187,36 @@ export default function Yahtzee({ sessionId, onBack }) {
 
         const timeout = setTimeout(executeBotTurn, 500);
         return () => clearTimeout(timeout);
-    }, [gameState?.turnIndex, gameState?.status, rolling]);
+    }, [gameState, rolling, updateState]);
+
+    // --- LOADING GUARD (AFTER ALL HOOKS) ---
+    if (!gameState) {
+        return <div className="flex items-center justify-center h-full bg-slate-900 text-yellow-500 font-bold animate-pulse uppercase tracking-widest">Loading Game Tables...</div>;
+    }
+
+    // --- SAFE DATA HANDLING ---
+    const playersList = (Array.isArray(gameState?.players)
+        ? gameState.players
+        : Object.values(gameState?.players || {}).filter(p => !!p)
+    ).map(p => ({
+        ...p,
+        name: p.name || `Player ${String(p.id).slice(0, 4)}`
+    }));
+
+    const safeScores = (gameState?.scores && typeof gameState.scores === 'object') ? gameState.scores : {};
+    const safeDice = Array.isArray(gameState?.dice) ? gameState.dice : Array(5).fill({ value: 1, held: false });
+
+    const activePlayerIndex = (typeof gameState?.turnIndex === 'number')
+        ? (gameState.turnIndex % (playersList.length || 1))
+        : 0;
+
+    const activePlayer = playersList[activePlayerIndex];
+    const isMyTurn = activePlayer?.id === playerId && gameState?.status === 'PLAYING';
+    const isBotTurn = activePlayer?.isBot && gameState?.status === 'PLAYING';
+
+    const myPlayer = playersList.find(p => p.id === playerId);
+    const targetPlayerId = viewingPlayerId || (myPlayer ? playerId : (activePlayer?.id || null));
+    const targetPlayer = playersList.find(p => p.id === targetPlayerId);
 
     // --- ACTIONS ---
 
