@@ -270,15 +270,11 @@ export default function Battleship({ sessionId, onBack }) {
         if (gameState.phase === 'SETUP') {
             if (gameState.ready[myPlayerIndex]) return;
 
-            // Check if clicking on existing ship to rotate it
+            // Check if clicking on existing ship to SELECT it
             const clickedShip = myShips.find(s => isOverlapping(s, r, c));
             if (clickedShip && !placingShip) {
-                // TAP TO ROTATE: Toggle orientation and re-place if valid
-                const newOrient = clickedShip.orient === 'H' ? 'V' : 'H';
-                if (canPlaceShip(myShips, clickedShip, clickedShip.r, clickedShip.c, newOrient)) {
-                    const rotatedShip = { ...clickedShip, orient: newOrient };
-                    setMyShips(myShips.map(s => s.id === clickedShip.id ? rotatedShip : s));
-                }
+                // TAP TO SELECT: show Move/Remove/Rotate buttons
+                setSelectedShip(clickedShip);
                 return;
             }
 
@@ -771,10 +767,42 @@ export default function Battleship({ sessionId, onBack }) {
                                 })}
                             </div>
 
+                            {/* Selected Ship Actions */}
+                            {selectedShip && (
+                                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3 flex flex-col sm:flex-row items-center gap-2">
+                                    <span className="text-yellow-400 text-sm font-bold">
+                                        {SHIPS.find(s => s.id === selectedShip.id)?.icon} {selectedShip.name}
+                                    </span>
+                                    <div className="flex gap-2 flex-wrap justify-center">
+                                        <button onClick={() => {
+                                            const newOrient = selectedShip.orient === 'H' ? 'V' : 'H';
+                                            if (canPlaceShip(myShips, selectedShip, selectedShip.r, selectedShip.c, newOrient)) {
+                                                const rotatedShip = { ...selectedShip, orient: newOrient };
+                                                setMyShips(myShips.map(s => s.id === selectedShip.id ? rotatedShip : s));
+                                                setSelectedShip(rotatedShip);
+                                            }
+                                        }} className="px-3 py-1 text-xs bg-cyan-600 rounded hover:bg-cyan-500">
+                                            ↻ Rotate
+                                        </button>
+                                        <button onClick={() => handleMoveShip(selectedShip)} className="px-3 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500">
+                                            ✋ Move
+                                        </button>
+                                        <button onClick={() => handleRemoveShip(selectedShip)} className="px-3 py-1 text-xs bg-red-600 rounded hover:bg-red-500">
+                                            🗑️ Remove
+                                        </button>
+                                        <button onClick={() => setSelectedShip(null)} className="px-3 py-1 text-xs bg-slate-600 rounded hover:bg-slate-500">
+                                            ✕
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Instructions */}
-                            <div className="text-[10px] text-slate-500 text-center">
-                                Tap ship to rotate • Long-press to remove
-                            </div>
+                            {!selectedShip && (
+                                <div className="text-[10px] text-slate-500 text-center">
+                                    Tap placed ship to edit • Drag to position
+                                </div>
+                            )}
 
                             {/* Confirm Button */}
                             <button
