@@ -302,9 +302,13 @@ export default function Battleship({ sessionId, onBack }) {
         }
     };
 
-    // Handle drag start from ship button
+    // Handle drag start from ship button OR from placed ship on grid
     const handleDragStart = (ship, e) => {
         setPlacingShip(ship);
+        // Use ship's current orientation if it has one (i.e., it's being moved)
+        if (ship.orient) {
+            setOrientation(ship.orient);
+        }
         setIsDragging(true);
         if (e.dataTransfer) {
             e.dataTransfer.effectAllowed = 'move';
@@ -320,11 +324,15 @@ export default function Battleship({ sessionId, onBack }) {
     // Handle drop on grid cell
     const handleDrop = (r, c, e) => {
         e.preventDefault();
-        if (placingShip && canPlaceShip(myShips, placingShip, r, c, orientation)) {
-            const newShip = { ...placingShip, r, c, orient: orientation, hits: 0 };
-            const newShips = [...myShips.filter(s => s.id !== placingShip.id), newShip];
-            setMyShips(newShips);
-            setPlacingShip(null);
+        if (placingShip) {
+            // Use the ship's orientation if it has one (being moved), otherwise use current orientation
+            const useOrient = placingShip.orient || orientation;
+            if (canPlaceShip(myShips, placingShip, r, c, useOrient)) {
+                const newShip = { ...placingShip, r, c, orient: useOrient, hits: 0 };
+                const newShips = [...myShips.filter(s => s.id !== placingShip.id), newShip];
+                setMyShips(newShips);
+                setPlacingShip(null);
+            }
         }
         setIsDragging(false);
     };
@@ -600,15 +608,18 @@ export default function Battleship({ sessionId, onBack }) {
                             return (
                                 <div
                                     key={i}
+                                    draggable={shipHere && isSelf && gameState.phase === 'SETUP'}
+                                    onDragStart={(e) => shipHere && isSelf && gameState.phase === 'SETUP' && handleDragStart(myShipObj, e)}
+                                    onDragEnd={handleDragEnd}
                                     onClick={() => handleCellClick(r, c)}
                                     onMouseEnter={() => isSelf && gameState.phase === 'SETUP' && setHoverCell({ r, c })}
                                     onMouseLeave={() => setHoverCell(null)}
                                     onDrop={(e) => isSelf && gameState.phase === 'SETUP' && handleDrop(r, c, e)}
                                     onDragOver={handleDragOver}
-                                    className={`relative w-full h-full cursor-pointer hover:bg-white/10 transition-all ${bgClass} ${extraClass}`}
+                                    className={`relative w-full h-full cursor-pointer hover:bg-white/10 transition-all ${bgClass} ${extraClass} ${shipHere && isSelf && gameState.phase === 'SETUP' ? 'cursor-grab active:cursor-grabbing' : ''}`}
                                 >
                                     {content}
-                                    {/* Tap to rotate hint */}
+                                    {/* Drag/rotate hint */}
                                     {shipHere && isSelf && gameState.phase === 'SETUP' && (
                                         <span className="absolute bottom-0 right-0 text-[8px] text-cyan-300/50">↻</span>
                                     )}
