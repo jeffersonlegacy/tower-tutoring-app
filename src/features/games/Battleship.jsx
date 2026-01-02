@@ -44,6 +44,8 @@ export default function Battleship({ sessionId, onBack }) {
     const [hoverCell, setHoverCell] = useState(null); // { r, c } for preview
     const [selectedShip, setSelectedShip] = useState(null); // For moving placed ships
     const [sunkToast, setSunkToast] = useState(null); // Toast message for sunk ships
+    const [isDragging, setIsDragging] = useState(false); // Track if dragging a ship
+    const gridRef = useRef(null); // Ref for grid to calculate drop position
 
     // Derived IDs
     const myPlayerIndex = isHost ? '0' : '1';
@@ -268,10 +270,15 @@ export default function Battleship({ sessionId, onBack }) {
         if (gameState.phase === 'SETUP') {
             if (gameState.ready[myPlayerIndex]) return;
 
-            // Check if clicking on existing ship to select it
+            // Check if clicking on existing ship to rotate it
             const clickedShip = myShips.find(s => isOverlapping(s, r, c));
             if (clickedShip && !placingShip) {
-                setSelectedShip(clickedShip);
+                // TAP TO ROTATE: Toggle orientation and re-place if valid
+                const newOrient = clickedShip.orient === 'H' ? 'V' : 'H';
+                if (canPlaceShip(myShips, clickedShip, clickedShip.r, clickedShip.c, newOrient)) {
+                    const rotatedShip = { ...clickedShip, orient: newOrient };
+                    setMyShips(myShips.map(s => s.id === clickedShip.id ? rotatedShip : s));
+                }
                 return;
             }
 
@@ -293,6 +300,38 @@ export default function Battleship({ sessionId, onBack }) {
             if (gameState.mode === 'VS_CPU' && !isHost) return;
             handleFire(r, c, oppPlayerIndex);
         }
+    };
+
+    // Handle drag start from ship button
+    const handleDragStart = (ship, e) => {
+        setPlacingShip(ship);
+        setIsDragging(true);
+        if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', ship.id);
+        }
+    };
+
+    // Handle drag end
+    const handleDragEnd = () => {
+        setIsDragging(false);
+    };
+
+    // Handle drop on grid cell
+    const handleDrop = (r, c, e) => {
+        e.preventDefault();
+        if (placingShip && canPlaceShip(myShips, placingShip, r, c, orientation)) {
+            const newShip = { ...placingShip, r, c, orient: orientation, hits: 0 };
+            const newShips = [...myShips.filter(s => s.id !== placingShip.id), newShip];
+            setMyShips(newShips);
+            setPlacingShip(null);
+        }
+        setIsDragging(false);
+    };
+
+    // Handle drag over (needed to allow drop)
+    const handleDragOver = (e) => {
+        e.preventDefault();
     };
 
     const handleRemoveShip = (ship) => {
@@ -564,9 +603,15 @@ export default function Battleship({ sessionId, onBack }) {
                                     onClick={() => handleCellClick(r, c)}
                                     onMouseEnter={() => isSelf && gameState.phase === 'SETUP' && setHoverCell({ r, c })}
                                     onMouseLeave={() => setHoverCell(null)}
+                                    onDrop={(e) => isSelf && gameState.phase === 'SETUP' && handleDrop(r, c, e)}
+                                    onDragOver={handleDragOver}
                                     className={`relative w-full h-full cursor-pointer hover:bg-white/10 transition-all ${bgClass} ${extraClass}`}
                                 >
                                     {content}
+                                    {/* Tap to rotate hint */}
+                                    {shipHere && isSelf && gameState.phase === 'SETUP' && (
+                                        <span className="absolute bottom-0 right-0 text-[8px] text-cyan-300/50">↻</span>
+                                    )}
                                 </div>
                             );
                         })}
@@ -675,9 +720,7 @@ export default function Battleship({ sessionId, onBack }) {
                     <div className="bg-slate-800/50 p-2 rounded-t-lg border-b border-white/5 flex justify-between items-center">
                         <span className="font-bold text-cyan-400 flex items-center gap-2">YOUR FLEET</span>
                         {gameState.phase === 'SETUP' && (
-                            <button onClick={() => setOrientation(o => o === 'H' ? 'V' : 'H')} className="text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600 transition-colors">
-                                🔄 {orientation === 'H' ? 'HORIZONTAL' : 'VERTICAL'}
-                            </button>
+                            <span className="text-[10px] text-cyan-500/60">Tap placed ship to rotate</span>
                         )}
                     </div>
 
@@ -691,7 +734,8 @@ export default function Battleship({ sessionId, onBack }) {
                     {/* Setup Controls */}
                     {gameState.phase === 'SETUP' && !gameState.ready[myPlayerIndex] && (
                         <div className="mt-4 space-y-3">
-                            {/* Ship Selection */}
+                            {/* Ship Selection - Drag to place */}
+                            <div className="text-[10px] text-slate-400 text-center">Drag ships to grid or tap to select, then tap grid to place</div>
                             <div className="grid grid-cols-2 gap-2">
                                 {SHIPS.map(ship => {
                                     const placed = myShips.some(s => s.name === ship.name);
@@ -699,10 +743,13 @@ export default function Battleship({ sessionId, onBack }) {
                                     return (
                                         <button
                                             key={ship.name}
-                                            onClick={() => setPlacingShip(isPlacing ? null : ship)}
-                                            className={`p-2 text-xs font-bold rounded border transition-all flex items-center gap-2 ${placed ? 'bg-green-900/20 border-green-500/30 text-green-500' :
-                                                isPlacing ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500 scale-105' :
-                                                    'bg-slate-800 border-slate-700 hover:border-white/30'
+                                            draggable={!placed}
+                                            onDragStart={(e) => !placed && handleDragStart(ship, e)}
+                                            onDragEnd={handleDragEnd}
+                                            onClick={() => !placed && setPlacingShip(isPlacing ? null : ship)}
+                                            className={`p-2 text-xs font-bold rounded border transition-all flex items-center gap-2 ${placed ? 'bg-green-900/20 border-green-500/30 text-green-500 cursor-default' :
+                                                isPlacing ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500 scale-105 cursor-grab' :
+                                                    'bg-slate-800 border-slate-700 hover:border-white/30 cursor-grab'
                                                 }`}
                                         >
                                             <span>{ship.icon}</span>
@@ -713,25 +760,10 @@ export default function Battleship({ sessionId, onBack }) {
                                 })}
                             </div>
 
-                            {/* Selected Ship Actions */}
-                            {selectedShip && (
-                                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3 flex items-center justify-between">
-                                    <span className="text-yellow-400 text-sm font-bold">
-                                        {selectedShip.icon} {selectedShip.name} selected
-                                    </span>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleMoveShip(selectedShip)} className="px-3 py-1 text-xs bg-cyan-600 rounded hover:bg-cyan-500">
-                                            Move
-                                        </button>
-                                        <button onClick={() => handleRemoveShip(selectedShip)} className="px-3 py-1 text-xs bg-red-600 rounded hover:bg-red-500">
-                                            Remove
-                                        </button>
-                                        <button onClick={() => setSelectedShip(null)} className="px-3 py-1 text-xs bg-slate-600 rounded hover:bg-slate-500">
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            {/* Instructions */}
+                            <div className="text-[10px] text-slate-500 text-center">
+                                Tap ship to rotate • Long-press to remove
+                            </div>
 
                             {/* Confirm Button */}
                             <button
