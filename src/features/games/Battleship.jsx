@@ -460,10 +460,10 @@ export default function Battleship({ sessionId, onBack }) {
                                     <div
                                         key={i}
                                         className={`w-3 h-3 rounded-sm ${i < ship.hits
-                                                ? 'bg-red-500'
-                                                : ship.placed || isEnemy
-                                                    ? 'bg-cyan-600'
-                                                    : 'bg-slate-700'
+                                            ? 'bg-red-500'
+                                            : ship.placed || isEnemy
+                                                ? 'bg-cyan-600'
+                                                : 'bg-slate-700'
                                             }`}
                                     />
                                 ))}
@@ -594,11 +594,11 @@ export default function Battleship({ sessionId, onBack }) {
                 <div className="relative z-10 flex flex-col items-center">
                     <div className="mb-10 relative">
                         <div className="absolute -inset-4 bg-blue-500/20 blur-xl rounded-full"></div>
-                        <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-br from-cyan-400 to-blue-600 tracking-[0.2em] relative z-10 drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]">
+                        <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-br from-cyan-400 to-blue-600 tracking-[0.1em] sm:tracking-[0.15em] md:tracking-[0.2em] relative z-10 drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]">
                             BATTLESHIP
                         </h1>
                         <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-cyan-500 to-transparent mt-2"></div>
-                        <p className="text-xs font-bold text-cyan-500/80 tracking-[0.5em] mt-2 uppercase">Naval Warfare Simulator</p>
+                        <p className="text-[10px] sm:text-xs font-bold text-cyan-500/80 tracking-[0.2em] sm:tracking-[0.5em] mt-2 uppercase">Naval Warfare Simulator</p>
                     </div>
 
                     <div className="w-full max-w-sm space-y-4">
@@ -654,17 +654,17 @@ export default function Battleship({ sessionId, onBack }) {
             )}
 
             {/* Header */}
-            <div className="flex justify-between items-center mb-4 relative z-10">
-                <button onClick={onBack} className="text-sm text-slate-400 hover:text-white">← BACK</button>
-                <div className="text-center">
-                    <h2 className="text-2xl font-black text-white tracking-widest uppercase filter drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">BATTLESHIP</h2>
-                    <p className={`text-xs font-mono font-bold ${gameState.phase === 'PLAYING' ? (isMyTurn ? 'text-green-400' : 'text-red-400') : 'text-slate-400'}`}>
-                        {gameState.phase === 'SETUP' ? 'DEPLOYMENT PHASE' :
-                            gameState.phase === 'GAMEOVER' ? (String(gameState.winner) === myPlayerIndex ? <span className="text-yellow-400 animate-pulse">👑 VICTORY 👑</span> : <span className="text-red-500">💀 DEFEAT 💀</span>) :
-                                (isMyTurn ? 'YOUR TURN - FIRE AT WILL' : (gameState.mode === 'VS_CPU' ? <span className="animate-pulse text-red-400">CPU TARGETING...</span> : 'ENEMY TURN - BRACE FOR IMPACT'))}
+            <div className="flex justify-between items-center mb-4 relative z-10 gap-2">
+                <button onClick={onBack} className="text-xs sm:text-sm text-slate-400 hover:text-white flex-shrink-0">← BACK</button>
+                <div className="text-center flex-1 min-w-0">
+                    <h2 className="text-lg sm:text-2xl font-black text-white tracking-wider sm:tracking-widest uppercase filter drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] truncate">BATTLESHIP</h2>
+                    <p className={`text-[10px] sm:text-xs font-mono font-bold truncate ${gameState.phase === 'PLAYING' ? (isMyTurn ? 'text-green-400' : 'text-red-400') : 'text-slate-400'}`}>
+                        {gameState.phase === 'SETUP' ? 'DEPLOY SHIPS' :
+                            gameState.phase === 'GAMEOVER' ? (String(gameState.winner) === myPlayerIndex ? <span className="text-yellow-400 animate-pulse">👑 VICTORY</span> : <span className="text-red-500">💀 DEFEAT</span>) :
+                                (isMyTurn ? 'YOUR TURN' : (gameState.mode === 'VS_CPU' ? <span className="animate-pulse text-red-400">CPU...</span> : 'ENEMY TURN'))}
                     </p>
                 </div>
-                <button onClick={handleReset} className="text-xs bg-red-500/10 text-red-400 px-3 py-1 rounded hover:bg-red-500/20">🔄 RESET</button>
+                <button onClick={handleReset} className="text-[10px] sm:text-xs bg-red-500/10 text-red-400 px-2 sm:px-3 py-1 rounded hover:bg-red-500/20 flex-shrink-0">🔄</button>
             </div>
 
             {/* Game Area */}
@@ -701,8 +701,8 @@ export default function Battleship({ sessionId, onBack }) {
                                             key={ship.name}
                                             onClick={() => setPlacingShip(isPlacing ? null : ship)}
                                             className={`p-2 text-xs font-bold rounded border transition-all flex items-center gap-2 ${placed ? 'bg-green-900/20 border-green-500/30 text-green-500' :
-                                                    isPlacing ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500 scale-105' :
-                                                        'bg-slate-800 border-slate-700 hover:border-white/30'
+                                                isPlacing ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500 scale-105' :
+                                                    'bg-slate-800 border-slate-700 hover:border-white/30'
                                                 }`}
                                         >
                                             <span>{ship.icon}</span>
