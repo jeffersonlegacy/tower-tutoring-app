@@ -51,18 +51,30 @@ export default function AirHockey({ sessionId, onBack }) {
 
         // Sync local state with authoritative state (if meaningful diff or init)
         if (gameState.status === 'PLAYING') {
-            // If PvP Client, sync Puck from Host
-            if (gameState.mode === 'PVP' && !isHost) {
-                localState.current.puck.x = gameState.puck?.x || 200;
-                localState.current.puck.y = gameState.puck?.y || 300;
-                // Sync opponent paddle (Host's is '0')
-                localState.current.oppPaddle.x = gameState.pddl?.[0]?.x || 200;
-                localState.current.oppPaddle.y = gameState.pddl?.[0]?.y || 550;
-            }
-            // If PvP Host, sync Opponent Paddle (Client's is '1')
-            if (gameState.mode === 'PVP' && isHost) {
-                localState.current.oppPaddle.x = gameState.pddl?.[1]?.x || 200;
-                localState.current.oppPaddle.y = gameState.pddl?.[1]?.y || 50;
+            const mode = gameState.mode;
+
+            // Initialize paddle positions based on role
+            // Host = bottom (red), Client = top (blue) in PVP
+            // Player = bottom, AI = top in AI mode
+            if (mode === 'PVP') {
+                if (isHost) {
+                    // Host controls bottom
+                    localState.current.myPaddle.y = Math.max(localState.current.myPaddle.y, TABLE_HEIGHT / 2 + PADDLE_RADIUS);
+                    // Sync client's paddle from state
+                    localState.current.oppPaddle.x = gameState.pddl?.[1]?.x || 200;
+                    localState.current.oppPaddle.y = gameState.pddl?.[1]?.y || 50;
+                } else {
+                    // Client controls TOP - FIX: ensure Y is in top half
+                    if (localState.current.myPaddle.y > TABLE_HEIGHT / 2) {
+                        localState.current.myPaddle.y = 50; // Reset to top
+                    }
+                    // Sync puck from host
+                    localState.current.puck.x = gameState.puck?.x || 200;
+                    localState.current.puck.y = gameState.puck?.y || 300;
+                    // Sync host's paddle
+                    localState.current.oppPaddle.x = gameState.pddl?.[0]?.x || 200;
+                    localState.current.oppPaddle.y = gameState.pddl?.[0]?.y || 550;
+                }
             }
         }
     }, [gameState, isHost]);
@@ -75,7 +87,7 @@ export default function AirHockey({ sessionId, onBack }) {
         // Initialize puck with velocity when game starts
         const s = localState.current;
         if (s.puck.vx === 0 && s.puck.vy === 0) {
-            const startSpeed = 8;
+            const startSpeed = 14; // FASTER puck
             const randomAngle = (Math.random() * Math.PI / 2) + Math.PI / 4;
             const direction = Math.random() > 0.5 ? 1 : -1;
             s.puck.x = TABLE_WIDTH / 2;
@@ -115,8 +127,8 @@ export default function AirHockey({ sessionId, onBack }) {
         if (shouldCalcPhysics) {
             s.puck.x += s.puck.vx;
             s.puck.y += s.puck.vy;
-            s.puck.vx *= 0.99; // Friction
-            s.puck.vy *= 0.99;
+            s.puck.vx *= 0.995; // Less friction = faster gameplay
+            s.puck.vy *= 0.995;
 
             // Walls
             if (s.puck.x - PUCK_RADIUS < 0) {
@@ -346,8 +358,8 @@ export default function AirHockey({ sessionId, onBack }) {
     };
 
     const resetPuck = (s) => {
-        // Give puck initial velocity so game isn't stuck
-        const startSpeed = 8;
+        // Give puck initial velocity so game isn't stuck - FASTER PUCK
+        const startSpeed = 14;
         const randomAngle = (Math.random() * Math.PI / 2) + Math.PI / 4; // 45-135 degrees
         const direction = Math.random() > 0.5 ? 1 : -1; // Random up or down
 
@@ -424,9 +436,19 @@ export default function AirHockey({ sessionId, onBack }) {
 
         const s = localState.current;
 
-        // Constraint to bottom half
-        s.myPaddle.x = Math.max(PADDLE_RADIUS, Math.min(TABLE_WIDTH - PADDLE_RADIUS, x));
-        s.myPaddle.y = Math.max(TABLE_HEIGHT / 2 + PADDLE_RADIUS, Math.min(TABLE_HEIGHT - PADDLE_RADIUS, y));
+        // FIX: In PVP mode, client controls TOP paddle, host controls BOTTOM paddle
+        // In AI mode, player always controls bottom paddle
+        const isControllingBottom = (gameState?.mode === 'AI') || isHost;
+
+        if (isControllingBottom) {
+            // Constraint to bottom half
+            s.myPaddle.x = Math.max(PADDLE_RADIUS, Math.min(TABLE_WIDTH - PADDLE_RADIUS, x));
+            s.myPaddle.y = Math.max(TABLE_HEIGHT / 2 + PADDLE_RADIUS, Math.min(TABLE_HEIGHT - PADDLE_RADIUS, y));
+        } else {
+            // Client in PVP: Constraint to TOP half
+            s.myPaddle.x = Math.max(PADDLE_RADIUS, Math.min(TABLE_WIDTH - PADDLE_RADIUS, x));
+            s.myPaddle.y = Math.max(PADDLE_RADIUS, Math.min(TABLE_HEIGHT / 2 - PADDLE_RADIUS, y));
+        }
     };
 
     // --- RENDER ---
