@@ -1,16 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRealtimeGame } from '../../hooks/useRealtimeGame';
 import GameEndOverlay from './GameEndOverlay';
+import confetti from 'canvas-confetti';
 
 // Game Constants
 const BOARD_SIZE = 10;
 const SHIPS = [
-    { name: 'Carrier', size: 5, id: 'c' },
-    { name: 'Battleship', size: 4, id: 'b' },
-    { name: 'Cruiser', size: 3, id: 'r' },
-    { name: 'Submarine', size: 3, id: 's' },
-    { name: 'Destroyer', size: 2, id: 'd' }
+    { name: 'Carrier', size: 5, id: 'c', icon: '🚢' },
+    { name: 'Battleship', size: 4, id: 'b', icon: '⛴️' },
+    { name: 'Cruiser', size: 3, id: 'r', icon: '🛥️' },
+    { name: 'Submarine', size: 3, id: 's', icon: '🤿' },
+    { name: 'Destroyer', size: 2, id: 'd', icon: '🚤' }
 ];
+
+const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 
 const INITIAL_STATE = {
     phase: 'MENU', // MENU, SETUP, PLAYING, GAMEOVER
@@ -26,70 +29,68 @@ const INITIAL_STATE = {
     },
     ready: { '0': false, '1': false },
     winner: null,
-    matchHistory: []
+    matchHistory: [],
+    lastSunk: null // Track last sunk ship for animation
 };
 
 export default function Battleship({ sessionId, onBack }) {
-    const gameId = 'battleship_v1';
+    const gameId = 'battleship_v2';
     const { gameState, playerId, isHost, updateState } = useRealtimeGame(sessionId, gameId, INITIAL_STATE);
 
     // Local State for Setup
     const [myShips, setMyShips] = useState([]);
-    const [placingShip, setPlacingShip] = useState(null); // { name, size, id }
-    const [orientation, setOrientation] = useState('H'); // H or V
+    const [placingShip, setPlacingShip] = useState(null);
+    const [orientation, setOrientation] = useState('H');
+    const [hoverCell, setHoverCell] = useState(null); // { r, c } for preview
+    const [selectedShip, setSelectedShip] = useState(null); // For moving placed ships
+    const [sunkToast, setSunkToast] = useState(null); // Toast message for sunk ships
 
     // Derived IDs
     const myPlayerIndex = isHost ? '0' : '1';
     const oppPlayerIndex = isHost ? '1' : '0';
 
-    // --- AI LOGIC (VS CPU) ---
-    // AI Memory for "Hunt & Target" Strategy
-    const aiMemory = React.useRef({
-        mode: 'HUNT', // 'HUNT' or 'TARGET'
-        targets: [],  // Stack of coordinates to fire at (Stack usually LIFO, but queue might be better for parity)
-        lastHit: null // Coordinate of last hit to determine neighbors
+    // AI Memory
+    const aiMemory = useRef({
+        mode: 'HUNT',
+        targets: [],
+        lastHit: null
     });
 
+    // Track previously sunk ships to detect new sinks
+    const prevSunkRef = useRef(new Set());
+
+    // --- AI LOGIC ---
     useEffect(() => {
         if (gameState?.mode === 'VS_CPU' && gameState.phase === 'PLAYING' && gameState.turn === 1 && isHost) {
-            // CPU TURN
             const timer = setTimeout(() => {
                 const board = gameState.boards['0'];
                 const { mode, targets } = aiMemory.current;
 
                 let targetIdx = -1;
 
-                // 1. TARGET MODE: Fire at enqueued targets
                 if (mode === 'TARGET' && targets.length > 0) {
-                    // Pop a target
                     while (targets.length > 0) {
                         const candidate = targets.pop();
-                        // Validation: Check if already shot
                         if (board[candidate] === 0) {
                             targetIdx = candidate;
                             break;
                         }
                     }
-                    // If ran out of targets, revert to HUNT
                     if (targetIdx === -1) {
                         aiMemory.current.mode = 'HUNT';
                     }
                 }
 
-                // 2. HUNT MODE: Checkerboard Parity Search (Most efficient)
                 if (targetIdx === -1) {
                     const validMoves = [];
                     board.forEach((cell, i) => {
                         if (cell === 0) {
                             const r = Math.floor(i / BOARD_SIZE);
                             const c = i % BOARD_SIZE;
-                            // Parity: (r + c) is even (or odd). Covers every 2nd square.
-                            // Enough to hit smallest ship (Destroyer size 2)
                             if ((r + c) % 2 === 0) validMoves.push(i);
                         }
                     });
 
-                    // If parity moves exhausted (rare endgame), take any open spot
                     if (validMoves.length === 0) {
                         board.forEach((cell, i) => { if (cell === 0) validMoves.push(i); });
                     }
@@ -103,49 +104,62 @@ export default function Battleship({ sessionId, onBack }) {
                     const r = Math.floor(targetIdx / BOARD_SIZE);
                     const c = targetIdx % BOARD_SIZE;
 
-                    // PRE-CALC UPDATE for Memory (Since we don't have the result yet, we hook handleFire logic?)
-                    // Actually, handleFire needs to return result or we assume based on next render.
-                    // But 'handleFire' is async-ish state update.
-                    // Better approach: Calculate result locally to update memory *immediately* for next turn
-
-                    // Cheating peek to update memory
-                    const myShips = gameState.ships['0'];
-                    const isHit = myShips.some(s => isOverlapping(s, r, c));
+                    const myShipsArr = gameState.ships['0'];
+                    const isHit = myShipsArr.some(s => isOverlapping(s, r, c));
 
                     if (isHit) {
                         aiMemory.current.mode = 'TARGET';
-                        // Add neighbors to stack: Up, Down, Left, Right
                         const neighbors = [
                             { r: r - 1, c }, { r: r + 1, c },
                             { r, c: c - 1 }, { r, c: c + 1 }
                         ];
-
-                        // Shuffle neighbors for randomness so it doesn't always look same way
                         neighbors.sort(() => Math.random() - 0.5);
-
                         neighbors.forEach(n => {
                             if (n.r >= 0 && n.r < BOARD_SIZE && n.c >= 0 && n.c < BOARD_SIZE) {
                                 const idx = n.r * BOARD_SIZE + n.c;
-                                if (board[idx] === 0) { // Only add if not shot
+                                if (board[idx] === 0) {
                                     aiMemory.current.targets.push(idx);
                                 }
                             }
                         });
                     }
 
-                    // Fire!
-                    handleFire(r, c, 0); // CPU fires at P1 (0)
+                    handleFire(r, c, 0);
                 }
             }, 1000);
             return () => clearTimeout(timer);
         }
     }, [gameState?.phase, gameState?.turn, gameState?.mode, isHost, gameState?.boards]);
 
+    // Detect newly sunk ships for toast
+    useEffect(() => {
+        if (!gameState?.ships) return;
+        const oppShips = gameState.ships[oppPlayerIndex] || [];
+        const currentSunk = new Set();
+        oppShips.forEach(s => {
+            if (s.hits >= s.size) currentSunk.add(s.id);
+        });
+
+        // Find newly sunk
+        currentSunk.forEach(id => {
+            if (!prevSunkRef.current.has(id)) {
+                const ship = SHIPS.find(sh => sh.id === id);
+                if (ship) {
+                    setSunkToast(`${ship.icon} ${ship.name} SUNK!`);
+                    confetti({ particleCount: 80, spread: 60, origin: { y: 0.4 }, colors: ['#ef4444', '#f97316', '#000'] });
+                    setTimeout(() => setSunkToast(null), 2500);
+                }
+            }
+        });
+        prevSunkRef.current = currentSunk;
+    }, [gameState?.ships]);
+
     const setupAI = () => {
         let aiShips = [];
         SHIPS.forEach(ship => {
             let placed = false;
-            while (!placed) {
+            let attempts = 0;
+            while (!placed && attempts < 100) {
                 const r = Math.floor(Math.random() * BOARD_SIZE);
                 const c = Math.floor(Math.random() * BOARD_SIZE);
                 const orient = Math.random() > 0.5 ? 'H' : 'V';
@@ -153,25 +167,23 @@ export default function Battleship({ sessionId, onBack }) {
                     aiShips.push({ ...ship, r, c, orient, hits: 0 });
                     placed = true;
                 }
+                attempts++;
             }
         });
         return aiShips;
     };
 
     // --- GAME LOGIC ---
-
-    const getCell = (board, r, c) => board[r * BOARD_SIZE + c];
-
     const canPlaceShip = (currentShips, ship, r, c, orient) => {
         if (orient === 'H') {
             if (c + ship.size > BOARD_SIZE) return false;
             for (let i = 0; i < ship.size; i++) {
-                if (currentShips.some(s => isOverlapping(s, r, c + i))) return false;
+                if (currentShips.some(s => s.id !== ship.id && isOverlapping(s, r, c + i))) return false;
             }
         } else {
             if (r + ship.size > BOARD_SIZE) return false;
             for (let i = 0; i < ship.size; i++) {
-                if (currentShips.some(s => isOverlapping(s, r + i, c))) return false;
+                if (currentShips.some(s => s.id !== ship.id && isOverlapping(s, r + i, c))) return false;
             }
         }
         return true;
@@ -186,7 +198,18 @@ export default function Battleship({ sessionId, onBack }) {
         }
     };
 
-    // Refactored Fire Logic to reuse for AI
+    const getShipCells = (ship) => {
+        const cells = [];
+        for (let i = 0; i < ship.size; i++) {
+            if (ship.orient === 'H') {
+                cells.push({ r: ship.r, c: ship.c + i });
+            } else {
+                cells.push({ r: ship.r + i, c: ship.c });
+            }
+        }
+        return cells;
+    };
+
     const handleFire = (r, c, targetPlayerIndex) => {
         const targetBoard = gameState?.boards?.[targetPlayerIndex] || Array(100).fill(0);
         const targetIndex = r * BOARD_SIZE + c;
@@ -215,9 +238,6 @@ export default function Battleship({ sessionId, onBack }) {
         }
 
         const allSunk = newOppShips.length > 0 && newOppShips.every(s => s.hits >= s.size);
-        const nextTurn = targetPlayerIndex === 0 ? 0 : 1; // If CPU (1) fires at 0, turn goes to 0? No.
-        // Current turn is logic.
-        // If I fired (turn 0), next is 1. If AI fired (turn 1), next is 0.
 
         const updates = {
             [`boards/${targetPlayerIndex}`]: newBoard,
@@ -227,9 +247,7 @@ export default function Battleship({ sessionId, onBack }) {
 
         if (allSunk) {
             updates.phase = 'GAMEOVER';
-            updates.winner = gameState.turn; // The one who fired wins
-
-            // Log Match
+            updates.winner = gameState.turn;
             if (gameState.mode === 'PVP' || gameState.mode === 'VS_CPU') {
                 updates.matchHistory = [...(gameState.matchHistory || []), {
                     id: (gameState.matchHistory?.length || 0) + 1,
@@ -243,35 +261,48 @@ export default function Battleship({ sessionId, onBack }) {
         updateState(updates);
     };
 
-
     // --- EVENT HANDLERS ---
-
     const handleCellClick = (r, c) => {
         if (!gameState) return;
 
-        // SETUP PHASE
         if (gameState.phase === 'SETUP') {
             if (gameState.ready[myPlayerIndex]) return;
+
+            // Check if clicking on existing ship to select it
+            const clickedShip = myShips.find(s => isOverlapping(s, r, c));
+            if (clickedShip && !placingShip) {
+                setSelectedShip(clickedShip);
+                return;
+            }
 
             if (placingShip) {
                 if (canPlaceShip(myShips, placingShip, r, c, orientation)) {
                     const newShip = { ...placingShip, r, c, orient: orientation, hits: 0 };
-                    const newShips = [...myShips, newShip];
+                    const newShips = [...myShips.filter(s => s.id !== placingShip.id), newShip];
                     setMyShips(newShips);
                     setPlacingShip(null);
+                    setSelectedShip(null);
                 }
             }
             return;
         }
 
-        // PLAYING PHASE
         if (gameState.phase === 'PLAYING') {
             const isMyTurn = (gameState.turn === 0 && isHost) || (gameState.turn === 1 && !isHost);
             if (!isMyTurn) return;
-            if (gameState.mode === 'VS_CPU' && !isHost) return; // Only host plays vs CPU
-
+            if (gameState.mode === 'VS_CPU' && !isHost) return;
             handleFire(r, c, oppPlayerIndex);
         }
+    };
+
+    const handleRemoveShip = (ship) => {
+        setMyShips(myShips.filter(s => s.id !== ship.id));
+        setSelectedShip(null);
+    };
+
+    const handleMoveShip = (ship) => {
+        setPlacingShip(ship);
+        setSelectedShip(null);
     };
 
     const handleReady = () => {
@@ -285,10 +316,8 @@ export default function Battleship({ sessionId, onBack }) {
         if (gameState.mode === 'VS_CPU') {
             updates['ships/1'] = aiShips;
             updates['ready/1'] = true;
-            // Auto start if VS CPU
             updates.phase = 'PLAYING';
         } else {
-            // PVP Logic
             if (gameState.ready[oppPlayerIndex]) {
                 updates.phase = 'PLAYING';
             }
@@ -300,9 +329,12 @@ export default function Battleship({ sessionId, onBack }) {
     const handleReset = () => {
         updateState({ ...INITIAL_STATE, phase: 'MENU' });
         setMyShips([]);
+        setPlacingShip(null);
+        setSelectedShip(null);
+        aiMemory.current = { mode: 'HUNT', targets: [], lastHit: null };
+        prevSunkRef.current = new Set();
     };
 
-    // --- MENU ACTIONS ---
     const selectMode = (mode) => {
         updateState({
             phase: 'SETUP',
@@ -319,12 +351,244 @@ export default function Battleship({ sessionId, onBack }) {
     // --- RENDER ---
     if (!gameState) return <div className="text-white p-10 font-mono animate-pulse">Connecting to Naval Command...</div>;
 
+    // --- CSS ANIMATIONS ---
+    const visualStyles = `
+        @keyframes radar {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 0.5; }
+            90% { opacity: 0.5; }
+            100% { top: 100%; opacity: 0; }
+        }
+        @keyframes explosion {
+            0% { transform: scale(0.5); opacity: 1; filter: brightness(2); }
+            50% { transform: scale(1.5); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; filter: brightness(1); }
+        }
+        @keyframes ripple {
+            0% { transform: scale(0); opacity: 0.8; border-width: 4px; }
+            100% { transform: scale(2); opacity: 0; border-width: 0px; }
+        }
+        @keyframes smoke {
+            0% { opacity: 0.8; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-20px) scale(1.5); }
+        }
+        @keyframes sinkGlow {
+            0%, 100% { box-shadow: 0 0 10px rgba(0,0,0,0.8), inset 0 0 15px rgba(239,68,68,0.5); }
+            50% { box-shadow: 0 0 20px rgba(0,0,0,1), inset 0 0 25px rgba(239,68,68,0.8); }
+        }
+        @keyframes sunkPulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.8; }
+        }
+        .radar-sweep {
+            position: absolute;
+            left: 0; right: 0;
+            height: 10px;
+            background: linear-gradient(to bottom, transparent, rgba(6,182,212,0.6), transparent);
+            box-shadow: 0 0 15px rgba(6,182,212,0.8);
+            animation: radar 3s linear infinite;
+            pointer-events: none;
+            z-index: 20;
+        }
+        .animate-explosion { animation: explosion 0.4s ease-out forwards; }
+        .animate-ripple::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 50%;
+            animation: ripple 0.6s ease-out forwards;
+        }
+        .sunk-cell {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d1f1f 50%, #1a1a1a 100%);
+            animation: sinkGlow 2s ease-in-out infinite, sunkPulse 3s ease-in-out infinite;
+        }
+        .smoke-particle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: radial-gradient(circle, rgba(80,80,80,0.8), transparent);
+            border-radius: 50%;
+            animation: smoke 2s ease-out infinite;
+        }
+        .preview-valid { background: rgba(34, 197, 94, 0.4) !important; border: 2px solid rgba(34, 197, 94, 0.8) !important; }
+        .preview-invalid { background: rgba(239, 68, 68, 0.4) !important; border: 2px solid rgba(239, 68, 68, 0.8) !important; }
+        .ship-selected { animation: pulse 1s ease-in-out infinite; box-shadow: 0 0 15px rgba(250, 204, 21, 0.8); }
+    `;
+
+    // Get preview cells for placing ship
+    const getPreviewCells = () => {
+        if (!placingShip || !hoverCell || gameState.phase !== 'SETUP') return { cells: [], valid: false };
+        const cells = [];
+        const isValid = canPlaceShip(myShips, placingShip, hoverCell.r, hoverCell.c, orientation);
+
+        for (let i = 0; i < placingShip.size; i++) {
+            if (orientation === 'H') {
+                cells.push({ r: hoverCell.r, c: hoverCell.c + i });
+            } else {
+                cells.push({ r: hoverCell.r + i, c: hoverCell.c });
+            }
+        }
+        return { cells, valid: isValid };
+    };
+
+    const previewData = getPreviewCells();
+
+    // Ship Tracker Component
+    const ShipTracker = ({ ships, isEnemy }) => {
+        const trackShips = SHIPS.map(baseShip => {
+            const actualShip = ships?.find(s => s.id === baseShip.id);
+            const hits = actualShip?.hits || 0;
+            const isSunk = hits >= baseShip.size;
+            return { ...baseShip, hits, isSunk, placed: !!actualShip };
+        });
+
+        return (
+            <div className={`p-3 rounded-lg ${isEnemy ? 'bg-red-950/30 border border-red-500/20' : 'bg-cyan-950/30 border border-cyan-500/20'}`}>
+                <div className={`text-xs font-bold mb-2 ${isEnemy ? 'text-red-400' : 'text-cyan-400'}`}>
+                    {isEnemy ? '🎯 ENEMY FLEET' : '⚓ YOUR FLEET'}
+                </div>
+                <div className="space-y-1">
+                    {trackShips.map(ship => (
+                        <div key={ship.id} className={`flex items-center gap-2 text-xs ${ship.isSunk ? 'opacity-50' : ''}`}>
+                            <span>{ship.icon}</span>
+                            <span className={`flex-1 ${ship.isSunk ? 'line-through text-red-400' : 'text-white'}`}>
+                                {ship.name}
+                            </span>
+                            <div className="flex gap-0.5">
+                                {Array(ship.size).fill(0).map((_, i) => (
+                                    <div
+                                        key={i}
+                                        className={`w-3 h-3 rounded-sm ${i < ship.hits
+                                                ? 'bg-red-500'
+                                                : ship.placed || isEnemy
+                                                    ? 'bg-cyan-600'
+                                                    : 'bg-slate-700'
+                                            }`}
+                                    />
+                                ))}
+                            </div>
+                            {ship.isSunk && <span className="text-red-400 text-[10px] font-bold">SUNK</span>}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    // --- GRID RENDER ---
+    const renderGrid = (board, ships, isSelf) => {
+        const safeBoard = board || Array(100).fill(0);
+        const targetShips = isSelf ? ships : (gameState.ships?.[oppPlayerIndex] || []);
+
+        return (
+            <div className="relative">
+                {/* Column Labels */}
+                <div className="flex ml-6 mb-1">
+                    {COLS.map(col => (
+                        <div key={col} className="flex-1 text-center text-[10px] text-cyan-500 font-mono">{col}</div>
+                    ))}
+                </div>
+
+                <div className="flex">
+                    {/* Row Labels */}
+                    <div className="flex flex-col w-6">
+                        {Array(10).fill(0).map((_, i) => (
+                            <div key={i} className="flex-1 flex items-center justify-center text-[10px] text-cyan-500 font-mono">
+                                {i + 1}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Grid */}
+                    <div className="grid grid-cols-10 gap-px bg-slate-700 border border-slate-600 flex-1 aspect-square shadow-2xl relative overflow-hidden">
+                        {!isSelf && gameState.phase === 'PLAYING' && <div className="radar-sweep" />}
+
+                        {Array(100).fill(0).map((_, i) => {
+                            const r = Math.floor(i / BOARD_SIZE);
+                            const c = i % BOARD_SIZE;
+                            const cellState = safeBoard[i];
+
+                            let shipHere = false;
+                            let myShipObj = null;
+                            if (isSelf && ships) {
+                                myShipObj = ships.find(s => isOverlapping(s, r, c));
+                                shipHere = !!myShipObj;
+                            }
+
+                            const foundShip = targetShips?.find(s => isOverlapping(s, r, c));
+                            const sunkShip = foundShip && foundShip.hits >= foundShip.size;
+
+                            // Preview logic
+                            const isPreview = previewData.cells.some(pc => pc.r === r && pc.c === c);
+                            const isSelected = selectedShip && isOverlapping(selectedShip, r, c);
+
+                            let bgClass = 'bg-slate-900';
+                            let content = null;
+                            let extraClass = '';
+
+                            if (isPreview && isSelf && gameState.phase === 'SETUP') {
+                                extraClass = previewData.valid ? 'preview-valid' : 'preview-invalid';
+                            } else if (cellState === 'HIT') {
+                                if (sunkShip) {
+                                    bgClass = 'sunk-cell';
+                                    content = (
+                                        <>
+                                            <span className="absolute inset-0 flex items-center justify-center text-lg">💀</span>
+                                            <div className="smoke-particle" style={{ left: '20%', animationDelay: '0s' }} />
+                                            <div className="smoke-particle" style={{ left: '50%', animationDelay: '0.5s' }} />
+                                            <div className="smoke-particle" style={{ left: '80%', animationDelay: '1s' }} />
+                                        </>
+                                    );
+                                } else {
+                                    bgClass = 'bg-red-500/80 animate-explosion';
+                                    content = <span className="absolute inset-0 flex items-center justify-center text-xs">💥</span>;
+                                }
+                            } else if (cellState === 'MISS') {
+                                bgClass = 'bg-slate-800 animate-ripple';
+                                content = <span className="absolute inset-0 flex items-center justify-center text-xs text-white/20">●</span>;
+                            } else if (shipHere) {
+                                if (sunkShip) {
+                                    bgClass = 'sunk-cell';
+                                } else {
+                                    bgClass = 'bg-cyan-600 border border-cyan-400/50 shadow-[0_0_10px_rgba(6,182,212,0.5)] z-10';
+                                }
+                                if (isSelected) {
+                                    extraClass = 'ship-selected';
+                                }
+                            }
+
+                            return (
+                                <div
+                                    key={i}
+                                    onClick={() => handleCellClick(r, c)}
+                                    onMouseEnter={() => isSelf && gameState.phase === 'SETUP' && setHoverCell({ r, c })}
+                                    onMouseLeave={() => setHoverCell(null)}
+                                    className={`relative w-full h-full cursor-pointer hover:bg-white/10 transition-all ${bgClass} ${extraClass}`}
+                                >
+                                    {content}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Coordinate Display */}
+                {hoverCell && isSelf && gameState.phase === 'SETUP' && (
+                    <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded text-xs font-mono text-cyan-400">
+                        {COLS[hoverCell.c]}-{hoverCell.r + 1}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const isMyTurn = (gameState.turn === 0 && isHost) || (gameState.turn === 1 && !isHost);
+
     // MENU SCREEN
     if (gameState.phase === 'MENU') {
         return (
             <div className="flex flex-col items-center justify-center h-full p-6 text-center select-none font-mono bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-950 via-slate-950 to-black relative overflow-hidden">
-
-                {/* Background Grid */}
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(14,165,233,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(14,165,233,0.1)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)] opacity-30 pointer-events-none"></div>
 
                 <div className="relative z-10 flex flex-col items-center">
@@ -340,13 +604,11 @@ export default function Battleship({ sessionId, onBack }) {
                     <div className="w-full max-w-sm space-y-4">
                         <button
                             onClick={() => selectMode('VS_CPU')}
-                            className="w-full group relative overflow-hidden bg-slate-900 border border-cyan-500/30 hover:border-cyan-400 rounded-none p-6 transition-all hover:bg-cyan-950/30 clip-path-polygon"
+                            className="w-full group relative overflow-hidden bg-slate-900 border border-cyan-500/30 hover:border-cyan-400 rounded-none p-6 transition-all hover:bg-cyan-950/30"
                             style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
                         >
                             <div className="flex items-center gap-4">
-                                <div className="p-3 bg-cyan-900/40 border border-cyan-500/50 text-2xl group-hover:scale-110 transition-transform">
-                                    🤖
-                                </div>
+                                <div className="p-3 bg-cyan-900/40 border border-cyan-500/50 text-2xl group-hover:scale-110 transition-transform">🤖</div>
                                 <div className="flex flex-col text-left">
                                     <span className="text-xl font-bold text-cyan-100 group-hover:text-white uppercase tracking-wider">Tactical Sim</span>
                                     <span className="text-[10px] text-cyan-500 font-mono">VS AI COMMANDER</span>
@@ -357,13 +619,11 @@ export default function Battleship({ sessionId, onBack }) {
 
                         <button
                             onClick={() => selectMode('PVP')}
-                            className="w-full group relative overflow-hidden bg-slate-900 border border-blue-500/30 hover:border-blue-400 rounded-none p-6 transition-all hover:bg-blue-950/30 clip-path-polygon"
+                            className="w-full group relative overflow-hidden bg-slate-900 border border-blue-500/30 hover:border-blue-400 rounded-none p-6 transition-all hover:bg-blue-950/30"
                             style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
                         >
                             <div className="flex items-center gap-4">
-                                <div className="p-3 bg-blue-900/40 border border-blue-500/50 text-2xl group-hover:scale-110 transition-transform">
-                                    ⚔️
-                                </div>
+                                <div className="p-3 bg-blue-900/40 border border-blue-500/50 text-2xl group-hover:scale-110 transition-transform">⚔️</div>
                                 <div className="flex flex-col text-left">
                                     <span className="text-xl font-bold text-blue-100 group-hover:text-white uppercase tracking-wider">Live Combat</span>
                                     <span className="text-[10px] text-blue-500 font-mono">VS HUMAN ADMIRAL</span>
@@ -381,220 +641,109 @@ export default function Battleship({ sessionId, onBack }) {
         );
     }
 
-    // ... GAME RENDER ...
-
-    // --- ANIMATIONS & STYLES ---
-    const visualStyles = `
-        @keyframes radar {
-            0% { top: 0%; opacity: 0; }
-            10% { opacity: 0.5; }
-            90% { opacity: 0.5; }
-            100% { top: 100%; opacity: 0; }
-        }
-        @keyframes explosion {
-            0% { transform: scale(0.5); opacity: 1; filter: brightness(2); }
-            50% { transform: scale(1.5); opacity: 0.8; }
-            100% { transform: scale(1); opacity: 1; filter: brightness(1); }
-        }
-        @keyframes ripple {
-            0% { transform: scale(0); opacity: 0.8; border-width: 4px; }
-            100% { transform: scale(2); opacity: 0; border-width: 0px; }
-        }
-        @keyframes scanline {
-            0% { transform: translateY(-100%); }
-            100% { transform: translateY(100%); }
-        }
-        @keyframes sink {
-            0%, 100% { transform: scale(1) rotate(0deg); filter: grayscale(0) brightness(1); }
-            25% { transform: scale(0.9) rotate(-5deg); filter: grayscale(0.5) brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(3); }
-            50% { transform: scale(0.95) rotate(5deg); }
-            75% { transform: scale(0.9) rotate(-5deg); }
-        }
-        .radar-sweep {
-            position: absolute;
-            left: 0; right: 0;
-            height: 10px;
-            background: linear-gradient(to bottom, transparent, rgba(6,182,212,0.6), transparent);
-            box-shadow: 0 0 15px rgba(6,182,212,0.8);
-            animation: radar 3s linear infinite;
-            pointer-events: none;
-            z-index: 20;
-        }
-        .animate-explosion {
-            animation: explosion 0.4s ease-out forwards;
-        }
-        .animate-ripple::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border: 2px solid rgba(255,255,255,0.5);
-            border-radius: 50%;
-            animation: ripple 0.6s ease-out forwards;
-        }
-        .animate-sink {
-            animation: sink 2s ease-in-out infinite;
-            opacity: 0.6;
-            transition: opacity 1s;
-        }
-        .scanlines {
-            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
-            background-size: 100% 4px;
-            pointer-events: none;
-        }
-        .crt-flicker {
-            animation: flicker 0.15s infinite;
-        }
-    `;
-
-    // --- GAME RENDER ---
-
-    const renderGrid = (board, ships, isSelf) => {
-        // Merge ships into a visual grid for display
-        // If isSelf, show ships. If enemy, only show hits/misses (unless game over?)
-        const safeBoard = board || Array(100).fill(0); // Defensive init against RTDB null pruning
-
-        return (
-            <div className="grid grid-cols-10 gap-px bg-slate-700 border border-slate-600 w-full max-w-[400px] aspect-square shadow-2xl relative overflow-hidden group">
-                {/* Radar Sweep for Enemy Grid */}
-                {!isSelf && gameState.phase === 'PLAYING' && (
-                    <div className="radar-sweep" />
-                )}
-
-                {Array(100).fill(0).map((_, i) => {
-                    const r = Math.floor(i / BOARD_SIZE);
-                    const c = i % BOARD_SIZE;
-
-                    const cellState = safeBoard[i]; // 'HIT', 'MISS', or 0
-                    let shipHere = false;
-                    let myShipObj = null;
-
-                    if (isSelf && ships) {
-                        myShipObj = ships.find(s => isOverlapping(s, r, c));
-                        shipHere = !!myShipObj;
-                    }
-
-                    // Enemy Sinking Logic
-                    // We don't have direct access to 'enemy ships' array in render loop easily unless we pass it.
-                    // But 'ships' arg is passed as empty [] for enemy grid in current call `renderGrid(gameState.boards?.[oppPlayerIndex], [], false)`.
-                    // We need to pass the enemy ships to know if they are sunk?
-                    // Actually, 'ships' arg for enemy is empty. We need to pass it? 
-                    // Wait, `renderGrid` call on line 507 passes `[]`. 
-                    // Let's modify the call site (lines 461 and 507) to pass the ships if possible, 
-                    // OR we just use `gameState.ships[oppPlayerIndex]` if `!isSelf`.
-
-                    let sunkShip = false;
-                    const targetShips = isSelf ? ships : (gameState.ships?.[oppPlayerIndex] || []);
-                    const foundShip = targetShips?.find(s => isOverlapping(s, r, c));
-
-                    if (foundShip && foundShip.hits >= foundShip.size) {
-                        sunkShip = true; // This ship is fully sunk
-                    }
-
-                    // For SETUP phase: show preview of placing ship
-                    // Simplified: just click to place
-
-                    let bgClass = 'bg-slate-900';
-                    let content = null;
-
-                    if (cellState === 'HIT') {
-                        bgClass = sunkShip ? 'bg-red-900/50 animate-sink' : 'bg-red-500/80 animate-explosion';
-                        content = <span className="absolute inset-0 flex items-center justify-center text-xs">💥</span>;
-                    }
-                    else if (cellState === 'MISS') {
-                        bgClass = 'bg-slate-800 animate-ripple';
-                        content = <span className="absolute inset-0 flex items-center justify-center text-xs text-white/20">●</span>;
-                    }
-                    else if (shipHere) {
-                        // My Ships
-                        bgClass = sunkShip ? 'bg-red-900/50 grayscale opacity-50 border border-red-900' : 'bg-cyan-600 border border-cyan-400/50 shadow-[0_0_10px_rgba(6,182,212,0.5)] z-10';
-                    }
-
-                    return (
-                        <div
-                            key={i}
-                            onClick={() => handleCellClick(r, c)}
-                            className={`relative w-full h-full cursor-pointer hover:bg-white/10 transition-colors ${bgClass}`}
-                        >
-                            {content}
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    };
-
-    const isMyTurn = (gameState.turn === 0 && isHost) || (gameState.turn === 1 && !isHost);
-
+    // GAME RENDER
     return (
         <div className="flex flex-col h-full text-white p-4 overflow-y-auto relative">
             <style>{visualStyles}</style>
 
-            {/* CRT Overlay */}
-            <div className="absolute inset-0 pointer-events-none z-50 scanlines opacity-10"></div>
+            {/* Sunk Toast */}
+            {sunkToast && (
+                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-red-600 to-orange-600 text-white px-6 py-3 rounded-lg shadow-2xl font-bold text-lg animate-bounce">
+                    {sunkToast}
+                </div>
+            )}
 
             {/* Header */}
-            <div className="flex justify-between items-center mb-6 relative z-10">
+            <div className="flex justify-between items-center mb-4 relative z-10">
                 <button onClick={onBack} className="text-sm text-slate-400 hover:text-white">← BACK</button>
                 <div className="text-center">
                     <h2 className="text-2xl font-black text-white tracking-widest uppercase filter drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">BATTLESHIP</h2>
-                    <p className={`text-xs font-mono font-bold ${gameState.phase === 'PLAYING' ? (isMyTurn ? 'text-green-400' : 'text-red-400') : 'text-slate-400'
-                        }`}>
+                    <p className={`text-xs font-mono font-bold ${gameState.phase === 'PLAYING' ? (isMyTurn ? 'text-green-400' : 'text-red-400') : 'text-slate-400'}`}>
                         {gameState.phase === 'SETUP' ? 'DEPLOYMENT PHASE' :
                             gameState.phase === 'GAMEOVER' ? (String(gameState.winner) === myPlayerIndex ? <span className="text-yellow-400 animate-pulse">👑 VICTORY 👑</span> : <span className="text-red-500">💀 DEFEAT 💀</span>) :
                                 (isMyTurn ? 'YOUR TURN - FIRE AT WILL' : (gameState.mode === 'VS_CPU' ? <span className="animate-pulse text-red-400">CPU TARGETING...</span> : 'ENEMY TURN - BRACE FOR IMPACT'))}
                     </p>
                 </div>
-                <button onClick={handleReset} className="text-xs bg-red-500/10 text-red-400 px-3 py-1 rounded hover:bg-red-500/20">RESET GRID</button>
+                <button onClick={handleReset} className="text-xs bg-red-500/10 text-red-400 px-3 py-1 rounded hover:bg-red-500/20">🔄 RESET</button>
             </div>
 
             {/* Game Area */}
-            <div className="flex flex-col md:flex-row gap-8 items-start justify-center flex-1 relative z-10">
+            <div className="flex flex-col lg:flex-row gap-4 items-start justify-center flex-1 relative z-10">
 
-                {/* YOUR FLEET (Left) */}
+                {/* YOUR FLEET */}
                 <div className="flex-1 w-full max-w-md">
                     <div className="bg-slate-800/50 p-2 rounded-t-lg border-b border-white/5 flex justify-between items-center">
-                        <span className="font-bold text-cyan-400 flex items-center gap-2">
-                            YOUR FLEET {isHost ? '(P1)' : '(P2)'}
-                        </span>
+                        <span className="font-bold text-cyan-400 flex items-center gap-2">YOUR FLEET</span>
                         {gameState.phase === 'SETUP' && (
-                            <button onClick={() => setOrientation(o => o === 'H' ? 'V' : 'H')} className="text-xs bg-slate-700 px-2 rounded hover:bg-slate-600 transition-colors">
-                                ROTATE: {orientation === 'H' ? 'HORIZ' : 'VERT'}
+                            <button onClick={() => setOrientation(o => o === 'H' ? 'V' : 'H')} className="text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600 transition-colors">
+                                🔄 {orientation === 'H' ? 'HORIZONTAL' : 'VERTICAL'}
                             </button>
                         )}
                     </div>
+
                     {renderGrid(gameState.boards?.[myPlayerIndex], (gameState.phase === 'SETUP' ? myShips : gameState.ships?.[myPlayerIndex]), true)}
+
+                    {/* Ship Tracker - Your Fleet */}
+                    <div className="mt-3">
+                        <ShipTracker ships={gameState.phase === 'SETUP' ? myShips : gameState.ships?.[myPlayerIndex]} isEnemy={false} />
+                    </div>
 
                     {/* Setup Controls */}
                     {gameState.phase === 'SETUP' && !gameState.ready[myPlayerIndex] && (
-                        <div className="mt-4 grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-bottom-4">
-                            {SHIPS.map(ship => {
-                                const placed = myShips.some(s => s.name === ship.name);
-                                return (
-                                    <button
-                                        key={ship.name}
-                                        disabled={placed}
-                                        onClick={() => setPlacingShip(ship)}
-                                        className={`p-2 text-xs font-bold rounded border transition-all ${placed ? 'bg-green-900/20 border-green-500/30 text-green-500 opacity-50' :
-                                            placingShip?.name === ship.name ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500 scale-105' :
-                                                'bg-slate-800 border-slate-700 hover:border-white/30'
-                                            }`}
-                                    >
-                                        {ship.name} ({ship.size}) {placed && '✓'}
-                                    </button>
-                                );
-                            })}
+                        <div className="mt-4 space-y-3">
+                            {/* Ship Selection */}
+                            <div className="grid grid-cols-2 gap-2">
+                                {SHIPS.map(ship => {
+                                    const placed = myShips.some(s => s.name === ship.name);
+                                    const isPlacing = placingShip?.name === ship.name;
+                                    return (
+                                        <button
+                                            key={ship.name}
+                                            onClick={() => setPlacingShip(isPlacing ? null : ship)}
+                                            className={`p-2 text-xs font-bold rounded border transition-all flex items-center gap-2 ${placed ? 'bg-green-900/20 border-green-500/30 text-green-500' :
+                                                    isPlacing ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500 scale-105' :
+                                                        'bg-slate-800 border-slate-700 hover:border-white/30'
+                                                }`}
+                                        >
+                                            <span>{ship.icon}</span>
+                                            <span>{ship.name} ({ship.size})</span>
+                                            {placed && <span className="ml-auto">✓</span>}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Selected Ship Actions */}
+                            {selectedShip && (
+                                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3 flex items-center justify-between">
+                                    <span className="text-yellow-400 text-sm font-bold">
+                                        {selectedShip.icon} {selectedShip.name} selected
+                                    </span>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleMoveShip(selectedShip)} className="px-3 py-1 text-xs bg-cyan-600 rounded hover:bg-cyan-500">
+                                            Move
+                                        </button>
+                                        <button onClick={() => handleRemoveShip(selectedShip)} className="px-3 py-1 text-xs bg-red-600 rounded hover:bg-red-500">
+                                            Remove
+                                        </button>
+                                        <button onClick={() => setSelectedShip(null)} className="px-3 py-1 text-xs bg-slate-600 rounded hover:bg-slate-500">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Confirm Button */}
                             <button
                                 disabled={myShips.length < 5}
                                 onClick={handleReady}
-                                className="col-span-2 py-3 mt-2 bg-gradient-to-r from-cyan-600 to-blue-600 font-bold rounded shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-cyan-500/25 transition-all"
+                                className="w-full py-3 bg-gradient-to-r from-cyan-600 to-blue-600 font-bold rounded shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-cyan-500/25 transition-all"
                             >
-                                CONFIRM DEPLOYMENT
+                                ✅ CONFIRM DEPLOYMENT ({myShips.length}/5 Ships)
                             </button>
-                            <div className="col-span-2 text-[10px] text-slate-500 text-center mt-1">
-                                Place all 5 ships to enable confirmation.
-                            </div>
                         </div>
                     )}
+
                     {gameState.phase === 'SETUP' && gameState.ready[myPlayerIndex] && (
                         <div className="mt-4 text-center p-4 bg-slate-800/50 rounded animate-pulse text-cyan-400 border border-cyan-500/30">
                             WAITING FOR OPPONENT...
@@ -602,19 +751,18 @@ export default function Battleship({ sessionId, onBack }) {
                     )}
                 </div>
 
-                {/* ENEMY FLEET (Right) - Only in Playing Phase */}
-                <div className={`flex-1 w-full max-w-md transition-opacity duration-500 ${gameState.phase === 'SETUP' ? 'opacity-50 blur-sm pointer-events-none' : 'opacity-100'}`}>
+                {/* ENEMY FLEET */}
+                <div className={`flex-1 w-full max-w-md transition-opacity duration-500 ${gameState.phase === 'SETUP' ? 'opacity-30 blur-sm pointer-events-none' : 'opacity-100'}`}>
                     <div className="bg-slate-800/50 p-2 rounded-t-lg border-b border-white/5 flex justify-between">
                         <span className="font-bold text-red-400">ENEMY WATERS</span>
                         <span className="text-xs text-slate-500 animate-pulse">RADAR ONLINE</span>
                     </div>
+
                     {renderGrid(gameState.boards?.[oppPlayerIndex], [], false)}
 
-                    <div className="mt-4 p-4 bg-black/30 rounded text-xs font-mono text-slate-400 h-32 overflow-y-auto border border-white/5">
-                        <div className="mb-2 text-white border-b border-white/10 pb-1">COMBAT LOG</div>
-                        {isMyTurn && gameState.phase === 'PLAYING' && <div className="text-green-400">&gt; COMMANDER: AWAITING COORDINATES</div>}
-                        {!isMyTurn && gameState.phase === 'PLAYING' && <div className="text-red-400">&gt; WARNING: INCOMING BARRAGE DETECTED</div>}
-                        {gameState.phase === 'GAMEOVER' && <div className="text-yellow-400">&gt; WAR ENDED. {String(gameState.winner) === myPlayerIndex ? 'WE ARE VICTORIOUS.' : 'FLEET DESTROYED.'}</div>}
+                    {/* Ship Tracker - Enemy Fleet */}
+                    <div className="mt-3">
+                        <ShipTracker ships={gameState.ships?.[oppPlayerIndex]} isEnemy={true} />
                     </div>
                 </div>
 
@@ -624,10 +772,7 @@ export default function Battleship({ sessionId, onBack }) {
                         winner={String(gameState.winner) === myPlayerIndex}
                         score={String(gameState.winner) === myPlayerIndex ? 'VICTORY' : 'DEFEAT'}
                         onRestart={() => isHost && handleReset()}
-                        onExit={() => {
-                            handleReset(); // Ensure state is clean
-                            onBack();
-                        }}
+                        onExit={() => { handleReset(); onBack(); }}
                         isHost={isHost}
                     />
                 )}
