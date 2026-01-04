@@ -417,12 +417,44 @@ export default function Connect4({ sessionId, onBack }) {
                     80% { transform: translateY(-8%); }
                     100% { transform: translateY(0); }
                 }
-                @keyframes winPulse {
-                    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0.7); }
-                    50% { transform: scale(1.15); box-shadow: 0 0 20px 5px rgba(255,255,255,0.5); }
+                @keyframes winnerGlow {
+                    0%, 100% { 
+                        transform: scale(1.1); 
+                        box-shadow: 0 0 20px 8px currentColor;
+                        filter: brightness(1.3);
+                    }
+                    50% { 
+                        transform: scale(1.25); 
+                        box-shadow: 0 0 40px 15px currentColor;
+                        filter: brightness(1.6);
+                    }
+                }
+                @keyframes winnerBounce {
+                    0%, 100% { transform: scale(1.15) translateY(0); }
+                    50% { transform: scale(1.2) translateY(-10%); }
                 }
                 .animate-drop { animation: dropIn 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
-                .winning-cell { animation: winPulse 0.6s ease-in-out infinite; }
+                .winning-cell-red {
+                    animation: winnerGlow 0.8s ease-in-out infinite, winnerBounce 0.8s ease-in-out infinite;
+                    color: #ec4899;
+                    z-index: 20;
+                }
+                .winning-cell-yellow {
+                    animation: winnerGlow 0.8s ease-in-out infinite, winnerBounce 0.8s ease-in-out infinite;
+                    color: #facc15;
+                    z-index: 20;
+                }
+                .winning-cell-ring {
+                    position: absolute;
+                    inset: -8px;
+                    border-radius: 999px;
+                    border: 4px solid white;
+                    animation: winnerGlow 0.8s ease-in-out infinite;
+                }
+                .non-winning-piece {
+                    opacity: 0.3;
+                    filter: grayscale(0.5);
+                }
             `}</style>
 
             {/* Header */}
@@ -473,8 +505,8 @@ export default function Connect4({ sessionId, onBack }) {
                             onClick={() => handleDrop(c)}
                             disabled={!isMyTurn && gameState.mode !== 'SOLO'}
                             className={`h-8 flex items-center justify-center rounded-t-lg transition-all ${isMyTurn || gameState.mode === 'SOLO'
-                                    ? 'bg-white/10 hover:bg-white/30 text-white cursor-pointer'
-                                    : 'opacity-30 pointer-events-none'
+                                ? 'bg-white/10 hover:bg-white/30 text-white cursor-pointer'
+                                : 'opacity-30 pointer-events-none'
                                 }`}
                         >
                             <span className="text-xs">▼</span>
@@ -507,20 +539,46 @@ export default function Connect4({ sessionId, onBack }) {
                         const isWinning = winningCells.has(i);
                         const row = Math.floor(i / COLS);
                         const dropStart = `-${(row + 1) * 100}%`;
+                        const isFinished = gameState.status === 'FINISHED';
+                        const hasWinningCells = winningCells.size > 0;
+
+                        // Determine styling based on win state
+                        let pieceClass = 'animate-drop ';
+                        if (cell === 'red') {
+                            pieceClass += 'bg-gradient-to-br from-pink-400 to-pink-600 ';
+                            if (isWinning && isFinished) {
+                                pieceClass += 'winning-cell-red shadow-[0_0_30px_#ec4899] ';
+                            } else if (isFinished && hasWinningCells) {
+                                pieceClass += 'non-winning-piece ';
+                            } else {
+                                pieceClass += 'shadow-[0_0_12px_#ec4899] ';
+                            }
+                        } else if (cell === 'yellow') {
+                            pieceClass += 'bg-gradient-to-br from-yellow-300 to-yellow-500 ';
+                            if (isWinning && isFinished) {
+                                pieceClass += 'winning-cell-yellow shadow-[0_0_30px_#facc15] ';
+                            } else if (isFinished && hasWinningCells) {
+                                pieceClass += 'non-winning-piece ';
+                            } else {
+                                pieceClass += 'shadow-[0_0_12px_#facc15] ';
+                            }
+                        }
 
                         return (
                             <div
                                 key={i}
-                                className="aspect-square rounded-full border-2 border-slate-900/50 flex items-center justify-center bg-slate-950 shadow-inner"
+                                className={`aspect-square rounded-full border-2 border-slate-900/50 flex items-center justify-center bg-slate-950 shadow-inner relative ${isWinning && isFinished ? 'z-10' : ''}`}
                             >
                                 {cell && (
                                     <div
                                         style={{ '--drop-start': dropStart }}
-                                        className={`w-[85%] h-[85%] rounded-full shadow-lg animate-drop ${cell === 'red'
-                                                ? 'bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_12px_#ec4899]'
-                                                : 'bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_12px_#facc15]'
-                                            } ${isWinning && flashWin ? 'winning-cell ring-4 ring-white z-10' : ''}`}
-                                    />
+                                        className={`w-[85%] h-[85%] rounded-full shadow-lg ${pieceClass}`}
+                                    >
+                                        {/* Winning ring indicator */}
+                                        {isWinning && isFinished && (
+                                            <div className="absolute inset-[-6px] rounded-full border-4 border-white animate-ping opacity-75" />
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         );
