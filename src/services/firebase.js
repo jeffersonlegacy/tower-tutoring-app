@@ -5,6 +5,7 @@ import { getStorage } from "firebase/storage";
 import { getAuth, signInAnonymously } from "firebase/auth";
 import { getAnalytics } from "firebase/analytics";
 import { getPerformance } from "firebase/performance";
+import { getRemoteConfig, fetchAndActivate, getValue } from "firebase/remote-config";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -17,7 +18,7 @@ const firebaseConfig = {
   databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL
 };
 
-let app, db, rtdb, storage, auth, analytics, perf;
+let app, db, rtdb, storage, auth, analytics, perf, remoteConfig;
 
 try {
   app = initializeApp(firebaseConfig);
@@ -40,6 +41,14 @@ try {
   analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
   perf = typeof window !== 'undefined' ? getPerformance(app) : null;
 
+  // Initialize Remote Config
+  if (typeof window !== 'undefined') {
+    remoteConfig = getRemoteConfig(app);
+    remoteConfig.settings.minimumFetchIntervalMillis = 3600000; // 1 hour
+    remoteConfig.defaultConfig = { maintenance_mode: false };
+    fetchAndActivate(remoteConfig).catch(console.warn);
+  }
+
   console.log("Firebase Initialized Successfully");
 
   // Sign in anonymously for Storage/Firestore/RTDB access
@@ -52,5 +61,5 @@ try {
   console.error("CRITICAL: Firebase Initialization Failed", error);
 }
 
-export { app, db, rtdb, storage, auth, analytics, perf };
+export { app, db, rtdb, storage, auth, analytics, perf, remoteConfig, getValue };
 export default app;
