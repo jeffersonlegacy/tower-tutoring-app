@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRealtimeGame } from '../../hooks/useRealtimeGame';
 import GameEndOverlay from './GameEndOverlay';
 import confetti from 'canvas-confetti';
@@ -6,109 +6,46 @@ import confetti from 'canvas-confetti';
 const ROWS = 6;
 const COLS = 7;
 
+const createEmptyBoard = () => Array(ROWS * COLS).fill(null);
+
 const INITIAL_STATE = {
-    board: Array(ROWS * COLS).fill(null),
-    turn: 'red', // red (Host) starts
+    board: createEmptyBoard(),
+    turn: 'red',
     winner: null,
-    status: 'MENU', // MENU, WAITING, PLAYING, FINISHED
+    status: 'MENU',
     lastMoveTime: 0,
-    mode: 'PVP', // PVP, SOLO
-    difficulty: 'MEDIUM' // BEGINNER, MEDIUM, HARD, EXPERT, IMPOSSIBLE
+    mode: 'PVP',
+    difficulty: 'MEDIUM',
+    scores: { red: 0, yellow: 0 },
+    winningCells: []
 };
 
+// Convert Firebase object to array (Firebase can convert arrays to objects)
 const safeBoard = (b) => {
+    if (!b) return createEmptyBoard();
     if (Array.isArray(b)) return b;
-    const arr = Array(ROWS * COLS).fill(null);
-    if (b && typeof b === 'object') {
-        Object.keys(b).forEach(k => {
-            const idx = parseInt(k);
-            if (!isNaN(idx) && idx >= 0 && idx < arr.length) {
-                arr[idx] = b[k];
-            }
-        });
-    }
+    const arr = createEmptyBoard();
+    Object.keys(b).forEach(k => {
+        const idx = parseInt(k);
+        if (!isNaN(idx) && idx >= 0 && idx < arr.length) {
+            arr[idx] = b[k];
+        }
+    });
     return arr;
 };
 
-// --- MINIMAX AI ENGINE (OPTIMIZED) ---
-// Note: Board is now passed as Reference and MUTATED to avoid GC overhead.
-// We must Undo moves.
-
-// Heuristic Evaluation (Same logic, slightly cleaner)
-const evaluateWindow = (window, piece) => {
-    let score = 0;
-    const oppPiece = piece === 'yellow' ? 'red' : 'yellow';
-    const empty = null;
-
-    const countPiece = window.filter(c => c === piece).length;
-    const countEmpty = window.filter(c => c === empty).length;
-    const countOpp = window.filter(c => c === oppPiece).length;
-
-    if (countPiece === 4) score += 100;
-    else if (countPiece === 3 && countEmpty === 1) score += 5;
-    else if (countPiece === 2 && countEmpty === 2) score += 2;
-
-    if (countOpp === 3 && countEmpty === 1) score -= 4; // Block slightly
-
-    return score;
-};
-
-const scoreBoard = (board, piece) => {
-    let score = 0;
-
-    // Center Column Preference
-    const centerArray = [];
-    for (let r = 0; r < ROWS; r++) {
-        centerArray.push(board[r * COLS + Math.floor(COLS / 2)]);
-    }
-    const centerCount = centerArray.filter(c => c === piece).length;
-    score += centerCount * 3;
-
-    // Horizontal
-    for (let r = 0; r < ROWS; r++) {
-        const rowStart = r * COLS;
-        for (let c = 0; c < COLS - 3; c++) {
-            const window = [board[rowStart + c], board[rowStart + c + 1], board[rowStart + c + 2], board[rowStart + c + 3]];
-            score += evaluateWindow(window, piece);
-        }
-    }
-
-    // Vertical
-    for (let c = 0; c < COLS; c++) {
-        for (let r = 0; r < ROWS - 3; r++) {
-            const window = [board[r * COLS + c], board[(r + 1) * COLS + c], board[(r + 2) * COLS + c], board[(r + 3) * COLS + c]];
-            score += evaluateWindow(window, piece);
-        }
-    }
-
-    // Diag Positive
-    for (let r = 0; r < ROWS - 3; r++) {
-        for (let c = 0; c < COLS - 3; c++) {
-            const window = [board[r * COLS + c], board[(r + 1) * COLS + c + 1], board[(r + 2) * COLS + c + 2], board[(r + 3) * COLS + c + 3]];
-            score += evaluateWindow(window, piece);
-        }
-    }
-
-    // Diag Negative
-    for (let r = 3; r < ROWS; r++) {
-        for (let c = 0; c < COLS - 3; c++) {
-            const window = [board[r * COLS + c], board[(r - 1) * COLS + c + 1], board[(r - 2) * COLS + c + 2], board[(r - 3) * COLS + c + 3]];
-            score += evaluateWindow(window, piece);
-        }
-    }
-
-    return score;
-};
-
-const isTerminal = (board) => {
+// --- WIN DETECTION WITH CELL TRACKING ---
+const checkWin = (board) => {
     const b = safeBoard(board);
-    // Optimized check (inlined logic for speed)
+
     // Horizontal
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS - 3; c++) {
             const idx = r * COLS + c;
             const p = b[idx];
-            if (p && p === b[idx + 1] && p === b[idx + 2] && p === b[idx + 3]) return p;
+            if (p && p === b[idx + 1] && p === b[idx + 2] && p === b[idx + 3]) {
+                return { winner: p, cells: [idx, idx + 1, idx + 2, idx + 3] };
+            }
         }
     }
     // Vertical
@@ -116,508 +53,473 @@ const isTerminal = (board) => {
         for (let c = 0; c < COLS; c++) {
             const idx = r * COLS + c;
             const p = b[idx];
-            if (p && p === b[idx + COLS] && p === b[idx + COLS * 2] && p === b[idx + COLS * 3]) return p;
+            if (p && p === b[idx + COLS] && p === b[idx + COLS * 2] && p === b[idx + COLS * 3]) {
+                return { winner: p, cells: [idx, idx + COLS, idx + COLS * 2, idx + COLS * 3] };
+            }
         }
     }
-    // Diag Pos
+    // Diagonal ↘
     for (let r = 0; r < ROWS - 3; r++) {
         for (let c = 0; c < COLS - 3; c++) {
             const idx = r * COLS + c;
             const p = b[idx];
-            if (p && p === b[idx + COLS + 1] && p === b[idx + COLS * 2 + 2] && p === b[idx + COLS * 3 + 3]) return p;
+            if (p && p === b[idx + COLS + 1] && p === b[idx + COLS * 2 + 2] && p === b[idx + COLS * 3 + 3]) {
+                return { winner: p, cells: [idx, idx + COLS + 1, idx + COLS * 2 + 2, idx + COLS * 3 + 3] };
+            }
         }
     }
-    // Diag Neg
+    // Diagonal ↙
     for (let r = 3; r < ROWS; r++) {
         for (let c = 0; c < COLS - 3; c++) {
             const idx = r * COLS + c;
             const p = b[idx];
-            if (p && p === b[idx - COLS + 1] && p === b[idx - COLS * 2 + 2] && p === b[idx - COLS * 3 + 3]) return p;
+            if (p && p === b[idx - COLS + 1] && p === b[idx - COLS * 2 + 2] && p === b[idx - COLS * 3 + 3]) {
+                return { winner: p, cells: [idx, idx - COLS + 1, idx - COLS * 2 + 2, idx - COLS * 3 + 3] };
+            }
         }
     }
 
-    // Check full
-    let isFull = true;
-    for (let i = 0; i < b.length; i++) {
-        if (b[i] === null) { isFull = false; break; }
+    // Check draw
+    if (b.every(cell => cell !== null)) {
+        return { winner: 'draw', cells: [] };
     }
-    if (isFull) return 'draw';
 
     return null;
 };
 
-const getValidLocations = (board) => {
-    const b = safeBoard(board);
+// --- OPTIMIZED MINIMAX (reduced safeBoard calls) ---
+const getValidCols = (board) => {
     const valid = [];
     for (let c = 0; c < COLS; c++) {
-        // Row 0 is top
-        if (b[c] === null) valid.push(c);
+        if (board[c] === null) valid.push(c);
     }
     return valid;
 };
 
-const getNextOpenRow = (board, col) => {
-    if (col === null || col === undefined) return -1;
-    const b = safeBoard(board);
+const getDropRow = (board, col) => {
     for (let r = ROWS - 1; r >= 0; r--) {
-        if (b[r * COLS + col] === null) return r;
+        if (board[r * COLS + col] === null) return r;
     }
     return -1;
 };
 
-// MUTABLE MINIMAX
-const minimax = (board, depth, alpha, beta, maximizingPlayer) => {
-    const b = safeBoard(board);
-    const result = isTerminal(b);
+const evaluateWindow = (window, piece) => {
+    const opp = piece === 'yellow' ? 'red' : 'yellow';
+    const pCount = window.filter(c => c === piece).length;
+    const eCount = window.filter(c => c === null).length;
+    const oCount = window.filter(c => c === opp).length;
+
+    if (pCount === 4) return 100;
+    if (pCount === 3 && eCount === 1) return 5;
+    if (pCount === 2 && eCount === 2) return 2;
+    if (oCount === 3 && eCount === 1) return -4;
+    return 0;
+};
+
+const scorePosition = (board, piece) => {
+    let score = 0;
+
+    // Center column preference
+    for (let r = 0; r < ROWS; r++) {
+        if (board[r * COLS + 3] === piece) score += 3;
+    }
+
+    // Horizontal
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+            const idx = r * COLS + c;
+            score += evaluateWindow([board[idx], board[idx + 1], board[idx + 2], board[idx + 3]], piece);
+        }
+    }
+
+    // Vertical
+    for (let c = 0; c < COLS; c++) {
+        for (let r = 0; r < ROWS - 3; r++) {
+            const idx = r * COLS + c;
+            score += evaluateWindow([board[idx], board[idx + COLS], board[idx + COLS * 2], board[idx + COLS * 3]], piece);
+        }
+    }
+
+    // Diagonals
+    for (let r = 0; r < ROWS - 3; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+            const idx = r * COLS + c;
+            score += evaluateWindow([board[idx], board[idx + COLS + 1], board[idx + COLS * 2 + 2], board[idx + COLS * 3 + 3]], piece);
+        }
+    }
+    for (let r = 3; r < ROWS; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+            const idx = r * COLS + c;
+            score += evaluateWindow([board[idx], board[idx - COLS + 1], board[idx - COLS * 2 + 2], board[idx - COLS * 3 + 3]], piece);
+        }
+    }
+
+    return score;
+};
+
+const minimax = (board, depth, alpha, beta, maximizing, moveCount) => {
+    // Early termination for long games
+    if (moveCount > 35 && depth > 3) depth = 3;
+
+    const result = checkWin(board);
     if (result) {
-        if (result === 'yellow') return [null, 1000000];
-        if (result === 'red') return [null, -1000000];
-        if (result === 'draw') return [null, 0];
+        if (result.winner === 'yellow') return [null, 1000000 + depth];
+        if (result.winner === 'red') return [null, -1000000 - depth];
+        return [null, 0];
     }
-    if (depth === 0) {
-        return [null, scoreBoard(b, 'yellow')];
-    }
+    if (depth === 0) return [null, scorePosition(board, 'yellow')];
 
-    const validLocs = getValidLocations(b);
-    if (validLocs.length === 0) return [null, 0];
+    const validCols = getValidCols(board);
+    if (validCols.length === 0) return [null, 0];
 
-    validLocs.sort((a, b) => Math.abs(a - 3) - Math.abs(b - 3));
+    // Sort by center preference
+    validCols.sort((a, b) => Math.abs(a - 3) - Math.abs(b - 3));
 
-    if (maximizingPlayer) {
-        let value = -Infinity;
-        let column = validLocs[0];
-        for (const col of validLocs) {
-            const row = getNextOpenRow(b, col);
+    if (maximizing) {
+        let value = -Infinity, bestCol = validCols[0];
+        for (const col of validCols) {
+            const row = getDropRow(board, col);
             if (row === -1) continue;
             const idx = row * COLS + col;
-
-            b[idx] = 'yellow';
-            const res = minimax(b, depth - 1, alpha, beta, false);
-            const newScore = res ? res[1] : 0;
-            b[idx] = null;
-
-            if (newScore > value) {
-                value = newScore;
-                column = col;
-            }
+            board[idx] = 'yellow';
+            const [, newScore] = minimax(board, depth - 1, alpha, beta, false, moveCount + 1);
+            board[idx] = null;
+            if (newScore > value) { value = newScore; bestCol = col; }
             alpha = Math.max(alpha, value);
             if (alpha >= beta) break;
         }
-        return [column, value];
+        return [bestCol, value];
     } else {
-        let value = Infinity;
-        let column = validLocs[0];
-        for (const col of validLocs) {
-            const row = getNextOpenRow(b, col);
+        let value = Infinity, bestCol = validCols[0];
+        for (const col of validCols) {
+            const row = getDropRow(board, col);
             if (row === -1) continue;
             const idx = row * COLS + col;
-
-            b[idx] = 'red';
-            const res = minimax(b, depth - 1, alpha, beta, true);
-            const newScore = res ? res[1] : 0;
-            b[idx] = null;
-
-            if (newScore < value) {
-                value = newScore;
-                column = col;
-            }
+            board[idx] = 'red';
+            const [, newScore] = minimax(board, depth - 1, alpha, beta, true, moveCount + 1);
+            board[idx] = null;
+            if (newScore < value) { value = newScore; bestCol = col; }
             beta = Math.min(beta, value);
             if (alpha >= beta) break;
         }
-        return [column, value];
+        return [bestCol, value];
     }
 };
 
 export default function Connect4({ sessionId, onBack }) {
-    const gameId = 'connect4_v2';
+    const gameId = 'connect4_v3'; // Version bump for new state structure
     const { gameState, playerId, isHost, updateState } = useRealtimeGame(sessionId, gameId, INITIAL_STATE);
     const [localDifficulty, setLocalDifficulty] = useState(null);
-
-    // Mount tracking - MUST BE BEFORE ANY CONDITIONAL RETURNS
+    const [flashWin, setFlashWin] = useState(false);
     const isMounted = useRef(true);
-    const boardShakeRef = useRef('');
+    const aiThinking = useRef(false);
 
-    // Mount effect
     useEffect(() => {
         isMounted.current = true;
         return () => { isMounted.current = false; };
     }, []);
 
-    // Shake effect - MUST BE BEFORE ANY CONDITIONAL RETURNS
+    // Win flash effect
     useEffect(() => {
-        if (gameState?.lastMoveTime > 0) {
-            boardShakeRef.current = 'animate-shake';
-            const t = setTimeout(() => {
-                boardShakeRef.current = '';
-            }, 300);
-            return () => clearTimeout(t);
+        if (gameState?.winner && gameState.winner !== 'draw') {
+            setFlashWin(true);
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        } else {
+            setFlashWin(false);
         }
-    }, [gameState?.lastMoveTime]);
+    }, [gameState?.winner]);
 
-    // AI Turn Logic - MUST BE BEFORE ANY CONDITIONAL RETURNS
+    // AI Turn
     useEffect(() => {
         if (!gameState || gameState.mode !== 'SOLO' || gameState.status !== 'PLAYING') return;
-        if (gameState.turn !== 'yellow') return;
+        if (gameState.turn !== 'yellow' || aiThinking.current) return;
 
-        const aiMove = async () => {
-            await new Promise(r => setTimeout(r, 600));
+        aiThinking.current = true;
+
+        const runAI = async () => {
+            await new Promise(r => setTimeout(r, 500));
+            if (!isMounted.current) return;
 
             const board = [...safeBoard(gameState.board)];
-            const validCols = getValidLocations(board);
+            const validCols = getValidCols(board);
+            if (validCols.length === 0) { aiThinking.current = false; return; }
 
-            if (validCols.length === 0) return;
+            const moveCount = board.filter(c => c !== null).length;
+            const diff = gameState.difficulty || 'MEDIUM';
+            const depthMap = { BEGINNER: 1, MEDIUM: 2, HARD: 3, EXPERT: 4, IMPOSSIBLE: 5 };
+            const depth = depthMap[diff] || 2;
 
-            let chosenCol;
-            const difficulty = gameState.difficulty || 'MEDIUM';
-
-            try {
-                if (difficulty === 'BEGINNER') {
-                    chosenCol = validCols[Math.floor(Math.random() * validCols.length)];
-                } else if (difficulty === 'MEDIUM') {
-                    chosenCol = minimax(board, 2, -Infinity, Infinity, true)[0];
-                } else if (difficulty === 'HARD') {
-                    chosenCol = minimax(board, 3, -Infinity, Infinity, true)[0];
-                } else if (difficulty === 'EXPERT') {
-                    chosenCol = minimax(board, 4, -Infinity, Infinity, true)[0];
-                } else {
-                    // IMPOSSIBLE - depth 5 max to prevent hanging
-                    chosenCol = minimax(board, 5, -Infinity, Infinity, true)[0];
-                }
-            } catch (e) {
-                console.warn('[Connect4 AI] Minimax error, using fallback:', e);
-                chosenCol = null;
+            let col;
+            if (diff === 'BEGINNER') {
+                col = validCols[Math.floor(Math.random() * validCols.length)];
+            } else {
+                [col] = minimax(board, depth, -Infinity, Infinity, true, moveCount);
             }
 
-            // Fallback: if minimax returned invalid, pick center or random
-            if (chosenCol === undefined || chosenCol === null || !validCols.includes(chosenCol)) {
-                // Prefer center columns
-                const preferredOrder = [3, 2, 4, 1, 5, 0, 6];
-                chosenCol = preferredOrder.find(c => validCols.includes(c)) || validCols[0];
+            if (col === null || !validCols.includes(col)) {
+                col = [3, 2, 4, 1, 5, 0, 6].find(c => validCols.includes(c)) ?? validCols[0];
             }
 
-            if (chosenCol === undefined || chosenCol === null) return;
+            const row = getDropRow(board, col);
+            if (row === -1) { aiThinking.current = false; return; }
 
-            const realBoard = [...safeBoard(gameState.board)];
-            const row = getNextOpenRow(realBoard, chosenCol);
-            if (row === -1) return;
+            board[row * COLS + col] = 'yellow';
+            const result = checkWin(board);
 
-            realBoard[row * COLS + chosenCol] = 'yellow';
-
-            const term = isTerminal(realBoard);
-            let winner = null;
-            if (term === 'yellow') winner = 'yellow';
-            else if (term === 'draw') winner = 'draw';
-            else if (term === 'red') winner = 'red';
+            const newScores = { ...gameState.scores };
+            if (result?.winner === 'yellow') newScores.yellow++;
 
             updateState({
-                board: realBoard,
+                board,
                 turn: 'red',
-                winner: winner,
-                status: winner ? 'FINISHED' : 'PLAYING',
-                lastMoveTime: Date.now()
+                winner: result?.winner || null,
+                winningCells: result?.cells || [],
+                status: result ? 'FINISHED' : 'PLAYING',
+                lastMoveTime: Date.now(),
+                scores: newScores
             });
+
+            aiThinking.current = false;
         };
 
-        const moveTimer = setTimeout(aiMove, 100);
-        return () => clearTimeout(moveTimer);
+        const timer = setTimeout(runAI, 100);
+        return () => clearTimeout(timer);
     }, [gameState?.turn, gameState?.status, gameState?.mode, updateState]);
 
-    // --- LOADING GUARD (AFTER ALL HOOKS) ---
-    if (!gameState) return <div className="text-white p-4 font-mono animate-pulse">Connecting to Matrix...</div>;
-
-    // Game Logic
-    const handleDrop = (colIndex) => {
+    const handleDrop = useCallback((col) => {
         if (!gameState || gameState.status !== 'PLAYING') return;
 
-        // Turn Enforcement (Skip for SOLO)
         const myColor = isHost ? 'red' : 'yellow';
         if (gameState.mode !== 'SOLO' && gameState.turn !== myColor) return;
-        if (gameState.mode === 'SOLO' && gameState.turn !== 'red') return; // Humans only play Red in solo
+        if (gameState.mode === 'SOLO' && gameState.turn !== 'red') return;
 
-        // Find available row
-        const currentBoard = [...safeBoard(gameState.board)];
-        let targetIdx = -1;
+        const board = [...safeBoard(gameState.board)];
+        const row = getDropRow(board, col);
+        if (row === -1) return;
 
-        for (let r = ROWS - 1; r >= 0; r--) {
-            const idx = r * COLS + colIndex;
-            if (!currentBoard[idx]) {
-                targetIdx = idx;
-                break;
-            }
+        board[row * COLS + col] = gameState.turn;
+        const result = checkWin(board);
+
+        const newScores = { ...gameState.scores };
+        if (result?.winner && result.winner !== 'draw') {
+            newScores[result.winner]++;
         }
 
-        if (targetIdx === -1) return; // Column full
-
-        // Apply Move
-        const mover = gameState.turn; // 'red' or 'yellow'
-
-        currentBoard[targetIdx] = mover;
-        const nextTurn = mover === 'red' ? 'yellow' : 'red';
-
-        // Check Win
-        const term = isTerminal(currentBoard);
-        let winner = null;
-        if (term === 'red' || term === 'yellow') winner = term;
-        else if (term === 'draw') winner = 'draw';
-
-        const updates = {
-            board: currentBoard,
-            turn: nextTurn,
-            winner: winner,
-            status: winner ? 'FINISHED' : 'PLAYING',
-            lastMoveTime: Date.now()
-        };
-
-        updateState(updates);
-    };
-
-
-
-    const handleReset = () => {
         updateState({
-            board: Array(ROWS * COLS).fill(null),
+            board,
+            turn: gameState.turn === 'red' ? 'yellow' : 'red',
+            winner: result?.winner || null,
+            winningCells: result?.cells || [],
+            status: result ? 'FINISHED' : 'PLAYING',
+            lastMoveTime: Date.now(),
+            scores: newScores
+        });
+    }, [gameState, isHost, updateState]);
+
+    const handleReset = useCallback(() => {
+        updateState({
+            board: createEmptyBoard(),
             turn: 'red',
             winner: null,
+            winningCells: [],
             status: gameState.mode === 'SOLO' ? 'PLAYING' : 'WAITING',
             lastMoveTime: 0
         });
-    };
+    }, [gameState?.mode, updateState]);
 
-    // START PVP MATCH
-    const handleStart = () => {
+    const handleStart = useCallback(() => {
         updateState({ status: 'PLAYING' });
-    };
+    }, [updateState]);
 
-    // SELECT MODE
-    const setMode = (mode, diff = 'MEDIUM') => {
-        if (mode === 'SOLO') {
-            updateState({ status: 'PLAYING', mode: 'SOLO', turn: 'red', difficulty: diff });
-        } else {
-            updateState({ status: 'WAITING', mode: 'PVP', turn: 'red' });
-        }
+    const setMode = useCallback((mode, diff = 'MEDIUM') => {
+        updateState({
+            status: mode === 'SOLO' ? 'PLAYING' : 'WAITING',
+            mode,
+            turn: 'red',
+            difficulty: diff,
+            scores: { red: 0, yellow: 0 },
+            board: createEmptyBoard(),
+            winner: null,
+            winningCells: []
+        });
         setLocalDifficulty(null);
-    };
+    }, [updateState]);
 
+    const winningCells = useMemo(() =>
+        new Set(gameState?.winningCells || []),
+        [gameState?.winningCells]
+    );
 
-    // --- RENDER ---
-    if (!gameState) return <div className="text-white p-4 font-mono animate-pulse">Connecting to Matrix...</div>;
-
-    // MENU SCREEN
-    if (gameState.status === 'MENU') {
-        const diffs = ['BEGINNER', 'MEDIUM', 'HARD', 'EXPERT', 'IMPOSSIBLE'];
-        return (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-auto cursor-auto space-y-8 select-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-pink-950 via-slate-950 to-black">
-
-                <div className="relative z-10 flex flex-col items-center animate-in zoom-in duration-500">
-                    <span className="text-8xl leading-none mb-4 animate-bounce drop-shadow-[0_0_15px_rgba(236,72,153,0.5)]">🔴</span>
-                    <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-t from-pink-600 to-red-400 tracking-tighter filter drop-shadow-[0_0_20px_rgba(236,72,153,0.5)] mb-2 italic transform -skew-x-6">
-                        NEON CONNECT
-                    </h1>
-                    <p className="text-pink-400 font-mono font-bold tracking-[0.5em] text-sm animate-pulse uppercase">Tactical Linkage</p>
-                </div>
-
-                <div className="w-full max-w-xs space-y-4 relative z-10">
-                    <div className="w-full max-w-xs space-y-4">
-                        {localDifficulty ? (
-                            <div className="space-y-2 animate-in fade-in slide-in-from-right-8 bg-slate-900/50 p-6 rounded-xl border border-white/5 backdrop-blur-md">
-                                <div className="text-white font-bold mb-4 uppercase tracking-widest text-xs text-center">Select AI Level</div>
-                                {diffs.map(d => (
-                                    <button key={d} onClick={() => setMode('SOLO', d)} className={`w-full py-3 rounded-lg font-black text-white text-xs uppercase tracking-widest transition-all hover:scale-105 border border-white/10 ${d === 'BEGINNER' ? 'bg-green-600 shadow-[0_0_10px_rgba(22,163,74,0.4)]' :
-                                        d === 'MEDIUM' ? 'bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]' :
-                                            d === 'HARD' ? 'bg-orange-600 shadow-[0_0_10px_rgba(234,88,12,0.4)]' :
-                                                d === 'EXPERT' ? 'bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.4)]' : 'bg-slate-900 border-red-500 shadow-[0_0_15px_red]'
-                                        }`}>
-                                        {d}
-                                    </button>
-                                ))}
-                                <button onClick={() => setLocalDifficulty(false)} className="w-full mt-4 text-[10px] text-slate-500 hover:text-white uppercase tracking-widest border-t border-white/10 pt-2">Back</button>
-                            </div>
-                        ) : (
-                            <>
-                                <button onClick={() => setLocalDifficulty(true)} className="w-full py-4 bg-slate-800 border-2 border-slate-600 hover:border-pink-500 rounded-xl font-bold text-white transition-all hover:scale-105 shadow-lg flex items-center justify-center gap-3 group">
-                                    <span className="text-2xl group-hover:rotate-12 transition-transform">🤖</span>
-                                    <span>SOLO PRACTICE</span>
-                                </button>
-                                <button onClick={() => setMode('PVP')} className="w-full py-4 bg-gradient-to-r from-pink-600 to-purple-600 rounded-xl font-bold text-white transition-all hover:scale-105 shadow-[0_0_20px_rgba(219,39,119,0.4)] flex items-center justify-center gap-3">
-                                    <span className="text-2xl">⚔️</span>
-                                    <span>VS PLAYER</span>
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </div>
-                <button onClick={onBack} className="mt-8 text-xs font-bold text-slate-500 hover:text-white uppercase tracking-widest">EXIT ARCADE</button>
-            </div>
-        );
+    if (!gameState) {
+        return <div className="text-white p-4 font-mono animate-pulse">Connecting...</div>;
     }
 
-    // ... REST OF THE GAME (Winning Indicies / Render) ...
-
+    const scores = gameState.scores || { red: 0, yellow: 0 };
     const myColor = isHost ? 'red' : 'yellow';
     const isMyTurn = gameState.turn === myColor;
     const playersCount = gameState.players ? Object.keys(gameState.players).length : 0;
     const opponentReady = playersCount >= 2;
 
-    const getWinningIndices = (board) => {
-        const b = safeBoard(board);
-        const indices = [];
-        const pieces = ['red', 'yellow'];
-        for (const p of pieces) {
-            // Horizontal
-            for (let r = 0; r < ROWS; r++) {
-                for (let c = 0; c < COLS - 3; c++) {
-                    const idx = r * COLS + c;
-                    if (b[idx] === p && b[idx + 1] === p && b[idx + 2] === p && b[idx + 3] === p) {
-                        indices.push(idx, idx + 1, idx + 2, idx + 3);
-                    }
-                }
-            }
-            // Vertical
-            for (let r = 0; r < ROWS - 3; r++) {
-                for (let c = 0; c < COLS; c++) {
-                    const idx = r * COLS + c;
-                    if (b[idx] === p && b[idx + COLS] === p && b[idx + COLS * 2] === p && b[idx + COLS * 3] === p) {
-                        indices.push(idx, idx + COLS, idx + COLS * 2, idx + COLS * 3);
-                    }
-                }
-            }
-            // Diag Pos
-            for (let r = 0; r < ROWS - 3; r++) {
-                for (let c = 0; c < COLS - 3; c++) {
-                    const idx = r * COLS + c;
-                    if (b[idx] === p && b[idx + COLS + 1] === p && b[idx + COLS * 2 + 2] === p && b[idx + COLS * 3 + 3] === p) {
-                        indices.push(idx, idx + COLS + 1, idx + COLS * 2 + 2, idx + COLS * 3 + 3);
-                    }
-                }
-            }
-            // Diag Neg
-            for (let r = 3; r < ROWS; r++) {
-                for (let c = 0; c < COLS - 3; c++) {
-                    const idx = r * COLS + c;
-                    if (b[idx] === p && b[idx - COLS + 1] === p && b[idx - COLS * 2 + 2] === p && b[idx - COLS * 3 + 3] === p) {
-                        indices.push(idx, idx - COLS + 1, idx - COLS * 2 + 2, idx - COLS * 3 + 3);
-                    }
-                }
-            }
-        }
-        return [...new Set(indices)];
-    };
+    // MENU
+    if (gameState.status === 'MENU') {
+        const diffs = ['BEGINNER', 'MEDIUM', 'HARD', 'EXPERT', 'IMPOSSIBLE'];
+        const diffColors = {
+            BEGINNER: 'bg-green-600', MEDIUM: 'bg-blue-600',
+            HARD: 'bg-orange-600', EXPERT: 'bg-red-600', IMPOSSIBLE: 'bg-purple-900 border-2 border-red-500'
+        };
 
-    const winningIndices = gameState ? getWinningIndices(gameState.board) : [];
+        return (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center p-4 select-none bg-gradient-to-br from-pink-950 via-slate-950 to-black">
+                <span className="text-8xl mb-4 animate-bounce">🔴</span>
+                <h1 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-t from-pink-600 to-red-400 tracking-tighter mb-2 italic">
+                    NEON CONNECT
+                </h1>
+                <p className="text-pink-400 font-mono text-sm tracking-widest mb-8 animate-pulse">4-IN-A-ROW</p>
+
+                <div className="w-full max-w-xs space-y-3">
+                    {localDifficulty ? (
+                        <div className="space-y-2 bg-slate-900/60 p-4 rounded-xl border border-white/10">
+                            <div className="text-white font-bold text-xs text-center tracking-widest mb-3">AI LEVEL</div>
+                            {diffs.map(d => (
+                                <button
+                                    key={d}
+                                    onClick={() => setMode('SOLO', d)}
+                                    className={`w-full py-2.5 rounded-lg font-bold text-white text-xs tracking-wide hover:scale-105 transition-all ${diffColors[d]}`}
+                                >
+                                    {d}
+                                </button>
+                            ))}
+                            <button onClick={() => setLocalDifficulty(false)} className="w-full mt-2 text-xs text-slate-500 hover:text-white">← Back</button>
+                        </div>
+                    ) : (
+                        <>
+                            <button onClick={() => setLocalDifficulty(true)} className="w-full py-4 bg-slate-800 border-2 border-slate-600 hover:border-pink-500 rounded-xl font-bold text-white flex items-center justify-center gap-3 hover:scale-105 transition-all">
+                                <span className="text-2xl">🤖</span> SOLO PRACTICE
+                            </button>
+                            <button onClick={() => setMode('PVP')} className="w-full py-4 bg-gradient-to-r from-pink-600 to-purple-600 rounded-xl font-bold text-white flex items-center justify-center gap-3 hover:scale-105 transition-all shadow-lg">
+                                <span className="text-2xl">⚔️</span> VS PLAYER
+                            </button>
+                        </>
+                    )}
+                </div>
+                <button onClick={onBack} className="mt-8 text-xs text-slate-500 hover:text-white">EXIT</button>
+            </div>
+        );
+    }
 
     return (
-        <div className="flex flex-col items-center gap-2 p-2 select-none overflow-hidden h-full font-mono w-full max-w-sm mx-auto">
+        <div className="flex flex-col items-center gap-3 p-4 select-none h-full font-mono w-full max-w-lg mx-auto">
             <style>{`
                 @keyframes dropIn {
                     0% { transform: translateY(var(--drop-start)); opacity: 0; }
                     20% { opacity: 1; }
                     60% { transform: translateY(0); }
-                    80% { transform: translateY(-10%); }
+                    80% { transform: translateY(-8%); }
                     100% { transform: translateY(0); }
                 }
-                @keyframes shake {
-                    0%, 100% { transform: translateX(0); }
-                    25% { transform: translateX(-2px) rotate(-1deg); }
-                    75% { transform: translateX(2px) rotate(1deg); }
+                @keyframes winPulse {
+                    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0.7); }
+                    50% { transform: scale(1.15); box-shadow: 0 0 20px 5px rgba(255,255,255,0.5); }
                 }
-                .animate-drop {
-                    animation: dropIn 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-                }
-                .animate-shake {
-                    animation: shake 0.2s ease-in-out;
-                }
+                .animate-drop { animation: dropIn 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+                .winning-cell { animation: winPulse 0.6s ease-in-out infinite; }
             `}</style>
 
-
             {/* Header */}
-            <div className="flex justify-between items-center w-full px-4 mb-2">
-                <div className="flex gap-2">
+            <div className="flex justify-between items-center w-full">
+                <div className="flex gap-3">
                     <button onClick={onBack} className="text-xs text-slate-400 hover:text-white">EXIT</button>
-                    <button onClick={() => updateState({ status: 'MENU', board: Array(ROWS * COLS).fill(null), winner: null })} className="text-xs text-red-400 hover:text-white">🔄</button>
+                    <button onClick={() => updateState({ status: 'MENU', board: createEmptyBoard(), winner: null, winningCells: [], scores: { red: 0, yellow: 0 } })} className="text-xs text-red-400 hover:text-white">MENU</button>
                 </div>
                 <div className="text-[10px] font-bold text-slate-400">
-                    {gameState.status === 'WAITING' ? 'WAITING FOR PLAYERS' :
-                        gameState.status === 'FINISHED' ? 'GAME OVER' : 'MATCH LIVE'}
+                    {gameState.status === 'WAITING' ? 'WAITING' : gameState.status === 'FINISHED' ? 'GAME OVER' : 'LIVE'}
+                </div>
+            </div>
+
+            {/* SCOREBOARD */}
+            <div className="flex items-center gap-6 bg-black/50 px-6 py-3 rounded-xl border border-white/10 w-full max-w-md justify-center">
+                <div className={`flex flex-col items-center transition-all ${gameState.turn === 'red' ? 'scale-110' : 'opacity-60'}`}>
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_15px_#ec4899] ring-2 ring-white/20 mb-1" />
+                    <span className="text-pink-400 font-bold text-xs">RED</span>
+                    <span className="text-white text-2xl font-black">{scores.red}</span>
+                </div>
+
+                <div className="text-slate-600 text-2xl font-bold">VS</div>
+
+                <div className={`flex flex-col items-center transition-all ${gameState.turn === 'yellow' ? 'scale-110' : 'opacity-60'}`}>
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_15px_#facc15] ring-2 ring-white/20 mb-1" />
+                    <span className="text-yellow-400 font-bold text-xs">YELLOW</span>
+                    <span className="text-white text-2xl font-black">{scores.yellow}</span>
                 </div>
             </div>
 
             {/* Turn Indicator */}
-            <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-white/5 shadow-lg mb-2">
-                <div className={`flex flex-col items-center transition-all duration-300 ${gameState.turn === 'red' ? 'opacity-100 scale-110' : 'opacity-40'}`}>
-                    <div className="w-4 h-4 rounded-full bg-pink-500 shadow-[0_0_10px_#ec4899] ring-2 ring-white/10 mb-1" />
-                    <span className="text-[8px] text-pink-500 font-bold">P1 (RED)</span>
-                </div>
-
-                <div className="w-px h-6 bg-white/10" />
-
-                <div className={`flex flex-col items-center transition-all duration-300 ${gameState.turn === 'yellow' ? 'opacity-100 scale-110' : 'opacity-40'}`}>
-                    <div className="w-4 h-4 rounded-full bg-yellow-400 shadow-[0_0_10px_#facc15] ring-2 ring-white/10 mb-1" />
-                    <span className="text-[8px] text-yellow-400 font-bold">P2 (YEL)</span>
-                </div>
-            </div>
-
-            <div className="text-xs font-bold mb-2 animate-pulse">
+            <div className="text-sm font-bold">
                 {gameState.status === 'WAITING' ? (
-                    isHost ? (opponentReady ? "OPPONENT DETECTED. START WHEN READY." : "WAITING FOR OPPONENT...") : "WAITING FOR HOST TO START..."
+                    <span className="text-slate-400">{isHost ? (opponentReady ? "READY - START MATCH" : "WAITING FOR OPPONENT...") : "WAITING FOR HOST..."}</span>
                 ) : gameState.status === 'FINISHED' ? (
-                    "MATCH CONCLUDED"
+                    <span className="text-white">{gameState.winner === 'draw' ? 'DRAW!' : `${gameState.winner?.toUpperCase()} WINS!`}</span>
                 ) : (
-                    isMyTurn ? <span className="text-green-400">YOUR TURN</span> : <span className="text-slate-500">OPPONENT THINKING...</span>
+                    isMyTurn ? <span className="text-green-400 animate-pulse">YOUR TURN</span> : <span className="text-slate-500">OPPONENT...</span>
                 )}
             </div>
 
-            {/* Drop Inputs */}
+            {/* Drop Buttons */}
             {gameState.status === 'PLAYING' && (
-                <div className="grid grid-cols-7 gap-1 px-1 w-full max-w-[280px]">
+                <div className="grid grid-cols-7 gap-1.5 w-full max-w-md">
                     {[0, 1, 2, 3, 4, 5, 6].map(c => (
                         <button
                             key={c}
                             onClick={() => handleDrop(c)}
-                            disabled={!isMyTurn}
-                            className={`w-full h-6 flex items-center justify-center rounded-t-lg transition-all ${isMyTurn ? 'bg-white/10 hover:bg-white/20 text-white cursor-pointer' : 'opacity-0 pointer-events-none'}`}
+                            disabled={!isMyTurn && gameState.mode !== 'SOLO'}
+                            className={`h-8 flex items-center justify-center rounded-t-lg transition-all ${isMyTurn || gameState.mode === 'SOLO'
+                                    ? 'bg-white/10 hover:bg-white/30 text-white cursor-pointer'
+                                    : 'opacity-30 pointer-events-none'
+                                }`}
                         >
-                            <span className="text-[8px]">▼</span>
+                            <span className="text-xs">▼</span>
                         </button>
                     ))}
                 </div>
             )}
 
-            {/* The Grid */}
-            <div className={`bg-slate-800 p-2.5 rounded-xl shadow-2xl border-4 border-slate-700 w-full max-w-[280px] min-h-[240px] relative ${boardShakeRef.current} transition-transform`}>
-                {/* Pre-Game Overlay */}
+            {/* THE BOARD */}
+            <div className="bg-slate-800 p-3 rounded-2xl shadow-2xl border-4 border-slate-700 w-full max-w-md relative">
+                {/* Waiting Overlay */}
                 {gameState.status === 'WAITING' && (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-lg">
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 rounded-xl backdrop-blur-sm">
                         {isHost ? (
                             <button
                                 onClick={handleStart}
-                                className={`px-6 py-3 rounded font-bold text-white shadow-lg transition-all ${opponentReady ? 'bg-green-600 hover:scale-105' : 'bg-slate-600 opacity-50 cursor-not-allowed'}`}
+                                disabled={!opponentReady}
+                                className={`px-8 py-4 rounded-xl font-bold text-white text-lg transition-all ${opponentReady ? 'bg-green-600 hover:bg-green-500 hover:scale-105' : 'bg-slate-700 opacity-50 cursor-not-allowed'}`}
                             >
                                 START MATCH
                             </button>
                         ) : (
-                            <div className="text-yellow-400 font-bold animate-pulse">READY</div>
+                            <div className="text-yellow-400 font-bold text-lg animate-pulse">READY</div>
                         )}
                     </div>
                 )}
 
-                <div className="grid grid-cols-7 grid-rows-6 gap-1.5">
+                <div className="grid grid-cols-7 grid-rows-6 gap-2">
                     {safeBoard(gameState.board).map((cell, i) => {
-                        const isWinningPiece = winningIndices.includes(i);
+                        const isWinning = winningCells.has(i);
                         const row = Math.floor(i / COLS);
-                        const dropStart = `-${(row + 1) * 120}%`;
+                        const dropStart = `-${(row + 1) * 100}%`;
 
                         return (
                             <div
                                 key={i}
-                                className="aspect-square rounded-full border border-slate-900/50 flex items-center justify-center bg-slate-950 relative shadow-inner"
+                                className="aspect-square rounded-full border-2 border-slate-900/50 flex items-center justify-center bg-slate-950 shadow-inner"
                             >
                                 {cell && (
                                     <div
                                         style={{ '--drop-start': dropStart }}
-                                        className={`w-[85%] h-[85%] rounded-full shadow-lg ${cell === 'red'
-                                            ? 'bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_8px_#ec4899]'
-                                            : 'bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_8px_#facc15]'
-                                            } animate-drop ${isWinningPiece ? 'ring-4 ring-white animate-pulse brightness-125 z-10' : ''}`}
+                                        className={`w-[85%] h-[85%] rounded-full shadow-lg animate-drop ${cell === 'red'
+                                                ? 'bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_12px_#ec4899]'
+                                                : 'bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_12px_#facc15]'
+                                            } ${isWinning && flashWin ? 'winning-cell ring-4 ring-white z-10' : ''}`}
                                     />
                                 )}
                             </div>
@@ -625,16 +527,15 @@ export default function Connect4({ sessionId, onBack }) {
                     })}
                 </div>
 
-                {/* Standard Game End Overlay */}
+                {/* Game End Overlay */}
                 {gameState.status === 'FINISHED' && (
                     <GameEndOverlay
                         winner={gameState.winner === 'draw' ? null : (gameState.winner === 'red' && isHost) || (gameState.winner === 'yellow' && !isHost)}
                         isDraw={gameState.winner === 'draw'}
-                        score={gameState.winner === 'draw' ? 'DRAW' : (gameState.winner === 'red' ? 'RED WINS' : 'YELLOW WINS')}
+                        score={`RED ${scores.red} - ${scores.yellow} YELLOW`}
                         onRestart={() => isHost && handleReset()}
                         onExit={() => {
-                            updateState({ status: 'MENU', board: Array(ROWS * COLS).fill(null), winner: null });
-                            onBack(); // Optional: Return to arcade menu
+                            updateState({ status: 'MENU', board: createEmptyBoard(), winner: null, winningCells: [], scores: { red: 0, yellow: 0 } });
                         }}
                         isHost={isHost}
                     />
