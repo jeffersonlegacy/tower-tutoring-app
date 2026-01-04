@@ -1,16 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { createPortal } from 'react-dom';
-import Connect4 from './Connect4';
-import MathSprint from './MathSprint';
-import AirHockey from './AirHockey';
-import SwipeFight from './SwipeFight';
-import Yahtzee from './Yahtzee';
-import Battleship from './Battleship';
-import MathInvaders from './MathInvaders';
-import OffsetOperator from './OffsetOperator';
 import GameOverlay from './GameOverlay';
 import GlobalLeaderboard from './GlobalLeaderboard';
 import GameErrorBoundary from './GameErrorBoundary';
+
+// Lazy load games for code splitting (~300KB+ each)
+const Connect4 = lazy(() => import('./Connect4'));
+const MathSprint = lazy(() => import('./MathSprint'));
+const AirHockey = lazy(() => import('./AirHockey'));
+const SwipeFight = lazy(() => import('./SwipeFight'));
+const Yahtzee = lazy(() => import('./Yahtzee'));
+const Battleship = lazy(() => import('./Battleship'));
+const MathInvaders = lazy(() => import('./MathInvaders'));
+const OffsetOperator = lazy(() => import('./OffsetOperator'));
+
+const GameLoader = () => (
+    <div className="flex items-center justify-center h-full bg-slate-900">
+        <div className="text-center">
+            <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-cyan-400 font-mono text-sm">Loading game...</p>
+        </div>
+    </div>
+);
 
 export default function BrainBreak({ sessionId, onClose }) {
     const [game, setGame] = useState('menu'); // 'menu' | ... games
@@ -248,14 +259,16 @@ export default function BrainBreak({ sessionId, onClose }) {
                     onClose={closeGame}
                 >
                     {game === 'leaderboard' && <GlobalLeaderboard sessionId={sessionId} />}
-                    {game === 'connect4' && <GameErrorBoundary onBack={closeGame}><Connect4 sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                    {game === 'mathsprint' && <GameErrorBoundary onBack={closeGame}><MathSprint sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                    {game === 'airhockey' && <GameErrorBoundary onBack={closeGame}><AirHockey sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                    {game === 'swipefight' && <GameErrorBoundary onBack={closeGame}><SwipeFight sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                    {game === 'yahtzee' && <GameErrorBoundary onBack={closeGame}><Yahtzee sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                    {game === 'battleship' && <GameErrorBoundary onBack={closeGame}><Battleship sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                    {game === 'mathinvaders' && <GameErrorBoundary onBack={closeGame}><MathInvaders sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                    {game === 'offsetoperator' && <GameErrorBoundary onBack={closeGame}><OffsetOperator sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
+                    <Suspense fallback={<GameLoader />}>
+                        {game === 'connect4' && <GameErrorBoundary onBack={closeGame}><Connect4 sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
+                        {game === 'mathsprint' && <GameErrorBoundary onBack={closeGame}><MathSprint sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
+                        {game === 'airhockey' && <GameErrorBoundary onBack={closeGame}><AirHockey sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
+                        {game === 'swipefight' && <GameErrorBoundary onBack={closeGame}><SwipeFight sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
+                        {game === 'yahtzee' && <GameErrorBoundary onBack={closeGame}><Yahtzee sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
+                        {game === 'battleship' && <GameErrorBoundary onBack={closeGame}><Battleship sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
+                        {game === 'mathinvaders' && <GameErrorBoundary onBack={closeGame}><MathInvaders sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
+                        {game === 'offsetoperator' && <GameErrorBoundary onBack={closeGame}><OffsetOperator sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
+                    </Suspense>
                 </GameOverlay>,
                 document.body
             )}

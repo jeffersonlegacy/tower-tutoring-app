@@ -49,7 +49,17 @@ export default defineConfig({
       output: {
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]'
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+        manualChunks: {
+          // React core (rarely changes)
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          // Firebase SDK (split to avoid loading unused services)
+          'vendor-firebase-core': ['firebase/app', 'firebase/auth'],
+          'vendor-firebase-db': ['firebase/firestore', 'firebase/database'],
+          'vendor-firebase-extra': ['firebase/storage', 'firebase/analytics', 'firebase/performance', 'firebase/remote-config'],
+          // Heavy canvas lib for whiteboard
+          'vendor-tldraw': ['@tldraw/tldraw'],
+        }
       }
     }
   },

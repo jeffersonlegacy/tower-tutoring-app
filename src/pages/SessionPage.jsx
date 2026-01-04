@@ -1,13 +1,21 @@
-import { useState, useEffect } from "react";
-import Whiteboard from "../features/session/Whiteboard";
-import VideoChat from "../features/session/VideoChat";
-import HomeworkTray from "../features/session/HomeworkTray";
+import { useState, useEffect, Suspense, lazy } from "react";
 import { useParams } from "react-router-dom";
 import { useHomeworkUpload } from "../hooks/useHomeworkUpload";
-import BrainBreak from "../features/games/BrainBreak";
-import GeminiChat from "../features/chat/GeminiChat";
-import MathTools from "../features/tools/MathTools";
+import HomeworkTray from "../features/session/HomeworkTray";
 import MindHiveInterface from "../features/session/MindHiveInterface";
+
+// Lazy load heavy components
+const Whiteboard = lazy(() => import("../features/session/Whiteboard"));
+const VideoChat = lazy(() => import("../features/session/VideoChat"));
+const BrainBreak = lazy(() => import("../features/games/BrainBreak"));
+const GeminiChat = lazy(() => import("../features/chat/GeminiChat"));
+const MathTools = lazy(() => import("../features/tools/MathTools"));
+
+const ComponentLoader = () => (
+    <div className="flex items-center justify-center h-full bg-slate-900/50">
+        <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+);
 
 export default function Session() {
     const { sessionId } = useParams();
@@ -133,7 +141,9 @@ export default function Session() {
 
                     {/* Top: Video (Adaptive Height) */}
                     <div className="h-[220px] md:h-[320px] shrink-0 border-b border-slate-700 bg-slate-900/50">
-                        <VideoChat sessionId={sessionId} />
+                        <Suspense fallback={<ComponentLoader />}>
+                            <VideoChat sessionId={sessionId} />
+                        </Suspense>
                     </div>
 
                     {/* Sidebar Tabs (Local) */}
@@ -179,22 +189,26 @@ export default function Session() {
                         {sidebarMode === 'homework' && (
                             <HomeworkTray sessionId={sessionId} />
                         )}
-                        {sidebarMode === 'ai' && (
-                            <GeminiChat sessionId={sessionId} mode="fullscreen" />
-                        )}
-                        {sidebarMode === 'arcade' && (
-                            <BrainBreak sessionId={sessionId} onClose={() => setSidebarMode('homework')} />
-                        )}
-                        {sidebarMode === 'tools' && (
-                            <MathTools />
-                        )}
+                        <Suspense fallback={<ComponentLoader />}>
+                            {sidebarMode === 'ai' && (
+                                <GeminiChat sessionId={sessionId} mode="fullscreen" />
+                            )}
+                            {sidebarMode === 'arcade' && (
+                                <BrainBreak sessionId={sessionId} onClose={() => setSidebarMode('homework')} />
+                            )}
+                            {sidebarMode === 'tools' && (
+                                <MathTools />
+                            )}
+                        </Suspense>
                     </div>
 
                 </div>
 
                 {/* Main Stage: Whiteboard (Right/Bottom) */}
                 <div className={`flex-1 bg-slate-200 relative overflow-hidden h-full ${mainTab === 'board' ? 'block' : 'hidden md:block'}`}>
-                    <Whiteboard sessionId={sessionId} />
+                    <Suspense fallback={<ComponentLoader />}>
+                        <Whiteboard sessionId={sessionId} />
+                    </Suspense>
                 </div>
 
             </div>
