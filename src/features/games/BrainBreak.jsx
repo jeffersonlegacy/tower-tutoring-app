@@ -61,10 +61,10 @@ export default function BrainBreak({ sessionId, onClose }) {
                         <div className="flex justify-between items-center mb-6">
                             <div>
                                 <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 italic tracking-tighter filter drop-shadow-[0_0_10px_rgba(6,182,212,0.5)]">
-                                    NEON ARCADE
+                                    BRAIN BREAK
                                 </h1>
                                 <p className="text-cyan-500 font-mono text-xs tracking-[0.3em] font-bold uppercase mt-1 animate-pulse">
-                                    Ready Player One
+                                    Tower Gaming Lab
                                 </p>
                             </div>
                             <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white">
