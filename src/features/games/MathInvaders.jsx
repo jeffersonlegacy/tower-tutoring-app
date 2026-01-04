@@ -1,113 +1,90 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import GameEndOverlay from './GameEndOverlay';
 
-// --- MATH LOGIC ---
-const DIFFICULTIES = {
-    BEGINNER: 1,
-    INTERMEDIATE: 2,
-    EXPERT: 3
-};
+const DIFFICULTIES = { BEGINNER: 1, INTERMEDIATE: 2, EXPERT: 3 };
 
-const generateProblem = (difficulty) => {
+const generateProblem = (level) => {
     let a, b, op, answer, decoys = [];
+    const difficulty = level || DIFFICULTIES.BEGINNER;
 
-    // Safety checks
-    const level = difficulty || DIFFICULTIES.BEGINNER;
-
-    if (level === DIFFICULTIES.BEGINNER) {
+    if (difficulty === DIFFICULTIES.BEGINNER) {
         op = Math.random() > 0.5 ? '+' : '-';
         a = Math.floor(Math.random() * 20) + 1;
         b = Math.floor(Math.random() * 10) + 1;
-        if (op === '-') {
-            // Ensure positive result for beginner
-            if (b > a) [a, b] = [b, a];
-            answer = a - b;
-        } else {
-            answer = a + b;
-        }
+        if (op === '-' && b > a) [a, b] = [b, a];
+        answer = op === '+' ? a + b : a - b;
     } else {
-        // Intermediate+ (Multiplication)
         op = 'x';
-        const max = level === DIFFICULTIES.EXPERT ? 15 : 11;
+        const max = difficulty === DIFFICULTIES.EXPERT ? 15 : 11;
         a = Math.floor(Math.random() * max) + 2;
         b = Math.floor(Math.random() * max) + 2;
         answer = a * b;
     }
 
-    // Generate Decoys (plausible wrong answers)
     const potentialDecoys = [
         answer + 1, answer - 1, answer + 10, answer - 10,
         answer + 2, answer - 2, answer + 5,
-        (op === 'x' ? (a + 1) * b : answer + 3),
-        (op === 'x' ? a * (b - 1) : answer - 3)
+        op === 'x' ? (a + 1) * b : answer + 3,
+        op === 'x' ? a * (b - 1) : answer - 3
     ];
 
-    // Select unique decoys
-    let attempts = 0;
-    while (decoys.length < 5 && attempts < 50) { // Safety break
+    while (decoys.length < 5) {
         const d = potentialDecoys[Math.floor(Math.random() * potentialDecoys.length)];
-        if (d !== answer && d >= 0 && !decoys.includes(d)) {
-            decoys.push(d);
-        }
-        // Fallback random if we run out of "smart" decoys
+        if (d !== answer && d >= 0 && !decoys.includes(d)) decoys.push(d);
         if (decoys.length < 5 && Math.random() > 0.8) {
-            let r = Math.floor(Math.random() * 50);
+            const r = Math.floor(Math.random() * 50);
             if (r !== answer && !decoys.includes(r)) decoys.push(r);
         }
-        attempts++;
     }
 
-    // Fallback if loop failed
-    while (decoys.length < 5) {
-        decoys.push(answer + decoys.length + 1);
-    }
-
-    return {
-        equation: `${a} ${op} ${b} = ?`,
-        answer: answer,
-        decoys: decoys
-    };
+    return { equation: `${a} ${op} ${b} = ?`, answer, decoys };
 };
 
 export default function MathInvaders({ onBack }) {
     const canvasRef = useRef(null);
-    // HUD State: Score, Timer, Equation
     const [hud, setHud] = useState({
         score: 0,
+        streak: 0,
         timeLeft: 30,
         equation: "READY?",
         gameOver: false,
         menu: true,
-        difficulty: 'BEGINNER' // Default UI state
+        difficulty: 'BEGINNER'
     });
     const requestRef = useRef();
 
-    // Game State Mutable Ref (60fps)
     const gameState = useRef({
-        player: { x: 0, y: 0, w: 40, h: 40 },
+        player: { x: 0, y: 0 },
         bullets: [],
         invaders: [],
         particles: [],
-        texts: [], // [NEW] Floating texts
-        lastFired: 0,
+        texts: [],
         problem: null,
         frame: 0,
         score: 0,
-        timeLeft: 30, // seconds
+        streak: 0,
+        timeLeft: 30,
         lastTimeCheck: Date.now(),
-        level: 1, // 1=Beg, 2=Int, 3=Exp
-        active: false, // Start inactive to prevent freeze
-        combo: 0
+        level: 1,
+        active: false,
+        alienSpawnTime: 0, // When current wave spawned
+        alienLifetime: 4000, // ms before aliens leave (4 seconds)
+        shooting: false // Manual shoot control
     });
 
-    // --- GAME ENGINE ---
+    // SHOOT FUNCTION (called by button)
+    const shoot = useCallback(() => {
+        if (!gameState.current.active) return;
+        const state = gameState.current;
+        state.bullets.push({ x: state.player.x, y: state.player.y - 20 });
+    }, []);
+
     useEffect(() => {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
 
-        // Handle Resize
         const resize = () => {
-            if (!canvas || !canvas.parentElement) return;
+            if (!canvas?.parentElement) return;
             canvas.width = canvas.parentElement.clientWidth;
             canvas.height = canvas.parentElement.clientHeight;
             gameState.current.player.y = canvas.height - 80;
@@ -116,80 +93,51 @@ export default function MathInvaders({ onBack }) {
         window.addEventListener('resize', resize);
         resize();
 
-        // Input Handling (Slide-to-Aim)
         const handleInput = (e) => {
             if (!gameState.current.active) return;
             const rect = canvas.getBoundingClientRect();
-
-            // Fix "reading '0'" error: Ensure touches array exists and has items
-            let clientX;
-            if (e.touches && e.touches.length > 0) {
-                clientX = e.touches[0].clientX;
-            } else if (e.clientX !== undefined) {
-                clientX = e.clientX;
-            } else {
-                return; // Invalid event
-            }
-
-            const x = clientX - rect.left;
-
-            // Smoother clamping
-            gameState.current.player.x = Math.max(20, Math.min(canvas.width - 20, x));
+            let clientX = e.touches?.[0]?.clientX ?? e.clientX;
+            if (clientX === undefined) return;
+            gameState.current.player.x = Math.max(20, Math.min(canvas.width - 20, clientX - rect.left));
         };
 
         canvas.addEventListener('mousemove', handleInput);
         canvas.addEventListener('touchmove', handleInput, { passive: false });
 
-
-        // --- SPAWN LOGIC (SWARM ENTRANCE) ---
         const spawnInvaders = () => {
             const state = gameState.current;
             state.invaders = [];
-
-            if (!state.problem) return; // Safety
+            if (!state.problem) return;
 
             const cols = 5;
-            const startX = (canvas.width - (cols * 60)) / 2;
+            const startX = (canvas.width - cols * 60) / 2;
             const targetIndex = Math.floor(Math.random() * cols);
 
             for (let i = 0; i < cols; i++) {
                 const isTarget = i === targetIndex;
                 const val = isTarget ? state.problem.answer : state.problem.decoys[i % state.problem.decoys.length];
-                const bonus = Math.floor(Math.random() * 5) * 10 + 10;
-
-                // Spiral/Swarm Start Positions
                 const side = i % 2 === 0 ? -1 : 1;
-                const spawnX = (canvas.width / 2) + (side * canvas.width);
-                const spawnY = -200 - (i * 100);
 
                 state.invaders.push({
-                    x: spawnX,
-                    y: spawnY,
-                    targetX: startX + (i * 60), // Final Grid X
-                    targetY: 100, // Final Grid Y
-                    w: 40,
-                    h: 40,
-                    val: val,
-                    isTarget: isTarget,
-                    bonus: bonus,
-                    hue: 280,
-                    state: 'flying_in', // flying_in, hovering, divine
-                    flyProgress: 0
+                    x: (canvas.width / 2) + side * canvas.width,
+                    y: -200 - i * 100,
+                    targetX: startX + i * 60,
+                    targetY: 100,
+                    val,
+                    isTarget,
+                    state: 'flying_in',
+                    flyProgress: 0,
+                    hue: 280
                 });
             }
+            state.alienSpawnTime = Date.now();
         };
 
-        // --- EXPLOSION SYSTEM ---
         const createExplosion = (x, y, color) => {
-            // Screen Shake (Simple)
             if (canvasRef.current) {
                 canvasRef.current.style.transform = `translate(${Math.random() * 10 - 5}px, ${Math.random() * 10 - 5}px)`;
-                setTimeout(() => {
-                    if (canvasRef.current) canvasRef.current.style.transform = 'none';
-                }, 50);
+                setTimeout(() => canvasRef.current && (canvasRef.current.style.transform = 'none'), 50);
             }
-
-            // Particles
             for (let i = 0; i < 25; i++) {
                 const angle = Math.random() * Math.PI * 2;
                 const speed = Math.random() * 5 + 2;
@@ -199,18 +147,14 @@ export default function MathInvaders({ onBack }) {
                     vy: Math.sin(angle) * speed,
                     life: 1.0,
                     decay: Math.random() * 0.03 + 0.01,
-                    color: color,
+                    color,
                     size: Math.random() * 3 + 1
                 });
             }
         };
 
         const createFloatingText = (x, y, text, color) => {
-            gameState.current.texts.push({
-                x, y, text, color,
-                vy: -2,
-                life: 1.0
-            });
+            gameState.current.texts.push({ x, y, text, color, vy: -2, life: 1.0 });
         };
 
         const updateParticles = (ctx) => {
@@ -220,12 +164,7 @@ export default function MathInvaders({ onBack }) {
                 p.x += p.vx;
                 p.y += p.vy;
                 p.life -= p.decay;
-
-                if (p.life <= 0) {
-                    state.particles.splice(i, 1);
-                    continue;
-                }
-
+                if (p.life <= 0) { state.particles.splice(i, 1); continue; }
                 ctx.globalAlpha = p.life;
                 ctx.fillStyle = p.color;
                 ctx.beginPath();
@@ -235,11 +174,8 @@ export default function MathInvaders({ onBack }) {
             }
         };
 
-        // --- LOOP ---
         const update = () => {
             if (!gameState.current.active) {
-                // Keep loop running but minimal for menu bg if needed, or just pause
-                // drawing background prevents trail artifacts
                 ctx.fillStyle = '#0f172a';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 requestRef.current = requestAnimationFrame(update);
@@ -249,7 +185,7 @@ export default function MathInvaders({ onBack }) {
             const state = gameState.current;
             const now = Date.now();
 
-            // TIMER
+            // Timer
             const dt = now - state.lastTimeCheck;
             if (dt >= 1000) {
                 state.timeLeft -= 1;
@@ -258,13 +194,11 @@ export default function MathInvaders({ onBack }) {
                 if (state.timeLeft <= 0) {
                     state.active = false;
                     setHud(h => ({ ...h, gameOver: true, timeLeft: 0 }));
-
-                    // Don't return here, let one last frame draw
                 }
             }
             state.frame++;
 
-            // 1. Clear
+            // Clear
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -279,7 +213,7 @@ export default function MathInvaders({ onBack }) {
                 ctx.stroke();
             }
 
-            // 2. Player
+            // Player
             ctx.shadowBlur = 20;
             ctx.shadowColor = '#06b6d4';
             ctx.fillStyle = '#06b6d4';
@@ -293,11 +227,7 @@ export default function MathInvaders({ onBack }) {
             ctx.closePath();
             ctx.fill();
 
-            // 3. Bullets
-            if (now - state.lastFired > 200) {
-                state.bullets.push({ x: px, y: py - 20 });
-                state.lastFired = now;
-            }
+            // Bullets
             ctx.shadowColor = '#f472b6';
             ctx.fillStyle = '#f472b6';
             for (let i = state.bullets.length - 1; i >= 0; i--) {
@@ -307,52 +237,56 @@ export default function MathInvaders({ onBack }) {
                 if (b.y < -20) state.bullets.splice(i, 1);
             }
 
-            // 4. Invaders (Swarm Logic)
-            // FIX: Spawn invaders when we have none
+            // Spawn invaders if none
             if (state.invaders.length === 0) {
-                // Generate problem if missing
                 if (!state.problem) {
                     state.problem = generateProblem(state.level);
                     setHud(h => ({ ...h, equation: state.problem.equation }));
                 }
-                // Spawn invaders for current problem
                 spawnInvaders();
             }
 
+            // Check if aliens should leave (timeout)
+            const alienAge = now - state.alienSpawnTime;
+            const allHovering = state.invaders.every(inv => inv.state === 'hovering');
+            if (allHovering && alienAge > state.alienLifetime) {
+                // Aliens leaving - PENALTY
+                state.streak = 0;
+                state.score = Math.max(0, state.score - 1);
+                setHud(h => ({ ...h, score: state.score, streak: 0 }));
+                createFloatingText(canvas.width / 2, 100, '-1 (TIMEOUT)', '#ef4444');
+
+                // New wave
+                state.problem = generateProblem(state.level);
+                setHud(h => ({ ...h, equation: state.problem.equation }));
+                spawnInvaders();
+            }
+
+            // Update invaders
             state.invaders.forEach(inv => {
                 if (inv.state === 'flying_in') {
-                    // Cubic Ease-Out
                     inv.flyProgress += 0.02;
                     if (inv.flyProgress >= 1) {
                         inv.flyProgress = 1;
                         inv.state = 'hovering';
                     }
-                    const t = inv.flyProgress;
-                    const ease = 1 - Math.pow(1 - t, 3);
-
-                    inv.x = inv.x + (inv.targetX - inv.x) * 0.1; // Simple lerp for smoothness
-                    inv.y = inv.y + (inv.targetY - inv.y) * 0.1;
-
-                    // Snap when close
+                    inv.x += (inv.targetX - inv.x) * 0.1;
+                    inv.y += (inv.targetY - inv.y) * 0.1;
                     if (Math.abs(inv.x - inv.targetX) < 1 && Math.abs(inv.y - inv.targetY) < 1) {
                         inv.state = 'hovering';
                         inv.x = inv.targetX;
                         inv.y = inv.targetY;
                     }
-
                 } else {
-                    // Hovering Bob
                     inv.y = inv.targetY + Math.sin(state.frame * 0.05) * 10;
-                    inv.finalY = inv.y; // Ensure sync
                 }
 
-                // Draw Invader
+                // Draw
                 ctx.shadowBlur = 15;
                 ctx.shadowColor = `hsl(${inv.hue}, 100%, 50%)`;
                 ctx.strokeStyle = `hsl(${inv.hue}, 100%, 70%)`;
                 ctx.lineWidth = 2;
                 ctx.strokeRect(inv.x - 20, inv.y - 20, 40, 40);
-
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = '#fff';
                 ctx.font = 'bold 20px monospace';
@@ -361,67 +295,55 @@ export default function MathInvaders({ onBack }) {
                 ctx.fillText(inv.val, inv.x, inv.y);
             });
 
-            // Render Particles
             updateParticles(ctx);
 
-            // 5. Collision Detection
+            // Collision
             state.bullets.forEach((b, bIdx) => {
-                state.invaders.forEach((inv, iIdx) => {
-                    // Simple Box/Point Collision
-                    if (b.x > inv.x - 25 && b.x < inv.x + 25 &&
-                        b.y > inv.y - 25 && b.y < inv.y + 25) { // Use inv.y
-
-                        // Collision!
+                state.invaders.forEach((inv) => {
+                    if (b.x > inv.x - 25 && b.x < inv.x + 25 && b.y > inv.y - 25 && b.y < inv.y + 25) {
                         state.bullets.splice(bIdx, 1);
                         createExplosion(inv.x, inv.y, inv.isTarget ? '#00ff00' : '#ff0000');
 
                         if (inv.isTarget) {
                             // CORRECT!
-                            state.bullets = []; // Clear bullets
-                            // Score: Base (50) + Combo (10*count) + Random Bonus (10-50)
-                            const points = 50 + (state.combo * 10) + inv.bonus;
+                            state.bullets = [];
+                            state.streak++;
+                            // Base 10 + streak bonus (5 per streak, capped at 50)
+                            const streakBonus = Math.min(state.streak * 5, 50);
+                            const points = 10 + streakBonus;
                             state.score += points;
-                            state.combo++;
 
-                            createFloatingText(inv.x, inv.y, `+${points}`, '#4ade80'); // Green
+                            createFloatingText(inv.x, inv.y, `+${points}`, '#4ade80');
+                            if (state.streak > 1) {
+                                createFloatingText(inv.x, inv.y + 25, `🔥 x${state.streak}`, '#fbbf24');
+                            }
 
-                            // Trigger Next Question
                             state.problem = generateProblem(state.level);
-                            setHud(h => ({
-                                ...h,
-                                score: state.score,
-                                equation: state.problem.equation
-                            }));
-                            // Refresh Invaders
+                            setHud(h => ({ ...h, score: state.score, streak: state.streak, equation: state.problem.equation }));
                             spawnInvaders();
                         } else {
-                            // WRONG!
-                            state.combo = 0;
-                            const penalty = 50;
-                            state.score = Math.max(0, state.score - penalty);
-                            setHud(h => ({ ...h, score: state.score }));
-
-                            createFloatingText(inv.x, inv.y, `-${penalty}`, '#ef4444'); // Red
-
-                            // Screen Shake
+                            // WRONG - only -1 penalty
+                            state.streak = 0;
+                            state.score = Math.max(0, state.score - 1);
+                            setHud(h => ({ ...h, score: state.score, streak: 0 }));
+                            createFloatingText(inv.x, inv.y, '-1', '#ef4444');
                             canvas.style.transform = `translate(${Math.random() * 10 - 5}px, ${Math.random() * 10 - 5}px)`;
                             setTimeout(() => canvas.style.transform = 'none', 100);
                         }
+
+                        // Remove hit invader
+                        const idx = state.invaders.indexOf(inv);
+                        if (idx > -1) state.invaders.splice(idx, 1);
                     }
                 });
             });
 
-            // 7. Floating Texts
+            // Floating Texts
             for (let i = state.texts.length - 1; i >= 0; i--) {
                 const t = state.texts[i];
                 t.y += t.vy;
                 t.life -= 0.02;
-
-                if (t.life <= 0) {
-                    state.texts.splice(i, 1);
-                    continue;
-                }
-
+                if (t.life <= 0) { state.texts.splice(i, 1); continue; }
                 ctx.globalAlpha = t.life;
                 ctx.fillStyle = t.color;
                 ctx.font = 'bold 24px monospace';
@@ -444,7 +366,6 @@ export default function MathInvaders({ onBack }) {
         };
     }, []);
 
-    // --- HELPER: START GAME FROM MENU ---
     const startGame = () => {
         let diffLevel = DIFFICULTIES.BEGINNER;
         if (hud.difficulty === 'INTERMEDIATE') diffLevel = DIFFICULTIES.INTERMEDIATE;
@@ -453,103 +374,106 @@ export default function MathInvaders({ onBack }) {
         gameState.current.level = diffLevel;
         gameState.current.active = true;
         gameState.current.score = 0;
+        gameState.current.streak = 0;
         gameState.current.timeLeft = 30;
         gameState.current.invaders = [];
-        gameState.current.problem = generateProblem(diffLevel);
+        gameState.current.bullets = [];
+        gameState.current.problem = null;
         gameState.current.lastTimeCheck = Date.now();
+        gameState.current.alienSpawnTime = Date.now();
 
-        // Explicitly call spawn logic logic via a reset flag or similar? 
-        // Actually the game loop checks `if (!state.invaders... && !state.problem)`
-        // But we just set state.problem. So loop needs to know to spawn.
-        // Let's manually trigger spawn in the loop by clearing invaders (done above)
-        // And relying on the loop's `if (invaders.length === 0)` block?
-        // Wait, loop has `if (invaders.length === 0)` logic?
-        // Ah, loop logic: `if (state.invaders.length === 0 && !state.problem)`.
-        // We set state.problem. So invalid.
-        // We need the loop to spawn if we have a problem but no invaders.
-        // Let's rely on the fact that `spawnInvaders` was defined inside useEffect and not accessible here easily without ref logic.
-        // Workaround: Set problem to null? No.
-        // BETTER: Move spawnInvaders to a ref or just let loop handle "have problem, no invaders" -> spawn.
-        // Let's look at loop: "if (state.invaders.length === 0 && !state.problem) { startLevel() }".
-        // What if we have problem?
-        // We need to add "if (state.invaders.length === 0 && state.problem) spawnInvaders()". 
-        // BUT spawnInvaders is inside closure. 
-        // To fix this cleanly: I will reset problem to null here, and let the loop generate it.
-
-        gameState.current.problem = null; // Loop will see active=true, problem=null -> generate & spawn.
-
-        setHud(h => ({ ...h, menu: false, timeLeft: 30, score: 0, gameOver: false, equation: "GET READY" }));
+        setHud(h => ({ ...h, menu: false, timeLeft: 30, score: 0, streak: 0, gameOver: false, equation: "GET READY" }));
     };
 
-    // --- RENDER ---
     return (
-        <div className="w-full h-full relative bg-slate-900 overflow-hidden cursor-none touch-none">
+        <div className="w-full h-full relative bg-slate-900 overflow-hidden touch-none">
 
-            {/* MENU SCREEN */}
+            {/* MENU */}
             {hud.menu && (
-                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-auto cursor-auto space-y-8 select-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-950 via-slate-950 to-black">
+                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center p-6 select-none bg-gradient-to-br from-purple-950 via-slate-950 to-black">
+                    <span className="text-8xl mb-4 animate-bounce">👾</span>
+                    <h1 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-t from-purple-600 to-pink-400 tracking-tighter mb-2 italic">
+                        MATH INVADERS
+                    </h1>
+                    <p className="text-purple-400 text-sm mb-6">Shoot the correct answer!</p>
 
-                    <div className="relative z-10 flex flex-col items-center animate-in zoom-in duration-500">
-                        <span className="text-8xl leading-none mb-4 animate-bounce drop-shadow-[0_0_15px_rgba(168,85,247,0.5)]">👾</span>
-                        <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-t from-purple-600 to-pink-400 tracking-tighter filter drop-shadow-[0_0_20px_rgba(147,51,234,0.5)] mb-2 italic transform -skew-x-6">
-                            MATH INVADERS
-                        </h1>
-                    </div>
-
-                    {/* DIFFICULTY SELECTOR */}
-                    <div className="flex gap-4 mb-4 z-20">
+                    <div className="flex gap-3 mb-6">
                         {['BEGINNER', 'INTERMEDIATE', 'EXPERT'].map(d => (
                             <button
                                 key={d}
                                 onClick={() => setHud(h => ({ ...h, difficulty: d }))}
-                                className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-widest border transition-all ${hud.difficulty === d ? 'bg-purple-600 border-purple-400 scale-110 shadow-lg' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'}`}
+                                className={`px-4 py-2 rounded-lg font-bold text-xs uppercase border transition-all ${hud.difficulty === d
+                                        ? 'bg-purple-600 border-purple-400 scale-105'
+                                        : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'
+                                    }`}
                             >
                                 {d}
                             </button>
                         ))}
                     </div>
 
-                    <div className="flex flex-col gap-4 relative z-10 w-full max-w-xs">
-                        <button
-                            onClick={startGame}
-                            className="w-full group relative overflow-hidden bg-purple-600 hover:bg-purple-500 text-white font-black text-xl rounded-xl py-6 shadow-[0_0_30px_rgba(147,51,234,0.3)] transition-all transform hover:scale-105 active:scale-95"
-                        >
-                            <span className="relative z-10 uppercase tracking-widest flex items-center justify-center gap-2">
-                                <span>Start Mission</span>
-                                <span className="text-2xl animate-pulse">🚀</span>
-                            </span>
-                        </button>
+                    <button
+                        onClick={startGame}
+                        className="w-full max-w-xs bg-purple-600 hover:bg-purple-500 text-white font-black text-xl rounded-xl py-5 mb-4 hover:scale-105 transition-all"
+                    >
+                        🚀 START MISSION
+                    </button>
 
-                        <button
-                            onClick={onBack}
-                            className="w-full py-4 text-xs font-bold text-slate-500 hover:text-white uppercase tracking-[0.2em] transition-colors hover:bg-white/5 rounded-xl border border-transparent hover:border-white/10"
-                        >
-                            Abort Game
-                        </button>
-                    </div>
+                    <button onClick={onBack} className="text-sm text-slate-500 hover:text-white">
+                        Exit
+                    </button>
                 </div>
             )}
 
-
             {/* HUD */}
-            <div className="absolute top-0 w-full p-4 flex justify-between items-start pointer-events-none z-10">
-                <div className="flex flex-col gap-1">
-                    <div className="text-4xl font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">
-                        {hud.equation}
-                    </div>
+            <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start pointer-events-none z-10">
+                <div>
+                    <div className="text-3xl md:text-4xl font-black text-white drop-shadow-lg">{hud.equation}</div>
+                    {hud.streak > 0 && (
+                        <div className="text-orange-400 font-bold text-sm mt-1 animate-pulse">
+                            🔥 STREAK: x{hud.streak}
+                        </div>
+                    )}
                 </div>
                 <div className="text-right">
                     <div className="text-2xl font-mono text-cyan-400">SCORE: {hud.score}</div>
-                    <div className={`text-xl font-bold font-mono mt-1 ${hud.timeLeft <= 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+                    <div className={`text-xl font-bold font-mono ${hud.timeLeft <= 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
                         TIME: {hud.timeLeft}s
                     </div>
                 </div>
             </div>
 
-            {/* CANVAS LAYER */}
+            {/* CANVAS */}
             <canvas ref={canvasRef} className="block w-full h-full" />
 
-            {/* GAMEOVER OVERLAY */}
+            {/* SHOOT BUTTON - Only visible during gameplay */}
+            {!hud.gameOver && !hud.menu && (
+                <button
+                    onMouseDown={shoot}
+                    onTouchStart={(e) => { e.preventDefault(); shoot(); }}
+                    className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-24 h-24 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 border-4 border-white/30 shadow-[0_0_30px_rgba(236,72,153,0.5)] active:scale-90 transition-transform flex items-center justify-center"
+                >
+                    <span className="text-white font-black text-xs uppercase tracking-wider">FIRE</span>
+                </button>
+            )}
+
+            {/* EXIT/RESET during game */}
+            {!hud.gameOver && !hud.menu && (
+                <div className="absolute top-16 left-4 z-20 flex gap-3">
+                    <button onClick={onBack} className="text-slate-500 hover:text-white text-sm">ESC</button>
+                    <button
+                        onClick={() => {
+                            gameState.current.active = false;
+                            setHud(h => ({ ...h, menu: true, gameOver: false, score: 0, streak: 0, timeLeft: 30, equation: 'READY?' }));
+                        }}
+                        className="text-red-400 hover:text-white text-sm"
+                    >
+                        🔄
+                    </button>
+                </div>
+            )}
+
+            {/* GAME OVER */}
             {hud.gameOver && (
                 <GameEndOverlay
                     winner={true}
@@ -559,27 +483,6 @@ export default function MathInvaders({ onBack }) {
                     onRestart={() => setHud(h => ({ ...h, menu: true, gameOver: false }))}
                     onExit={onBack}
                 />
-            )}
-
-            {/* EXIT/RESET BUTTONS (If not game over) */}
-            {!hud.gameOver && !hud.menu && (
-                <div className="absolute top-4 left-4 z-20 flex gap-3 pointer-events-auto">
-                    <button
-                        onClick={onBack}
-                        className="text-slate-500 hover:text-white"
-                    >
-                        ESC
-                    </button>
-                    <button
-                        onClick={() => {
-                            gameState.current.active = false;
-                            setHud(h => ({ ...h, menu: true, gameOver: false, score: 0, timeLeft: 30, equation: 'READY?' }));
-                        }}
-                        className="text-red-400 hover:text-white"
-                    >
-                        🔄
-                    </button>
-                </div>
             )}
         </div>
     );
