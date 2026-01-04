@@ -3,8 +3,8 @@
         "sessions": {
             "$sessionId": {
                 "games": {
-                    ".read": true,
-                    ".write": true
+                    ".read": "auth != null",
+                    ".write": "auth != null"
                 }
             }
         },

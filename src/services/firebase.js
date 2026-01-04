@@ -4,6 +4,7 @@ import { getDatabase } from "firebase/database";
 import { getStorage } from "firebase/storage";
 import { getAuth, signInAnonymously } from "firebase/auth";
 import { getAnalytics } from "firebase/analytics";
+import { getPerformance } from "firebase/performance";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -16,7 +17,7 @@ const firebaseConfig = {
   databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL
 };
 
-let app, db, rtdb, storage, auth, analytics;
+let app, db, rtdb, storage, auth, analytics, perf;
 
 try {
   app = initializeApp(firebaseConfig);
@@ -37,6 +38,7 @@ try {
   storage = getStorage(app);
   auth = getAuth(app);
   analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
+  perf = typeof window !== 'undefined' ? getPerformance(app) : null;
 
   console.log("Firebase Initialized Successfully");
 
@@ -50,5 +52,5 @@ try {
   console.error("CRITICAL: Firebase Initialization Failed", error);
 }
 
-export { app, db, rtdb, storage, auth, analytics };
+export { app, db, rtdb, storage, auth, analytics, perf };
 export default app;
