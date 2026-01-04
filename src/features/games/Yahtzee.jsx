@@ -88,10 +88,10 @@ const ScoreCard = ({ category, score, potential, onClick, isAvailable }) => {
             onClick={onClick}
             disabled={!isPotential || isLocked}
             className={`w-full p-3 rounded-xl flex items-center justify-between transition-all duration-200 ${isLocked
-                    ? 'bg-slate-800/50 border border-slate-700'
-                    : isPotential
-                        ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-400/50 hover:border-cyan-400 hover:scale-[1.02] cursor-pointer shadow-lg'
-                        : 'bg-slate-900/50 border border-slate-800'
+                ? 'bg-slate-800/50 border border-slate-700'
+                : isPotential
+                    ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-400/50 hover:border-cyan-400 hover:scale-[1.02] cursor-pointer shadow-lg'
+                    : 'bg-slate-900/50 border border-slate-800'
                 }`}
         >
             <div className="flex items-center gap-3">
@@ -102,10 +102,10 @@ const ScoreCard = ({ category, score, potential, onClick, isAvailable }) => {
                 </span>
             </div>
             <div className={`font-black text-lg ${isLocked
-                    ? 'text-white'
-                    : isPotential
-                        ? 'text-cyan-400 animate-pulse'
-                        : 'text-slate-700'
+                ? 'text-white'
+                : isPotential
+                    ? 'text-cyan-400 animate-pulse'
+                    : 'text-slate-700'
                 }`}>
                 {isLocked ? score : isPotential ? `+${potential}` : '-'}
             </div>
@@ -241,12 +241,17 @@ export default function Yahtzee({ sessionId, onBack }) {
 
     // --- ACTIONS ---
     const handleJoin = () => {
-        if (playersList.find(p => p.id === playerId)) return;
+        // Check if already in the game
+        const existingPlayer = playersList.find(p => p.id === playerId && !p.isBot);
+        if (existingPlayer) return;
+
         const newPlayer = {
             id: playerId,
-            name: `Player ${(playersList.length || 0) + 1}`,
+            name: `Player ${(playersList.filter(p => !p.isBot).length || 0) + 1}`,
             color: '#000',
-            joinedAt: Date.now()
+            joinedAt: Date.now(),
+            isBot: false,
+            isHost: isHost
         };
         updateState({ players: [...playersList, newPlayer] });
     };
@@ -495,8 +500,8 @@ export default function Yahtzee({ sessionId, onBack }) {
                             key={p.id}
                             onClick={() => setViewingPlayerId(p.id)}
                             className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all ${targetPlayerId === p.id
-                                    ? 'bg-gradient-to-br from-cyan-400 to-purple-500 ring-2 ring-white'
-                                    : 'bg-slate-700 text-white/60'
+                                ? 'bg-gradient-to-br from-cyan-400 to-purple-500 ring-2 ring-white'
+                                : 'bg-slate-700 text-white/60'
                                 } ${activePlayer?.id === p.id ? 'ring-2 ring-amber-400' : ''}`}
                         >
                             {p.name[0]}
@@ -597,8 +602,8 @@ export default function Yahtzee({ sessionId, onBack }) {
                         onClick={handleRoll}
                         disabled={!isMyTurn || gameState.rollCount >= 3 || rolling}
                         className={`w-full py-4 rounded-2xl font-black text-xl uppercase tracking-widest transition-all ${!isMyTurn || gameState.rollCount >= 3
-                                ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
-                                : 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white shadow-lg hover:scale-[1.02] active:scale-[0.98]'
+                            ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white shadow-lg hover:scale-[1.02] active:scale-[0.98]'
                             }`}
                         style={isMyTurn && gameState.rollCount < 3 ? {
                             boxShadow: '0 0 30px rgba(6,182,212,0.4)'
