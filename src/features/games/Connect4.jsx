@@ -468,31 +468,43 @@ export default function Connect4({ sessionId, onBack }) {
                 </div>
             </div>
 
-            {/* SCOREBOARD */}
-            <div className="flex items-center gap-6 bg-black/50 px-6 py-3 rounded-xl border border-white/10 w-full max-w-md justify-center">
+            {/* SCOREBOARD - Team Red vs Team Yellow */}
+            <div className="flex items-center gap-4 bg-black/50 px-4 py-3 rounded-xl border border-white/10 w-full max-w-md justify-center">
                 <div className={`flex flex-col items-center transition-all ${gameState.turn === 'red' ? 'scale-110' : 'opacity-60'}`}>
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_15px_#ec4899] ring-2 ring-white/20 mb-1" />
-                    <span className="text-pink-400 font-bold text-xs">RED</span>
-                    <span className="text-white text-2xl font-black">{scores.red}</span>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_15px_#ec4899] ring-2 ring-white/20 mb-1 flex items-center justify-center">
+                        {isHost && <span className="text-white text-xs font-black">YOU</span>}
+                    </div>
+                    <span className="text-pink-400 font-bold text-xs">TEAM RED</span>
+                    <span className="text-white text-3xl font-black">{scores.red}</span>
                 </div>
 
-                <div className="text-slate-600 text-2xl font-bold">VS</div>
+                <div className="text-slate-600 text-xl font-bold">VS</div>
 
                 <div className={`flex flex-col items-center transition-all ${gameState.turn === 'yellow' ? 'scale-110' : 'opacity-60'}`}>
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_15px_#facc15] ring-2 ring-white/20 mb-1" />
-                    <span className="text-yellow-400 font-bold text-xs">YELLOW</span>
-                    <span className="text-white text-2xl font-black">{scores.yellow}</span>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_15px_#facc15] ring-2 ring-white/20 mb-1 flex items-center justify-center">
+                        {!isHost && <span className="text-slate-900 text-xs font-black">YOU</span>}
+                    </div>
+                    <span className="text-yellow-400 font-bold text-xs">TEAM YELLOW</span>
+                    <span className="text-white text-3xl font-black">{scores.yellow}</span>
                 </div>
             </div>
 
             {/* Turn Indicator */}
             <div className="text-sm font-bold">
                 {gameState.status === 'WAITING' ? (
-                    <span className="text-slate-400">{isHost ? (opponentReady ? "READY - START MATCH" : "WAITING FOR OPPONENT...") : "WAITING FOR HOST..."}</span>
+                    <span className="text-slate-400">
+                        {isHost
+                            ? (opponentReady ? "TEAM YELLOW READY - START!" : "WAITING FOR TEAM YELLOW...")
+                            : "WAITING FOR TEAM RED TO START..."}
+                    </span>
                 ) : gameState.status === 'FINISHED' ? (
-                    <span className="text-white">{gameState.winner === 'draw' ? 'DRAW!' : `${gameState.winner?.toUpperCase()} WINS!`}</span>
+                    <span className={gameState.winner === 'red' ? 'text-pink-400' : 'text-yellow-400'}>
+                        {gameState.winner === 'draw' ? 'DRAW!' : `TEAM ${gameState.winner?.toUpperCase()} WINS!`}
+                    </span>
                 ) : (
-                    isMyTurn ? <span className="text-green-400 animate-pulse">YOUR TURN</span> : <span className="text-slate-500">OPPONENT...</span>
+                    isMyTurn
+                        ? <span className="text-green-400 animate-pulse">YOUR TURN</span>
+                        : <span className="text-slate-500">{gameState.mode === 'SOLO' ? 'CPU THINKING...' : 'OPPONENT...'}</span>
                 )}
             </div>
 

@@ -709,7 +709,13 @@ export default function Battleship({ sessionId, onBack }) {
             <div className="flex justify-between items-center mb-4 relative z-10 gap-2">
                 <button onClick={onBack} className="text-xs sm:text-sm text-slate-400 hover:text-white flex-shrink-0">← BACK</button>
                 <div className="text-center flex-1 min-w-0">
-                    <h2 className="text-lg sm:text-2xl font-black text-white tracking-wider sm:tracking-widest uppercase filter drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] truncate">BATTLESHIP</h2>
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                        <h2 className="text-lg sm:text-2xl font-black text-white tracking-wider sm:tracking-widest uppercase filter drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">BATTLESHIP</h2>
+                        {/* Team Badge */}
+                        <div className={`px-2 py-0.5 rounded text-[10px] font-black ${isHost ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30' : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'}`}>
+                            {isHost ? '🔴 TEAM RED' : '🟡 TEAM YELLOW'}
+                        </div>
+                    </div>
                     <p className={`text-[10px] sm:text-xs font-mono font-bold truncate ${gameState.phase === 'PLAYING' ? (isMyTurn ? 'text-green-400' : 'text-red-400') : 'text-slate-400'}`}>
                         {gameState.phase === 'SETUP' ? 'DEPLOY SHIPS' :
                             gameState.phase === 'GAMEOVER' ? (String(gameState.winner) === myPlayerIndex ? <span className="text-yellow-400 animate-pulse">👑 VICTORY</span> : <span className="text-red-500">💀 DEFEAT</span>) :

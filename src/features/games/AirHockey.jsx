@@ -380,13 +380,16 @@ export default function AirHockey({ sessionId, onBack }) {
                     <button onClick={() => updateState({ status: 'MENU', playerScore: 0, opponentScore: 0, winner: null })} className="text-xs text-red-400 hover:text-white">🔄 Reset</button>
                 </div>
 
-                {/* Big Score Display */}
-                <div className="flex items-center justify-center gap-8">
+                {/* Big Score Display - Team Red (You) vs Team Yellow (Opponent) */}
+                <div className="flex items-center justify-center gap-6">
                     <div className={`flex flex-col items-center transition-transform ${scoreFlash === 'player' ? 'scale-125' : ''}`}>
-                        <span className="text-5xl font-black text-emerald-400" style={{ textShadow: '0 0 30px rgba(16,185,129,0.6)' }}>
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_20px_#ec4899] flex items-center justify-center mb-1">
+                            <span className="text-white text-xs font-black">YOU</span>
+                        </div>
+                        <span className="text-4xl font-black text-pink-400" style={{ textShadow: '0 0 30px rgba(236,72,153,0.6)' }}>
                             {playerScore}
                         </span>
-                        <span className="text-xs text-emerald-500 font-bold uppercase tracking-widest">YOU</span>
+                        <span className="text-xs text-pink-500 font-bold uppercase tracking-widest">TEAM RED</span>
                     </div>
 
                     <div className="flex flex-col items-center">
@@ -395,11 +398,14 @@ export default function AirHockey({ sessionId, onBack }) {
                     </div>
 
                     <div className={`flex flex-col items-center transition-transform ${scoreFlash === 'opponent' ? 'scale-125' : ''}`}>
-                        <span className="text-5xl font-black text-rose-400" style={{ textShadow: '0 0 30px rgba(244,63,94,0.6)' }}>
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_20px_#facc15] flex items-center justify-center mb-1">
+                            <span className="text-slate-900 text-[10px] font-black">{gameState.mode === 'AI' ? 'CPU' : 'OPP'}</span>
+                        </div>
+                        <span className="text-4xl font-black text-yellow-400" style={{ textShadow: '0 0 30px rgba(250,204,21,0.6)' }}>
                             {opponentScore}
                         </span>
-                        <span className="text-xs text-rose-500 font-bold uppercase tracking-widest">
-                            {gameState.mode === 'AI' ? 'CPU' : 'OPP'}
+                        <span className="text-xs text-yellow-500 font-bold uppercase tracking-widest">
+                            {gameState.mode === 'AI' ? 'CPU' : 'TEAM YELLOW'}
                         </span>
                     </div>
                 </div>
