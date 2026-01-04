@@ -1,43 +1,112 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import GameEndOverlay from './GameEndOverlay';
 
-const DIFFICULTIES = { BEGINNER: 1, INTERMEDIATE: 2, EXPERT: 3 };
+const DIFFICULTIES = { EASY: 1, INTERMEDIATE: 2, ADVANCED: 3 };
 
 const generateProblem = (level) => {
-    let a, b, op, answer, decoys = [];
-    const difficulty = level || DIFFICULTIES.BEGINNER;
+    let equation, answer, decoys = [];
+    const difficulty = level || DIFFICULTIES.EASY;
 
-    if (difficulty === DIFFICULTIES.BEGINNER) {
-        op = Math.random() > 0.5 ? '+' : '-';
-        a = Math.floor(Math.random() * 20) + 1;
-        b = Math.floor(Math.random() * 10) + 1;
-        if (op === '-' && b > a) [a, b] = [b, a];
-        answer = op === '+' ? a + b : a - b;
+    if (difficulty === DIFFICULTIES.EASY) {
+        // Basic arithmetic: addition, subtraction, simple multiplication
+        const ops = ['+', '-', 'x'];
+        const op = ops[Math.floor(Math.random() * ops.length)];
+        let a, b;
+
+        if (op === 'x') {
+            a = Math.floor(Math.random() * 10) + 2;
+            b = Math.floor(Math.random() * 10) + 2;
+            answer = a * b;
+        } else if (op === '+') {
+            a = Math.floor(Math.random() * 50) + 10;
+            b = Math.floor(Math.random() * 30) + 5;
+            answer = a + b;
+        } else {
+            a = Math.floor(Math.random() * 50) + 20;
+            b = Math.floor(Math.random() * 20) + 1;
+            if (b > a) [a, b] = [b, a];
+            answer = a - b;
+        }
+        equation = `${a} ${op} ${b} = ?`;
+
+        // Generate decoys
+        decoys = [answer + 1, answer - 1, answer + 10, answer - 10, answer + 2].filter(d => d !== answer && d >= 0);
+
+    } else if (difficulty === DIFFICULTIES.INTERMEDIATE) {
+        // Solve for x: linear equations like "5x + 2 = 12"
+        // Structure: ax + b = c, solve for x
+        const x = Math.floor(Math.random() * 10) + 1; // x is the answer (1-10)
+        const a = Math.floor(Math.random() * 8) + 2; // coefficient (2-9)
+        const b = Math.floor(Math.random() * 15) + 1; // constant (1-15)
+        const c = a * x + b; // result
+
+        const formats = [
+            { eq: `${a}x + ${b} = ${c}`, ans: x },
+            { eq: `${a}x - ${b} = ${c - 2 * b}`, ans: x },
+            { eq: `${c} = ${a}x + ${b}`, ans: x },
+            { eq: `${c - b} = ${a}x`, ans: x },
+        ];
+        const chosen = formats[Math.floor(Math.random() * formats.length)];
+        equation = `Solve: ${chosen.eq}`;
+        answer = chosen.ans;
+
+        // Decoys: nearby integers
+        decoys = [x + 1, x - 1, x + 2, x * 2, Math.floor(c / a)].filter(d => d !== answer && d >= 0);
+
     } else {
-        op = 'x';
-        const max = difficulty === DIFFICULTIES.EXPERT ? 15 : 11;
-        a = Math.floor(Math.random() * max) + 2;
-        b = Math.floor(Math.random() * max) + 2;
-        answer = a * b;
-    }
+        // Advanced: tricky algebra with negatives, or two-step problems
+        const type = Math.floor(Math.random() * 4);
 
-    const potentialDecoys = [
-        answer + 1, answer - 1, answer + 10, answer - 10,
-        answer + 2, answer - 2, answer + 5,
-        op === 'x' ? (a + 1) * b : answer + 3,
-        op === 'x' ? a * (b - 1) : answer - 3
-    ];
+        if (type === 0) {
+            // Negative solutions: ax - b = c where x could be negative
+            const x = Math.floor(Math.random() * 10) - 3; // x from -3 to 6
+            const a = Math.floor(Math.random() * 5) + 2;
+            const b = Math.floor(Math.random() * 10) + 5;
+            const c = a * x - b;
+            equation = `Solve: ${a}x - ${b} = ${c}`;
+            answer = x;
+            decoys = [x + 1, x - 1, x + 2, x - 2, -x].filter(d => d !== answer);
 
-    while (decoys.length < 5) {
-        const d = potentialDecoys[Math.floor(Math.random() * potentialDecoys.length)];
-        if (d !== answer && d >= 0 && !decoys.includes(d)) decoys.push(d);
-        if (decoys.length < 5 && Math.random() > 0.8) {
-            const r = Math.floor(Math.random() * 50);
-            if (r !== answer && !decoys.includes(r)) decoys.push(r);
+        } else if (type === 1) {
+            // Distributive: a(x + b) = c
+            const x = Math.floor(Math.random() * 8) + 1;
+            const a = Math.floor(Math.random() * 4) + 2;
+            const b = Math.floor(Math.random() * 5) + 1;
+            const c = a * (x + b);
+            equation = `Solve: ${a}(x + ${b}) = ${c}`;
+            answer = x;
+            decoys = [x + 1, x - 1, c / a, b, x + b].filter(d => d !== answer && d >= 0 && Number.isInteger(d));
+
+        } else if (type === 2) {
+            // Variables on both sides: ax + b = cx + d
+            const x = Math.floor(Math.random() * 8) + 2;
+            const a = Math.floor(Math.random() * 5) + 3;
+            const c = Math.floor(Math.random() * 3) + 1;
+            const d = Math.floor(Math.random() * 10) + 1;
+            const b = c * x + d - a * x; // Ensure clean solution
+            equation = `Solve: ${a}x + ${b} = ${c}x + ${d}`;
+            answer = x;
+            decoys = [x + 1, x - 1, x + 2, d - b, a - c].filter(d => d !== answer && d > 0);
+
+        } else {
+            // Fraction result: ax = b where b/a is clean
+            const x = Math.floor(Math.random() * 10) + 1;
+            const a = [2, 3, 4, 5][Math.floor(Math.random() * 4)];
+            const b = a * x;
+            equation = `Solve: ${a}x = ${b}`;
+            answer = x;
+            decoys = [x + 1, x - 1, b, a, x * 2].filter(d => d !== answer && d >= 0);
         }
     }
 
-    return { equation: `${a} ${op} ${b} = ?`, answer, decoys };
+    // Ensure we have enough unique decoys
+    while (decoys.length < 5) {
+        const r = answer + (Math.floor(Math.random() * 10) - 5);
+        if (r !== answer && !decoys.includes(r)) decoys.push(r);
+    }
+    decoys = decoys.slice(0, 5);
+
+    return { equation, answer, decoys };
 };
 
 export default function MathInvaders({ onBack }) {
@@ -49,7 +118,7 @@ export default function MathInvaders({ onBack }) {
         equation: "READY?",
         gameOver: false,
         menu: true,
-        difficulty: 'BEGINNER'
+        difficulty: 'EASY'
     });
     const requestRef = useRef();
 
@@ -367,9 +436,9 @@ export default function MathInvaders({ onBack }) {
     }, []);
 
     const startGame = () => {
-        let diffLevel = DIFFICULTIES.BEGINNER;
+        let diffLevel = DIFFICULTIES.EASY;
         if (hud.difficulty === 'INTERMEDIATE') diffLevel = DIFFICULTIES.INTERMEDIATE;
-        if (hud.difficulty === 'EXPERT') diffLevel = DIFFICULTIES.EXPERT;
+        if (hud.difficulty === 'ADVANCED') diffLevel = DIFFICULTIES.ADVANCED;
 
         gameState.current.level = diffLevel;
         gameState.current.active = true;
@@ -397,17 +466,25 @@ export default function MathInvaders({ onBack }) {
                     </h1>
                     <p className="text-purple-400 text-sm mb-6">Shoot the correct answer!</p>
 
-                    <div className="flex gap-3 mb-6">
-                        {['BEGINNER', 'INTERMEDIATE', 'EXPERT'].map(d => (
+                    <div className="flex flex-col gap-3 mb-6 w-full max-w-sm">
+                        {[
+                            { id: 'EASY', label: 'Easy', desc: 'Addition, Subtraction, Multiplication', color: 'green' },
+                            { id: 'INTERMEDIATE', label: 'Intermediate', desc: 'Solve for X: Linear Equations', color: 'blue' },
+                            { id: 'ADVANCED', label: 'Advanced', desc: 'Tricky Algebra & Negatives', color: 'red' }
+                        ].map(d => (
                             <button
-                                key={d}
-                                onClick={() => setHud(h => ({ ...h, difficulty: d }))}
-                                className={`px-4 py-2 rounded-lg font-bold text-xs uppercase border transition-all ${hud.difficulty === d
-                                        ? 'bg-purple-600 border-purple-400 scale-105'
-                                        : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'
+                                key={d.id}
+                                onClick={() => setHud(h => ({ ...h, difficulty: d.id }))}
+                                className={`w-full px-4 py-3 rounded-xl font-bold text-left border transition-all ${hud.difficulty === d.id
+                                    ? `bg-${d.color}-600 border-${d.color}-400 scale-105 shadow-lg`
+                                    : 'bg-slate-800 border-slate-700 hover:border-slate-500'
                                     }`}
                             >
-                                {d}
+                                <div className="flex justify-between items-center">
+                                    <span className="text-white text-sm uppercase tracking-wide">{d.label}</span>
+                                    {hud.difficulty === d.id && <span className="text-white">✓</span>}
+                                </div>
+                                <p className="text-xs text-slate-400 mt-1">{d.desc}</p>
                             </button>
                         ))}
                     </div>
