@@ -65,6 +65,7 @@ const SkillCard = ({ skill, stats, onClick }) => {
     const xp = stats?.xp || 0;
     const xpMax = nextLevel?.xpRequired || 100;
     const accuracy = stats?.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
+    const currentStandards = skill.standards?.[stats?.level || 1] || [];
 
     return (
         <button
@@ -86,10 +87,14 @@ const SkillCard = ({ skill, stats, onClick }) => {
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                         <span className={`text-xs text-${skill.color}-400`}>Lv{stats?.level || 1}</span>
-                        <div className="flex-1">
-                            <XPBar current={xp} max={xpMax} color={skill.color} />
-                        </div>
-                        <span className="text-[10px] text-slate-600">{xp}/{xpMax}</span>
+                        <span className="text-[9px] text-slate-600">•</span>
+                        <span className="text-[9px] text-slate-500">{skill.gradeRange}</span>
+                        {currentStandards.length > 0 && (
+                            <span className="text-[9px] text-cyan-600 font-mono">{currentStandards[0]}</span>
+                        )}
+                    </div>
+                    <div className="mt-1">
+                        <XPBar current={xp} max={xpMax} color={skill.color} />
                     </div>
                 </div>
                 <div className="text-slate-600 group-hover:text-slate-400 transition-colors">→</div>
@@ -97,6 +102,7 @@ const SkillCard = ({ skill, stats, onClick }) => {
         </button>
     );
 };
+
 
 const StepByStepExplanation = ({ problem, onContinue }) => {
     const [stepIndex, setStepIndex] = useState(0);
@@ -356,9 +362,9 @@ const PracticeScreen = ({ profile, skillId, onBack, onTeach, onUpdateProfile }) 
             <div className="flex flex-col h-full p-6 items-center justify-center slide-up">
                 <div className="text-4xl mb-3">{summary.accuracy >= 80 ? '🎯' : summary.accuracy >= 60 ? '📈' : '💪'}</div>
                 <h2 className="text-2xl font-bold text-white mb-1">Session Complete</h2>
-                <p className="text-slate-500 mb-6">{summary.encouragement}</p>
+                <p className="text-slate-500 mb-4">{summary.encouragement}</p>
 
-                <div className="glass rounded-2xl p-6 w-full max-w-xs mb-6">
+                <div className="glass rounded-2xl p-6 w-full max-w-xs mb-4">
                     <div className="grid grid-cols-2 gap-4 text-center">
                         <div>
                             <div className="text-3xl font-bold text-white">{summary.problemsSolved}</div>
@@ -379,6 +385,23 @@ const PracticeScreen = ({ profile, skillId, onBack, onTeach, onUpdateProfile }) 
                             <div className="text-xs text-slate-500">Avg Time</div>
                         </div>
                     </div>
+
+                    {/* CA Standards Covered */}
+                    {summary.standardsCovered?.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-white/10">
+                            <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-2">CA Standards Practiced</div>
+                            <div className="flex flex-wrap gap-1">
+                                {summary.standardsCovered.slice(0, 4).map(std => (
+                                    <span key={std} className="text-[9px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                                        {std}
+                                    </span>
+                                ))}
+                                {summary.standardsCovered.length > 4 && (
+                                    <span className="text-[9px] text-slate-600">+{summary.standardsCovered.length - 4} more</span>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <button onClick={onBack} className="w-full max-w-xs py-3 bg-emerald-600 rounded-xl font-bold text-white">
@@ -395,7 +418,7 @@ const PracticeScreen = ({ profile, skillId, onBack, onTeach, onUpdateProfile }) 
             <style>{styles}</style>
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
                 <button onClick={handleEndSession} className="text-sm text-slate-500 hover:text-white">← End</button>
                 <div className="text-center">
                     <div className="flex items-center gap-2 justify-center">
@@ -404,7 +427,12 @@ const PracticeScreen = ({ profile, skillId, onBack, onTeach, onUpdateProfile }) 
                         </span>
                         <span className="font-semibold text-white">{skill.name}</span>
                     </div>
-                    <div className="text-xs text-slate-500">Level {stats?.level || 1}</div>
+                    <div className="flex items-center gap-2 justify-center">
+                        <span className="text-xs text-slate-500">Level {stats?.level || 1}</span>
+                        {problem?.standards?.[0] && (
+                            <span className="text-[9px] font-mono text-cyan-500">{problem.standards[0]}</span>
+                        )}
+                    </div>
                 </div>
                 <div className="text-sm">
                     <span className="text-emerald-400">{sessionHistory.filter(h => h.correct).length}</span>
@@ -426,7 +454,7 @@ const PracticeScreen = ({ profile, skillId, onBack, onTeach, onUpdateProfile }) 
                     <>
                         {/* Problem Card */}
                         <div className={`glass rounded-2xl p-6 w-full max-w-md text-center mb-6 transition-all ${feedback === 'correct' ? 'border-2 border-emerald-500 correct-glow' :
-                                feedback === 'wrong' ? 'border-2 border-rose-500 shake' : ''
+                            feedback === 'wrong' ? 'border-2 border-rose-500 shake' : ''
                             }`}>
                             <div className="text-3xl font-bold text-white mb-2">
                                 {problem.equation || problem.problem}
