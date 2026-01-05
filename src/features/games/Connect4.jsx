@@ -1,670 +1,571 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+/**
+ * Connect4.jsx - COMPLETE REWRITE
+ * Clean architecture: Pure functions for game logic, simple React for UI
+ */
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRealtimeGame } from '../../hooks/useRealtimeGame';
 import GameEndOverlay from './GameEndOverlay';
 import confetti from 'canvas-confetti';
 
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════
 const ROWS = 6;
 const COLS = 7;
+const CELL_COUNT = ROWS * COLS;
 
-const createEmptyBoard = () => Array(ROWS * COLS).fill(null);
+const PLAYER = { RED: 'red', YELLOW: 'yellow' };
+const STATUS = { MENU: 'MENU', WAITING: 'WAITING', PLAYING: 'PLAYING', FINISHED: 'FINISHED' };
+const MODE = { SOLO: 'SOLO', PVP: 'PVP' };
+const DIFFICULTY = { BEGINNER: 1, MEDIUM: 2, HARD: 3, EXPERT: 4, IMPOSSIBLE: 5 };
 
 const INITIAL_STATE = {
-    board: createEmptyBoard(),
-    turn: 'red',
+    board: null,
+    turn: PLAYER.RED,
     winner: null,
-    status: 'MENU',
-    lastMoveTime: 0,
-    lastMoveIndex: null, // Track last dropped piece for visual indicator
-    mode: 'PVP',
+    winningCells: [],
+    status: STATUS.MENU,
+    mode: MODE.PVP,
     difficulty: 'MEDIUM',
     scores: { red: 0, yellow: 0 },
-    winningCells: []
+    lastMove: null
 };
 
-// Convert Firebase object to array (Firebase can convert arrays to objects)
-const safeBoard = (b) => {
-    if (!b) return createEmptyBoard();
-    if (Array.isArray(b)) return b;
-    const arr = createEmptyBoard();
-    Object.keys(b).forEach(k => {
-        const idx = parseInt(k);
-        if (!isNaN(idx) && idx >= 0 && idx < arr.length) {
-            arr[idx] = b[k];
-        }
-    });
+// ═══════════════════════════════════════════════════════════════
+// PURE GAME LOGIC (no React, no side effects)
+// ═══════════════════════════════════════════════════════════════
+
+/** Create empty board */
+const createBoard = () => Array(CELL_COUNT).fill(null);
+
+/** Firebase sometimes converts arrays to objects - normalize */
+const normalizeBoard = (b) => {
+    if (!b) return createBoard();
+    if (Array.isArray(b) && b.length === CELL_COUNT) return b;
+    const arr = createBoard();
+    if (typeof b === 'object') {
+        Object.entries(b).forEach(([k, v]) => {
+            const idx = parseInt(k);
+            if (!isNaN(idx) && idx >= 0 && idx < CELL_COUNT) arr[idx] = v;
+        });
+    }
     return arr;
 };
 
-// Validate board has no "floating" pieces (pieces with empty cells below them)
+/** Get the row where a piece would land in a column (-1 if full) */
+const getDropRow = (board, col) => {
+    for (let row = ROWS - 1; row >= 0; row--) {
+        if (board[row * COLS + col] === null) return row;
+    }
+    return -1;
+};
+
+/** Get all columns that aren't full */
+const getValidColumns = (board) => {
+    const valid = [];
+    for (let col = 0; col < COLS; col++) {
+        if (board[col] === null) valid.push(col);
+    }
+    return valid;
+};
+
+/** Check if board is valid (no floating pieces) */
 const isBoardValid = (board) => {
     for (let col = 0; col < COLS; col++) {
         let foundEmpty = false;
         for (let row = ROWS - 1; row >= 0; row--) {
             const cell = board[row * COLS + col];
-            if (cell === null) {
-                foundEmpty = true;
-            } else if (foundEmpty) {
-                // Found a piece with an empty cell below it - invalid!
-                return false;
-            }
+            if (cell === null) foundEmpty = true;
+            else if (foundEmpty) return false;
         }
     }
     return true;
 };
 
-// --- WIN DETECTION WITH CELL TRACKING ---
-const checkWin = (board) => {
-    const b = safeBoard(board);
+/** Check for winner - returns { winner, cells } or null */
+const checkWinner = (board) => {
+    const check4 = (indices) => {
+        const p = board[indices[0]];
+        return p && indices.every(i => board[i] === p) ? { winner: p, cells: indices } : null;
+    };
 
     // Horizontal
     for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS - 3; c++) {
-            const idx = r * COLS + c;
-            const p = b[idx];
-            if (p && p === b[idx + 1] && p === b[idx + 2] && p === b[idx + 3]) {
-                return { winner: p, cells: [idx, idx + 1, idx + 2, idx + 3] };
-            }
+        for (let c = 0; c <= COLS - 4; c++) {
+            const i = r * COLS + c;
+            const result = check4([i, i + 1, i + 2, i + 3]);
+            if (result) return result;
         }
     }
     // Vertical
-    for (let r = 0; r < ROWS - 3; r++) {
+    for (let r = 0; r <= ROWS - 4; r++) {
         for (let c = 0; c < COLS; c++) {
-            const idx = r * COLS + c;
-            const p = b[idx];
-            if (p && p === b[idx + COLS] && p === b[idx + COLS * 2] && p === b[idx + COLS * 3]) {
-                return { winner: p, cells: [idx, idx + COLS, idx + COLS * 2, idx + COLS * 3] };
-            }
+            const i = r * COLS + c;
+            const result = check4([i, i + COLS, i + COLS * 2, i + COLS * 3]);
+            if (result) return result;
         }
     }
     // Diagonal ↘
-    for (let r = 0; r < ROWS - 3; r++) {
-        for (let c = 0; c < COLS - 3; c++) {
-            const idx = r * COLS + c;
-            const p = b[idx];
-            if (p && p === b[idx + COLS + 1] && p === b[idx + COLS * 2 + 2] && p === b[idx + COLS * 3 + 3]) {
-                return { winner: p, cells: [idx, idx + COLS + 1, idx + COLS * 2 + 2, idx + COLS * 3 + 3] };
-            }
+    for (let r = 0; r <= ROWS - 4; r++) {
+        for (let c = 0; c <= COLS - 4; c++) {
+            const i = r * COLS + c;
+            const step = COLS + 1;
+            const result = check4([i, i + step, i + step * 2, i + step * 3]);
+            if (result) return result;
         }
     }
     // Diagonal ↙
     for (let r = 3; r < ROWS; r++) {
-        for (let c = 0; c < COLS - 3; c++) {
-            const idx = r * COLS + c;
-            const p = b[idx];
-            if (p && p === b[idx - COLS + 1] && p === b[idx - COLS * 2 + 2] && p === b[idx - COLS * 3 + 3]) {
-                return { winner: p, cells: [idx, idx - COLS + 1, idx - COLS * 2 + 2, idx - COLS * 3 + 3] };
-            }
+        for (let c = 0; c <= COLS - 4; c++) {
+            const i = r * COLS + c;
+            const step = -COLS + 1;
+            const result = check4([i, i + step, i + step * 2, i + step * 3]);
+            if (result) return result;
         }
     }
-
-    // Check draw
-    if (b.every(cell => cell !== null)) {
-        return { winner: 'draw', cells: [] };
-    }
-
+    // Draw
+    if (board.every(c => c !== null)) return { winner: 'draw', cells: [] };
     return null;
 };
 
-// --- OPTIMIZED MINIMAX (reduced safeBoard calls) ---
-const getValidCols = (board) => {
-    const valid = [];
-    for (let c = 0; c < COLS; c++) {
-        if (board[c] === null) valid.push(c);
-    }
-    return valid;
+/** Drop a piece and return new board (immutable) */
+const dropPiece = (board, col, player) => {
+    const row = getDropRow(board, col);
+    if (row === -1) return null;
+    const newBoard = [...board];
+    newBoard[row * COLS + col] = player;
+    return { board: newBoard, index: row * COLS + col };
 };
 
-const getDropRow = (board, col) => {
-    for (let r = ROWS - 1; r >= 0; r--) {
-        if (board[r * COLS + col] === null) return r;
-    }
-    return -1;
-};
+// ═══════════════════════════════════════════════════════════════
+// AI LOGIC (Minimax with Alpha-Beta Pruning)
+// ═══════════════════════════════════════════════════════════════
 
-const evaluateWindow = (window, piece) => {
-    const opp = piece === 'yellow' ? 'red' : 'yellow';
-    const pCount = window.filter(c => c === piece).length;
-    const eCount = window.filter(c => c === null).length;
-    const oCount = window.filter(c => c === opp).length;
+const scoreWindow = (window, player) => {
+    const opp = player === PLAYER.YELLOW ? PLAYER.RED : PLAYER.YELLOW;
+    const own = window.filter(c => c === player).length;
+    const empty = window.filter(c => c === null).length;
+    const enemy = window.filter(c => c === opp).length;
 
-    if (pCount === 4) return 100;
-    if (pCount === 3 && eCount === 1) return 5;
-    if (pCount === 2 && eCount === 2) return 2;
-    if (oCount === 3 && eCount === 1) return -4;
+    if (own === 4) return 100;
+    if (own === 3 && empty === 1) return 5;
+    if (own === 2 && empty === 2) return 2;
+    if (enemy === 3 && empty === 1) return -4;
     return 0;
 };
 
-const scorePosition = (board, piece) => {
+const evaluateBoard = (board, player) => {
     let score = 0;
 
     // Center column preference
     for (let r = 0; r < ROWS; r++) {
-        if (board[r * COLS + 3] === piece) score += 3;
+        if (board[r * COLS + 3] === player) score += 3;
     }
 
-    // Horizontal
+    // All windows
+    const addWindowScore = (indices) => {
+        score += scoreWindow(indices.map(i => board[i]), player);
+    };
+
     for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS - 3; c++) {
-            const idx = r * COLS + c;
-            score += evaluateWindow([board[idx], board[idx + 1], board[idx + 2], board[idx + 3]], piece);
+        for (let c = 0; c <= COLS - 4; c++) {
+            const i = r * COLS + c;
+            addWindowScore([i, i + 1, i + 2, i + 3]);
         }
     }
-
-    // Vertical
-    for (let c = 0; c < COLS; c++) {
-        for (let r = 0; r < ROWS - 3; r++) {
-            const idx = r * COLS + c;
-            score += evaluateWindow([board[idx], board[idx + COLS], board[idx + COLS * 2], board[idx + COLS * 3]], piece);
+    for (let r = 0; r <= ROWS - 4; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const i = r * COLS + c;
+            addWindowScore([i, i + COLS, i + COLS * 2, i + COLS * 3]);
         }
     }
-
-    // Diagonals
-    for (let r = 0; r < ROWS - 3; r++) {
-        for (let c = 0; c < COLS - 3; c++) {
-            const idx = r * COLS + c;
-            score += evaluateWindow([board[idx], board[idx + COLS + 1], board[idx + COLS * 2 + 2], board[idx + COLS * 3 + 3]], piece);
+    for (let r = 0; r <= ROWS - 4; r++) {
+        for (let c = 0; c <= COLS - 4; c++) {
+            const i = r * COLS + c;
+            const s = COLS + 1;
+            addWindowScore([i, i + s, i + s * 2, i + s * 3]);
         }
     }
     for (let r = 3; r < ROWS; r++) {
-        for (let c = 0; c < COLS - 3; c++) {
-            const idx = r * COLS + c;
-            score += evaluateWindow([board[idx], board[idx - COLS + 1], board[idx - COLS * 2 + 2], board[idx - COLS * 3 + 3]], piece);
+        for (let c = 0; c <= COLS - 4; c++) {
+            const i = r * COLS + c;
+            const s = -COLS + 1;
+            addWindowScore([i, i + s, i + s * 2, i + s * 3]);
         }
     }
 
     return score;
 };
 
-const minimax = (board, depth, alpha, beta, maximizing, moveCount) => {
-    // Early termination for long games
-    if (moveCount > 35 && depth > 3) depth = 3;
-
-    const result = checkWin(board);
+const minimax = (board, depth, alpha, beta, maximizing) => {
+    const result = checkWinner(board);
     if (result) {
-        if (result.winner === 'yellow') return [null, 1000000 + depth];
-        if (result.winner === 'red') return [null, -1000000 - depth];
+        if (result.winner === PLAYER.YELLOW) return [null, 10000 + depth];
+        if (result.winner === PLAYER.RED) return [null, -10000 - depth];
         return [null, 0];
     }
-    if (depth === 0) return [null, scorePosition(board, 'yellow')];
+    if (depth === 0) return [null, evaluateBoard(board, PLAYER.YELLOW)];
 
-    const validCols = getValidCols(board);
-    if (validCols.length === 0) return [null, 0];
-
-    // Sort by center preference
-    validCols.sort((a, b) => Math.abs(a - 3) - Math.abs(b - 3));
+    const cols = getValidColumns(board).sort((a, b) => Math.abs(a - 3) - Math.abs(b - 3));
+    if (cols.length === 0) return [null, 0];
 
     if (maximizing) {
-        let value = -Infinity, bestCol = validCols[0];
-        for (const col of validCols) {
-            const row = getDropRow(board, col);
-            if (row === -1) continue;
-            const idx = row * COLS + col;
-            board[idx] = 'yellow';
-            const [, newScore] = minimax(board, depth - 1, alpha, beta, false, moveCount + 1);
-            board[idx] = null;
-            if (newScore > value) { value = newScore; bestCol = col; }
-            alpha = Math.max(alpha, value);
-            if (alpha >= beta) break;
+        let best = -Infinity, bestCol = cols[0];
+        for (const col of cols) {
+            const drop = dropPiece(board, col, PLAYER.YELLOW);
+            if (!drop) continue;
+            const [, score] = minimax(drop.board, depth - 1, alpha, beta, false);
+            if (score > best) { best = score; bestCol = col; }
+            alpha = Math.max(alpha, score);
+            if (beta <= alpha) break;
         }
-        return [bestCol, value];
+        return [bestCol, best];
     } else {
-        let value = Infinity, bestCol = validCols[0];
-        for (const col of validCols) {
-            const row = getDropRow(board, col);
-            if (row === -1) continue;
-            const idx = row * COLS + col;
-            board[idx] = 'red';
-            const [, newScore] = minimax(board, depth - 1, alpha, beta, true, moveCount + 1);
-            board[idx] = null;
-            if (newScore < value) { value = newScore; bestCol = col; }
-            beta = Math.min(beta, value);
-            if (alpha >= beta) break;
+        let best = Infinity, bestCol = cols[0];
+        for (const col of cols) {
+            const drop = dropPiece(board, col, PLAYER.RED);
+            if (!drop) continue;
+            const [, score] = minimax(drop.board, depth - 1, alpha, beta, true);
+            if (score < best) { best = score; bestCol = col; }
+            beta = Math.min(beta, score);
+            if (beta <= alpha) break;
         }
-        return [bestCol, value];
+        return [bestCol, best];
     }
 };
 
-export default function Connect4({ sessionId, onBack }) {
-    const gameId = 'connect4_v5'; // Version bump to clear corrupted state
-    const { gameState, playerId, isHost, updateState } = useRealtimeGame(sessionId, gameId, INITIAL_STATE);
-    const [localDifficulty, setLocalDifficulty] = useState(null);
-    const [flashWin, setFlashWin] = useState(false);
-    const [hoveredCol, setHoveredCol] = useState(null); // Column hover for preview
-    const isMounted = useRef(true);
-    const aiThinking = useRef(false);
+const getAIMove = (board, difficulty) => {
+    const depth = DIFFICULTY[difficulty] || 2;
+    const cols = getValidColumns(board);
+    if (cols.length === 0) return null;
 
+    // Beginner: random
+    if (difficulty === 'BEGINNER') {
+        return cols[Math.floor(Math.random() * cols.length)];
+    }
+
+    const [col] = minimax(board, depth, -Infinity, Infinity, true);
+    return col ?? cols[Math.floor(Math.random() * cols.length)];
+};
+
+// ═══════════════════════════════════════════════════════════════
+// REACT COMPONENT
+// ═══════════════════════════════════════════════════════════════
+
+export default function Connect4({ sessionId, onBack }) {
+    const gameId = 'connect4_v6';
+    const { gameState, playerId, isHost, updateState } = useRealtimeGame(sessionId, gameId, INITIAL_STATE);
+
+    const [hoveredCol, setHoveredCol] = useState(null);
+    const [showDiffMenu, setShowDiffMenu] = useState(false);
+    const aiTimer = useRef(null);
+    const mounted = useRef(true);
+
+    // Cleanup on unmount
     useEffect(() => {
-        isMounted.current = true;
-        return () => { isMounted.current = false; };
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+            if (aiTimer.current) clearTimeout(aiTimer.current);
+        };
     }, []);
 
-    // Win flash effect
+    // Derive state safely
+    const board = useMemo(() => normalizeBoard(gameState?.board), [gameState?.board]);
+    const myColor = isHost ? PLAYER.RED : PLAYER.YELLOW;
+    const isMyTurn = gameState?.turn === myColor;
+    const winningSet = useMemo(() => new Set(gameState?.winningCells || []), [gameState?.winningCells]);
+
+    // Auto-reset corrupted board
+    useEffect(() => {
+        if (gameState?.status === STATUS.PLAYING && !isBoardValid(board)) {
+            console.warn('[Connect4] Invalid board state - resetting');
+            updateState({ ...INITIAL_STATE, status: STATUS.MENU });
+        }
+    }, [board, gameState?.status, updateState]);
+
+    // AI turn
+    useEffect(() => {
+        if (!gameState || gameState.mode !== MODE.SOLO || gameState.status !== STATUS.PLAYING) return;
+        if (gameState.turn !== PLAYER.YELLOW) return;
+
+        aiTimer.current = setTimeout(() => {
+            if (!mounted.current) return;
+
+            const col = getAIMove(board, gameState.difficulty);
+            if (col === null) return;
+
+            const drop = dropPiece(board, col, PLAYER.YELLOW);
+            if (!drop) return;
+
+            const result = checkWinner(drop.board);
+            const scores = { ...gameState.scores };
+            if (result?.winner === PLAYER.YELLOW) scores.yellow++;
+
+            updateState({
+                board: drop.board,
+                turn: PLAYER.RED,
+                winner: result?.winner || null,
+                winningCells: result?.cells || [],
+                status: result ? STATUS.FINISHED : STATUS.PLAYING,
+                lastMove: drop.index
+            });
+        }, 600);
+
+        return () => clearTimeout(aiTimer.current);
+    }, [gameState?.turn, gameState?.status, gameState?.mode, board, updateState]);
+
+    // Win celebration
     useEffect(() => {
         if (gameState?.winner && gameState.winner !== 'draw') {
-            setFlashWin(true);
             confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-        } else {
-            setFlashWin(false);
         }
     }, [gameState?.winner]);
 
-    // Auto-reset corrupted board state (floating pieces)
-    useEffect(() => {
-        if (!gameState || gameState.status !== 'PLAYING') return;
-        const board = safeBoard(gameState.board);
-        if (!isBoardValid(board)) {
-            console.warn('[Connect4] Corrupted board detected - auto-resetting');
-            updateState({
-                ...INITIAL_STATE,
-                mode: gameState.mode,
-                difficulty: gameState.difficulty,
-                status: 'MENU'
-            });
-        }
-    }, [gameState?.board, gameState?.status, updateState]);
-
-    // AI Turn
-    useEffect(() => {
-        if (!gameState || gameState.mode !== 'SOLO' || gameState.status !== 'PLAYING') return;
-        if (gameState.turn !== 'yellow' || aiThinking.current) return;
-
-        aiThinking.current = true;
-
-        const runAI = async () => {
-            await new Promise(r => setTimeout(r, 500));
-            if (!isMounted.current) return;
-
-            const board = [...safeBoard(gameState.board)];
-            const validCols = getValidCols(board);
-            if (validCols.length === 0) { aiThinking.current = false; return; }
-
-            const moveCount = board.filter(c => c !== null).length;
-            const diff = gameState.difficulty || 'MEDIUM';
-            const depthMap = { BEGINNER: 1, MEDIUM: 2, HARD: 3, EXPERT: 4, IMPOSSIBLE: 5 };
-            const depth = depthMap[diff] || 2;
-
-            let col;
-            if (diff === 'BEGINNER') {
-                col = validCols[Math.floor(Math.random() * validCols.length)];
-            } else {
-                [col] = minimax(board, depth, -Infinity, Infinity, true, moveCount);
-            }
-
-            if (col === null || !validCols.includes(col)) {
-                col = [3, 2, 4, 1, 5, 0, 6].find(c => validCols.includes(c)) ?? validCols[0];
-            }
-
-            const row = getDropRow(board, col);
-            if (row === -1) { aiThinking.current = false; return; }
-
-            board[row * COLS + col] = 'yellow';
-            const result = checkWin(board);
-
-            const newScores = { ...gameState.scores };
-            if (result?.winner === 'yellow') newScores.yellow++;
-
-            updateState({
-                board,
-                turn: 'red',
-                winner: result?.winner || null,
-                winningCells: result?.cells || [],
-                status: result ? 'FINISHED' : 'PLAYING',
-                lastMoveTime: Date.now(),
-                scores: newScores
-            });
-
-            aiThinking.current = false;
-        };
-
-        const timer = setTimeout(runAI, 100);
-        return () => clearTimeout(timer);
-    }, [gameState?.turn, gameState?.status, gameState?.mode, updateState]);
-
+    // Handlers
     const handleDrop = useCallback((col) => {
-        if (!gameState || gameState.status !== 'PLAYING') return;
+        if (!gameState || gameState.status !== STATUS.PLAYING) return;
+        if (gameState.mode === MODE.PVP && !isMyTurn) return;
+        if (gameState.mode === MODE.SOLO && gameState.turn !== PLAYER.RED) return;
 
-        const myColor = isHost ? 'red' : 'yellow';
-        if (gameState.mode !== 'SOLO' && gameState.turn !== myColor) return;
-        if (gameState.mode === 'SOLO' && gameState.turn !== 'red') return;
+        const drop = dropPiece(board, col, gameState.turn);
+        if (!drop) return;
 
-        const board = [...safeBoard(gameState.board)];
-        const row = getDropRow(board, col);
-        if (row === -1) return;
-
-        const dropIndex = row * COLS + col;
-        board[dropIndex] = gameState.turn;
-        const result = checkWin(board);
-
-        const newScores = { ...gameState.scores };
-        if (result?.winner && result.winner !== 'draw') {
-            newScores[result.winner]++;
-        }
+        const result = checkWinner(drop.board);
+        const nextTurn = gameState.turn === PLAYER.RED ? PLAYER.YELLOW : PLAYER.RED;
+        const scores = { ...gameState.scores };
+        if (result?.winner === PLAYER.RED) scores.red++;
+        if (result?.winner === PLAYER.YELLOW) scores.yellow++;
 
         updateState({
-            board,
-            turn: gameState.turn === 'red' ? 'yellow' : 'red',
+            board: drop.board,
+            turn: nextTurn,
             winner: result?.winner || null,
             winningCells: result?.cells || [],
-            status: result ? 'FINISHED' : 'PLAYING',
-            lastMoveTime: Date.now(),
-            lastMoveIndex: dropIndex, // Track for visual pulse
-            scores: newScores
+            status: result ? STATUS.FINISHED : STATUS.PLAYING,
+            lastMove: drop.index
         });
-    }, [gameState, isHost, updateState]);
+    }, [gameState, board, isMyTurn, updateState]);
 
-    const handleReset = useCallback(() => {
+    const startGame = useCallback((mode, diff = 'MEDIUM') => {
         updateState({
-            board: createEmptyBoard(),
-            turn: 'red',
+            board: createBoard(),
+            turn: PLAYER.RED,
             winner: null,
             winningCells: [],
-            status: gameState.mode === 'SOLO' ? 'PLAYING' : 'WAITING',
-            lastMoveTime: 0
-        });
-    }, [gameState?.mode, updateState]);
-
-    const handleStart = useCallback(() => {
-        updateState({ status: 'PLAYING' });
-    }, [updateState]);
-
-    const setMode = useCallback((mode, diff = 'MEDIUM') => {
-        updateState({
-            status: mode === 'SOLO' ? 'PLAYING' : 'WAITING',
+            status: mode === MODE.SOLO ? STATUS.PLAYING : STATUS.WAITING,
             mode,
-            turn: 'red',
             difficulty: diff,
             scores: { red: 0, yellow: 0 },
-            board: createEmptyBoard(),
-            winner: null,
-            winningCells: []
+            lastMove: null
         });
-        setLocalDifficulty(null);
+        setShowDiffMenu(false);
     }, [updateState]);
 
-    const winningCells = useMemo(() =>
-        new Set(gameState?.winningCells || []),
-        [gameState?.winningCells]
-    );
+    const handleRematch = useCallback(() => {
+        updateState({
+            board: createBoard(),
+            turn: PLAYER.RED,
+            winner: null,
+            winningCells: [],
+            status: STATUS.PLAYING,
+            lastMove: null
+        });
+    }, [updateState]);
 
+    // Loading
     if (!gameState) {
-        return <div className="text-white p-4 font-mono animate-pulse">Connecting...</div>;
+        return <div className="flex items-center justify-center h-full text-white animate-pulse">Connecting...</div>;
     }
 
     const scores = gameState.scores || { red: 0, yellow: 0 };
-    const myColor = isHost ? 'red' : 'yellow';
-    const isMyTurn = gameState.turn === myColor;
-    const playersCount = gameState.players ? Object.keys(gameState.players).length : 0;
-    const opponentReady = playersCount >= 2;
 
-    // MENU
-    if (gameState.status === 'MENU') {
-        const diffs = ['BEGINNER', 'MEDIUM', 'HARD', 'EXPERT', 'IMPOSSIBLE'];
-        const diffColors = {
-            BEGINNER: 'bg-green-600', MEDIUM: 'bg-blue-600',
-            HARD: 'bg-orange-600', EXPERT: 'bg-red-600', IMPOSSIBLE: 'bg-purple-900 border-2 border-red-500'
-        };
-
+    // ═══════════════════════════════════════════════════════════════
+    // RENDER: MENU
+    // ═══════════════════════════════════════════════════════════════
+    if (gameState.status === STATUS.MENU) {
         return (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center p-4 select-none bg-gradient-to-br from-pink-950 via-slate-950 to-black">
-                <span className="text-8xl mb-4 animate-bounce">🔴</span>
-                <h1 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-t from-pink-600 to-red-400 tracking-tighter mb-2 italic">
+            <div className="flex flex-col items-center justify-center h-full p-6 bg-gradient-to-b from-slate-900 to-black">
+                <div className="text-7xl mb-4 animate-bounce">🔴</div>
+                <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-red-500 mb-2">
                     NEON CONNECT
                 </h1>
-                <p className="text-pink-400 font-mono text-sm tracking-widest mb-8 animate-pulse">4-IN-A-ROW</p>
+                <p className="text-slate-500 text-sm mb-8">4-IN-A-ROW</p>
 
                 <div className="w-full max-w-xs space-y-3">
-                    {localDifficulty ? (
-                        <div className="space-y-2 bg-slate-900/60 p-4 rounded-xl border border-white/10">
-                            <div className="text-white font-bold text-xs text-center tracking-widest mb-3">AI LEVEL</div>
-                            {diffs.map(d => (
+                    {showDiffMenu ? (
+                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 space-y-2">
+                            <div className="text-xs text-center text-slate-400 mb-3">SELECT AI LEVEL</div>
+                            {Object.keys(DIFFICULTY).map(d => (
                                 <button
                                     key={d}
-                                    onClick={() => setMode('SOLO', d)}
-                                    className={`w-full py-2.5 rounded-lg font-bold text-white text-xs tracking-wide hover:scale-105 transition-all ${diffColors[d]}`}
+                                    onClick={() => startGame(MODE.SOLO, d)}
+                                    className={`w-full py-2.5 rounded-lg font-bold text-white text-sm hover:scale-[1.02] transition ${d === 'BEGINNER' ? 'bg-green-600' :
+                                            d === 'MEDIUM' ? 'bg-blue-600' :
+                                                d === 'HARD' ? 'bg-orange-600' :
+                                                    d === 'EXPERT' ? 'bg-red-600' :
+                                                        'bg-purple-900 border border-red-500'
+                                        }`}
                                 >
                                     {d}
                                 </button>
                             ))}
-                            <button onClick={() => setLocalDifficulty(false)} className="w-full mt-2 text-xs text-slate-500 hover:text-white">← Back</button>
+                            <button onClick={() => setShowDiffMenu(false)} className="w-full text-sm text-slate-500 hover:text-white pt-2">
+                                ← Back
+                            </button>
                         </div>
                     ) : (
                         <>
-                            <button onClick={() => setLocalDifficulty(true)} className="w-full py-4 bg-slate-800 border-2 border-slate-600 hover:border-pink-500 rounded-xl font-bold text-white flex items-center justify-center gap-3 hover:scale-105 transition-all">
-                                <span className="text-2xl">🤖</span> SOLO PRACTICE
+                            <button
+                                onClick={() => setShowDiffMenu(true)}
+                                className="w-full py-4 bg-slate-800 border border-slate-600 hover:border-pink-500 rounded-xl font-bold text-white"
+                            >
+                                🤖 VS COMPUTER
                             </button>
-                            <button onClick={() => setMode('PVP')} className="w-full py-4 bg-gradient-to-r from-pink-600 to-purple-600 rounded-xl font-bold text-white flex items-center justify-center gap-3 hover:scale-105 transition-all shadow-lg">
-                                <span className="text-2xl">⚔️</span> VS PLAYER
+                            <button
+                                onClick={() => startGame(MODE.PVP)}
+                                className="w-full py-4 bg-gradient-to-r from-pink-600 to-purple-600 rounded-xl font-bold text-white shadow-lg"
+                            >
+                                ⚔️ VS PLAYER
                             </button>
                         </>
                     )}
                 </div>
-                <button onClick={onBack} className="mt-8 text-xs text-slate-500 hover:text-white">EXIT</button>
+                <button onClick={onBack} className="mt-6 text-sm text-slate-600 hover:text-white">EXIT</button>
             </div>
         );
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // RENDER: WAITING FOR OPPONENT
+    // ═══════════════════════════════════════════════════════════════
+    if (gameState.status === STATUS.WAITING) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+                <div className="text-5xl mb-4 animate-pulse">⏳</div>
+                <h2 className="text-xl font-bold text-white mb-2">Waiting for opponent...</h2>
+                <p className="text-slate-500 text-sm mb-4">Share this session ID with a friend</p>
+                {isHost && (
+                    <button
+                        onClick={() => updateState({ status: STATUS.PLAYING })}
+                        className="px-6 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-500"
+                    >
+                        Start Anyway
+                    </button>
+                )}
+                <button onClick={() => updateState({ status: STATUS.MENU })} className="mt-4 text-sm text-slate-500 hover:text-white">
+                    ← Back to Menu
+                </button>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // RENDER: GAME FINISHED
+    // ═══════════════════════════════════════════════════════════════
+    if (gameState.status === STATUS.FINISHED) {
+        const isWinner = gameState.winner === myColor;
+        const isDraw = gameState.winner === 'draw';
+        return (
+            <GameEndOverlay
+                winner={isWinner}
+                score={isDraw ? null : (isWinner ? scores[myColor] : scores[myColor === PLAYER.RED ? PLAYER.YELLOW : PLAYER.RED])}
+                title={isDraw ? 'DRAW!' : (isWinner ? 'YOU WIN!' : 'YOU LOSE')}
+                onRestart={handleRematch}
+                onExit={onBack}
+            />
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // RENDER: GAMEPLAY
+    // ═══════════════════════════════════════════════════════════════
+    const previewRow = hoveredCol !== null ? getDropRow(board, hoveredCol) : -1;
+    const canPlay = gameState.mode === MODE.SOLO ? gameState.turn === PLAYER.RED : isMyTurn;
+
     return (
-        <div className="flex flex-col items-center gap-3 p-4 select-none h-full font-mono w-full max-w-lg mx-auto">
-            <style>{`
-                @keyframes dropIn {
-                    0% { transform: translateY(var(--drop-start)); opacity: 0; }
-                    20% { opacity: 1; }
-                    60% { transform: translateY(0); }
-                    80% { transform: translateY(-8%); }
-                    100% { transform: translateY(0); }
-                }
-                @keyframes winnerGlow {
-                    0%, 100% { 
-                        transform: scale(1.1); 
-                        box-shadow: 0 0 20px 8px currentColor;
-                        filter: brightness(1.3);
-                    }
-                    50% { 
-                        transform: scale(1.25); 
-                        box-shadow: 0 0 40px 15px currentColor;
-                        filter: brightness(1.6);
-                    }
-                }
-                @keyframes winnerBounce {
-                    0%, 100% { transform: scale(1.15) translateY(0); }
-                    50% { transform: scale(1.2) translateY(-10%); }
-                }
-                .animate-drop { animation: dropIn 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
-                .winning-cell-red {
-                    animation: winnerGlow 0.8s ease-in-out infinite, winnerBounce 0.8s ease-in-out infinite;
-                    color: #ec4899;
-                    z-index: 20;
-                }
-                .winning-cell-yellow {
-                    animation: winnerGlow 0.8s ease-in-out infinite, winnerBounce 0.8s ease-in-out infinite;
-                    color: #facc15;
-                    z-index: 20;
-                }
-                .winning-cell-ring {
-                    position: absolute;
-                    inset: -8px;
-                    border-radius: 999px;
-                    border: 4px solid white;
-                    animation: winnerGlow 0.8s ease-in-out infinite;
-                }
-                .non-winning-piece {
-                    opacity: 0.3;
-                    filter: grayscale(0.5);
-                }
-            `}</style>
-
+        <div className="flex flex-col items-center h-full p-4 max-w-lg mx-auto">
             {/* Header */}
-            <div className="flex justify-between items-center w-full">
-                <div className="flex gap-3">
-                    <button onClick={onBack} className="text-xs text-slate-400 hover:text-white">EXIT</button>
-                    <button onClick={() => updateState({ status: 'MENU', board: createEmptyBoard(), winner: null, winningCells: [], scores: { red: 0, yellow: 0 } })} className="text-xs text-red-400 hover:text-white">MENU</button>
+            <div className="flex items-center justify-between w-full mb-4">
+                <button onClick={onBack} className="text-xs text-slate-500 hover:text-white">EXIT</button>
+                <button onClick={() => updateState({ status: STATUS.MENU })} className="text-xs text-pink-400 hover:text-pink-300">MENU</button>
+            </div>
+
+            {/* Scoreboard */}
+            <div className="flex items-center justify-center gap-6 mb-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 w-full">
+                <div className={`text-center transition ${gameState.turn === PLAYER.RED ? 'scale-110' : 'opacity-50'}`}>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 mx-auto mb-1 shadow-lg" />
+                    <div className="text-xs text-slate-400">TEAM RED</div>
+                    <div className="text-2xl font-black text-white">{scores.red}</div>
                 </div>
-                <div className="text-[10px] font-bold text-slate-400">
-                    {gameState.status === 'WAITING' ? 'WAITING' : gameState.status === 'FINISHED' ? 'GAME OVER' : 'LIVE'}
+                <div className="text-slate-600 font-bold">VS</div>
+                <div className={`text-center transition ${gameState.turn === PLAYER.YELLOW ? 'scale-110' : 'opacity-50'}`}>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 mx-auto mb-1 shadow-lg" />
+                    <div className="text-xs text-slate-400">TEAM YELLOW</div>
+                    <div className="text-2xl font-black text-white">{scores.yellow}</div>
                 </div>
             </div>
 
-            {/* SCOREBOARD - Team Red vs Team Yellow */}
-            <div className="flex items-center gap-4 bg-black/50 px-4 py-3 rounded-xl border border-white/10 w-full max-w-md justify-center">
-                <div className={`flex flex-col items-center transition-all ${gameState.turn === 'red' ? 'scale-110' : 'opacity-60'}`}>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_15px_#ec4899] ring-2 ring-white/20 mb-1 flex items-center justify-center">
-                        {isHost && <span className="text-white text-xs font-black">YOU</span>}
-                    </div>
-                    <span className="text-pink-400 font-bold text-xs">TEAM RED</span>
-                    <span className="text-white text-3xl font-black">{scores.red}</span>
-                </div>
-
-                <div className="text-slate-600 text-xl font-bold">VS</div>
-
-                <div className={`flex flex-col items-center transition-all ${gameState.turn === 'yellow' ? 'scale-110' : 'opacity-60'}`}>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_15px_#facc15] ring-2 ring-white/20 mb-1 flex items-center justify-center">
-                        {!isHost && <span className="text-slate-900 text-xs font-black">YOU</span>}
-                    </div>
-                    <span className="text-yellow-400 font-bold text-xs">TEAM YELLOW</span>
-                    <span className="text-white text-3xl font-black">{scores.yellow}</span>
-                </div>
-            </div>
-
-            {/* Turn Indicator */}
-            <div className="text-sm font-bold">
-                {gameState.status === 'WAITING' ? (
-                    <span className="text-slate-400">
-                        {isHost
-                            ? (opponentReady ? "TEAM YELLOW READY - START!" : "WAITING FOR TEAM YELLOW...")
-                            : "WAITING FOR TEAM RED TO START..."}
-                    </span>
-                ) : gameState.status === 'FINISHED' ? (
-                    <span className={gameState.winner === 'red' ? 'text-pink-400' : 'text-yellow-400'}>
-                        {gameState.winner === 'draw' ? 'DRAW!' : `TEAM ${gameState.winner?.toUpperCase()} WINS!`}
-                    </span>
+            {/* Turn indicator */}
+            <div className="text-center mb-3 text-sm font-bold">
+                {gameState.mode === MODE.SOLO && gameState.turn === PLAYER.YELLOW ? (
+                    <span className="text-yellow-400 animate-pulse">CPU THINKING...</span>
+                ) : canPlay ? (
+                    <span className="text-emerald-400">YOUR TURN</span>
                 ) : (
-                    isMyTurn
-                        ? <span className="text-green-400 animate-pulse">YOUR TURN</span>
-                        : <span className="text-slate-500">{gameState.mode === 'SOLO' ? 'CPU THINKING...' : 'OPPONENT...'}</span>
+                    <span className="text-slate-500">OPPONENT'S TURN</span>
                 )}
             </div>
 
-            {/* Drop Buttons with hover preview */}
-            {gameState.status === 'PLAYING' && (
-                <div className="grid grid-cols-7 gap-1.5 w-full max-w-md">
-                    {[0, 1, 2, 3, 4, 5, 6].map(c => (
-                        <button
-                            key={c}
-                            onClick={() => handleDrop(c)}
-                            onMouseEnter={() => setHoveredCol(c)}
-                            onMouseLeave={() => setHoveredCol(null)}
-                            disabled={!isMyTurn && gameState.mode !== 'SOLO'}
-                            className={`h-10 flex items-center justify-center rounded-t-lg transition-all ${isMyTurn || gameState.mode === 'SOLO'
-                                ? `bg-white/10 hover:bg-white/30 text-white cursor-pointer ${hoveredCol === c ? 'scale-110 bg-white/25' : ''}`
-                                : 'opacity-30 pointer-events-none'
+            {/* Drop buttons */}
+            <div className="grid grid-cols-7 gap-1 mb-1">
+                {Array(COLS).fill(0).map((_, col) => (
+                    <button
+                        key={col}
+                        onClick={() => handleDrop(col)}
+                        onMouseEnter={() => setHoveredCol(col)}
+                        onMouseLeave={() => setHoveredCol(null)}
+                        disabled={!canPlay || getDropRow(board, col) === -1}
+                        className={`w-10 h-8 rounded flex items-center justify-center text-white text-sm font-bold transition-all ${canPlay && getDropRow(board, col) !== -1
+                                ? 'bg-slate-700 hover:bg-slate-600'
+                                : 'bg-slate-800/30 text-slate-600 cursor-not-allowed'
+                            } ${hoveredCol === col ? 'bg-slate-600 scale-110' : ''}`}
+                    >
+                        ▼
+                    </button>
+                ))}
+            </div>
+
+            {/* Board */}
+            <div className="grid grid-cols-7 gap-1 p-3 bg-slate-800 rounded-xl border-2 border-slate-700 shadow-xl">
+                {board.map((cell, i) => {
+                    const row = Math.floor(i / COLS);
+                    const col = i % COLS;
+                    const isWinning = winningSet.has(i);
+                    const isLastMove = gameState.lastMove === i;
+                    const showPreview = !cell && previewRow === row && hoveredCol === col && canPlay;
+
+                    return (
+                        <div
+                            key={i}
+                            className={`w-10 h-10 rounded-full border-2 border-slate-900/50 flex items-center justify-center bg-slate-950/80 ${isWinning ? 'ring-2 ring-white' : ''
                                 }`}
                         >
-                            <span className={`text-lg transition-transform ${hoveredCol === c ? 'animate-bounce' : ''}`}>▼</span>
-                        </button>
-                    ))}
-                </div>
-            )}
-
-            {/* THE BOARD */}
-            <div className="bg-slate-800 p-3 rounded-2xl shadow-2xl border-4 border-slate-700 w-full max-w-md relative">
-                {/* Waiting Overlay */}
-                {gameState.status === 'WAITING' && (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 rounded-xl backdrop-blur-sm">
-                        {isHost ? (
-                            <button
-                                onClick={handleStart}
-                                disabled={!opponentReady}
-                                className={`px-8 py-4 rounded-xl font-bold text-white text-lg transition-all ${opponentReady ? 'bg-green-600 hover:bg-green-500 hover:scale-105' : 'bg-slate-700 opacity-50 cursor-not-allowed'}`}
-                            >
-                                START MATCH
-                            </button>
-                        ) : (
-                            <div className="text-yellow-400 font-bold text-lg animate-pulse">READY</div>
-                        )}
-                    </div>
-                )}
-
-                <div className="grid grid-cols-7 grid-rows-6 gap-2">
-                    {safeBoard(gameState.board).map((cell, i) => {
-                        const isWinning = winningCells.has(i);
-                        const row = Math.floor(i / COLS);
-                        const col = i % COLS;
-                        const dropStart = `-${(row + 1) * 100}%`;
-                        const isFinished = gameState.status === 'FINISHED';
-                        const hasWinningCells = winningCells.size > 0;
-                        const isLastMove = gameState.lastMoveIndex === i && !isFinished;
-
-                        // Calculate if this cell should show ghost preview
-                        const currentBoard = safeBoard(gameState.board);
-                        const previewRow = hoveredCol !== null && col === hoveredCol ? getDropRow(currentBoard, hoveredCol) : -1;
-                        const showGhost = !cell && previewRow === row && hoveredCol === col && (isMyTurn || gameState.mode === 'SOLO');
-                        const myColor = isHost ? 'red' : 'yellow';
-
-                        // Determine styling based on win state
-                        let pieceClass = 'animate-drop ';
-                        if (cell === 'red') {
-                            pieceClass += 'bg-gradient-to-br from-pink-400 to-pink-600 ';
-                            if (isWinning && isFinished) {
-                                pieceClass += 'winning-cell-red shadow-[0_0_30px_#ec4899] ';
-                            } else if (isFinished && hasWinningCells) {
-                                pieceClass += 'non-winning-piece ';
-                            } else {
-                                pieceClass += 'shadow-[0_0_12px_#ec4899] ';
-                            }
-                        } else if (cell === 'yellow') {
-                            pieceClass += 'bg-gradient-to-br from-yellow-300 to-yellow-500 ';
-                            if (isWinning && isFinished) {
-                                pieceClass += 'winning-cell-yellow shadow-[0_0_30px_#facc15] ';
-                            } else if (isFinished && hasWinningCells) {
-                                pieceClass += 'non-winning-piece ';
-                            } else {
-                                pieceClass += 'shadow-[0_0_12px_#facc15] ';
-                            }
-                        }
-
-                        return (
-                            <div
-                                key={i}
-                                className={`aspect-square rounded-full border-2 border-slate-900/50 flex items-center justify-center bg-slate-950 shadow-inner relative ${isWinning && isFinished ? 'z-10' : ''} ${showGhost ? 'bg-slate-900' : ''}`}
-                            >
-                                {/* Ghost preview piece */}
-                                {showGhost && (
-                                    <div className={`w-[85%] h-[85%] rounded-full opacity-40 ${myColor === 'red' ? 'bg-gradient-to-br from-pink-400 to-pink-600' : 'bg-gradient-to-br from-yellow-300 to-yellow-500'}`} />
-                                )}
-
-                                {cell && (
-                                    <div
-                                        style={{ '--drop-start': dropStart }}
-                                        className={`w-[85%] h-[85%] rounded-full shadow-lg ${pieceClass}`}
-                                    >
-                                        {/* Last move pulse indicator */}
-                                        {isLastMove && (
-                                            <div className="absolute inset-[-4px] rounded-full border-2 border-white/60 animate-pulse" />
-                                        )}
-                                        {/* Winning ring indicator */}
-                                        {isWinning && isFinished && (
-                                            <div className="absolute inset-[-6px] rounded-full border-4 border-white animate-ping opacity-75" />
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {/* Game End Overlay */}
-                {gameState.status === 'FINISHED' && (
-                    <GameEndOverlay
-                        winner={gameState.winner === 'draw' ? null : (gameState.winner === 'red' && isHost) || (gameState.winner === 'yellow' && !isHost)}
-                        isDraw={gameState.winner === 'draw'}
-                        score={`RED ${scores.red} - ${scores.yellow} YELLOW`}
-                        onRestart={() => isHost && handleReset()}
-                        onExit={() => {
-                            updateState({ status: 'MENU', board: createEmptyBoard(), winner: null, winningCells: [], scores: { red: 0, yellow: 0 } });
-                        }}
-                        isHost={isHost}
-                    />
-                )}
+                            {cell && (
+                                <div className={`w-[85%] h-[85%] rounded-full transition-all ${cell === PLAYER.RED
+                                        ? 'bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_12px_#ec4899]'
+                                        : 'bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_12px_#facc15]'
+                                    } ${isWinning ? 'animate-pulse scale-110' : ''} ${isLastMove ? 'ring-2 ring-white/50' : ''}`} />
+                            )}
+                            {showPreview && (
+                                <div className={`w-[85%] h-[85%] rounded-full opacity-30 ${myColor === PLAYER.RED
+                                        ? 'bg-gradient-to-br from-pink-400 to-pink-600'
+                                        : 'bg-gradient-to-br from-yellow-300 to-yellow-500'
+                                    }`} />
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
