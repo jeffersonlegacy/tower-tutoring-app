@@ -141,9 +141,47 @@ export function useRealtimeGame(sessionId, gameId, initialState) {
             }
         }, 5000);
 
+        // Stale user cleanup (runs every 30 seconds, host only)
+        const STALE_THRESHOLD = 2 * 60 * 60 * 1000; // 2 hours
+        const staleCleanup = setInterval(async () => {
+            if (isOffline || !rtdb) return;
+
+            // Only host cleans up stale users
+            const currentState = gameStateRef.current;
+            if (!currentState || currentState.hostId !== playerId) return;
+
+            const players = currentState.players;
+            if (!players || typeof players !== 'object') return;
+
+            const now = Date.now();
+            const staleIds = [];
+
+            Object.entries(players).forEach(([pid, pdata]) => {
+                // Don't remove bots or the current player
+                if (pid === playerId) return;
+                if (pdata?.isBot) return;
+
+                const lastSeen = pdata?.lastSeen || 0;
+                if (now - lastSeen > STALE_THRESHOLD) {
+                    staleIds.push(pid);
+                }
+            });
+
+            // Remove stale players
+            if (staleIds.length > 0) {
+                console.log('[RTDB] Removing stale players:', staleIds);
+                const updates = {};
+                staleIds.forEach(pid => {
+                    updates[`sessions/${sessionId}/games/${gameId}/players/${pid}`] = null;
+                });
+                update(ref(rtdb), updates).catch(err => console.warn('[RTDB] Stale cleanup error:', err));
+            }
+        }, 30000); // Check every 30 seconds
+
         return () => {
             mounted = false;
             clearInterval(heartbeat);
+            clearInterval(staleCleanup);
             if (unsubscribeRef.current) {
                 unsubscribeRef.current();
             }

@@ -217,14 +217,16 @@ export default function Yahtzee({ sessionId, onBack }) {
         );
     }
 
-    // Safe data extraction
+    // Safe data extraction - filter out any invalid/undefined entries
     const playersList = (Array.isArray(gameState?.players)
         ? gameState.players
         : Object.values(gameState?.players || {}).filter(p => !!p)
-    ).map(p => ({
-        ...p,
-        name: p.name || `Player ${String(p.id).slice(0, 4)}`
-    }));
+    )
+        .filter(p => p && p.id && typeof p.id === 'string' && p.id.length > 0) // Filter invalids
+        .map(p => ({
+            ...p,
+            name: p.name || (p.isBot ? `Bot ${String(p.id).slice(-4)}` : `Player ${String(p.id).slice(0, 4)}`)
+        }));
 
     const safeScores = (gameState?.scores && typeof gameState.scores === 'object') ? gameState.scores : {};
     const safeDice = Array.isArray(gameState?.dice) ? gameState.dice : Array(5).fill({ value: 1, held: false });
@@ -381,44 +383,44 @@ export default function Yahtzee({ sessionId, onBack }) {
     // --- LOBBY ---
     if (gameState.status === 'LOBBY') {
         return (
-            <div className="flex flex-col items-center justify-center min-h-full p-6 bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 text-white">
+            <div className="flex flex-col items-center justify-start min-h-full p-4 sm:p-6 bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 text-white overflow-y-auto">
                 <style>{styles}</style>
 
-                <div className="max-w-md w-full space-y-8">
-                    {/* Title */}
+                <div className="max-w-md w-full space-y-4 sm:space-y-6 py-4">
+                    {/* Title - smaller on mobile */}
                     <div className="text-center">
-                        <div className="flex justify-center gap-2 mb-4">
+                        <div className="flex justify-center gap-1.5 sm:gap-2 mb-2 sm:mb-4">
                             {[1, 2, 3, 4, 5].map(i => (
-                                <div key={i} className="w-10 h-10 bg-gradient-to-br from-white to-gray-200 rounded-lg shadow-lg flex items-center justify-center transform hover:rotate-12 transition-transform">
-                                    <span className="text-2xl">🎲</span>
+                                <div key={i} className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-white to-gray-200 rounded-lg shadow-lg flex items-center justify-center transform hover:rotate-12 transition-transform">
+                                    <span className="text-lg sm:text-2xl">🎲</span>
                                 </div>
                             ))}
                         </div>
-                        <h1 className="text-5xl font-black bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent tracking-tight">
+                        <h1 className="text-4xl sm:text-5xl font-black bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent tracking-tight">
                             YAHTZEE
                         </h1>
-                        <p className="text-white/50 text-sm mt-1 uppercase tracking-widest">Roll to Win!</p>
+                        <p className="text-white/50 text-xs sm:text-sm mt-1 uppercase tracking-widest">Roll to Win!</p>
                     </div>
 
-                    {/* Players */}
-                    <div className="bg-slate-800/50 rounded-2xl p-4 border border-white/10">
-                        <h3 className="text-xs font-bold text-white/50 uppercase tracking-widest mb-3">Players</h3>
-                        <div className="space-y-2">
+                    {/* Players - compact on mobile */}
+                    <div className="bg-slate-800/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/10">
+                        <h3 className="text-[10px] sm:text-xs font-bold text-white/50 uppercase tracking-widest mb-2 sm:mb-3">Players</h3>
+                        <div className="space-y-1.5 sm:space-y-2 max-h-40 overflow-y-auto">
                             {playersList.map(p => (
-                                <div key={p.id} className={`flex items-center gap-3 p-3 rounded-xl ${p.id === playerId ? 'bg-cyan-500/20 border border-cyan-500/30' : 'bg-slate-700/30'
+                                <div key={p.id} className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg sm:rounded-xl ${p.id === playerId ? 'bg-cyan-500/20 border border-cyan-500/30' : 'bg-slate-700/30'
                                     }`}>
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500 flex items-center justify-center font-bold text-white">
-                                        {p.name[0]}
+                                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm sm:text-base ${p.isBot ? 'bg-gradient-to-br from-slate-400 to-slate-600' : 'bg-gradient-to-br from-cyan-400 to-purple-500'}`}>
+                                        {p.isBot ? '🤖' : p.name[0]}
                                     </div>
-                                    <div>
-                                        <div className="font-bold">{p.name} {p.id === playerId ? '(You)' : ''}</div>
-                                        <div className="text-xs text-white/50">{p.isBot ? '🤖 CPU' : '👤 Player'}</div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-bold text-sm sm:text-base truncate">{p.name} {p.id === playerId ? '(You)' : ''}</div>
+                                        <div className="text-[10px] sm:text-xs text-white/50">{p.isBot ? '🤖 CPU' : '👤 Player'}</div>
                                     </div>
-                                    {p.isHost && <span className="ml-auto text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded">HOST</span>}
+                                    {p.isHost && <span className="text-[10px] sm:text-xs bg-yellow-500/20 text-yellow-400 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded shrink-0">HOST</span>}
                                 </div>
                             ))}
                             {playersList.length === 0 && (
-                                <div className="text-center text-white/30 py-8">Waiting for players...</div>
+                                <div className="text-center text-white/30 py-4 sm:py-8 text-sm">Waiting for players...</div>
                             )}
                         </div>
                     </div>
