@@ -35,6 +35,23 @@ const safeBoard = (b) => {
     return arr;
 };
 
+// Validate board has no "floating" pieces (pieces with empty cells below them)
+const isBoardValid = (board) => {
+    for (let col = 0; col < COLS; col++) {
+        let foundEmpty = false;
+        for (let row = ROWS - 1; row >= 0; row--) {
+            const cell = board[row * COLS + col];
+            if (cell === null) {
+                foundEmpty = true;
+            } else if (foundEmpty) {
+                // Found a piece with an empty cell below it - invalid!
+                return false;
+            }
+        }
+    }
+    return true;
+};
+
 // --- WIN DETECTION WITH CELL TRACKING ---
 const checkWin = (board) => {
     const b = safeBoard(board);
@@ -208,7 +225,7 @@ const minimax = (board, depth, alpha, beta, maximizing, moveCount) => {
 };
 
 export default function Connect4({ sessionId, onBack }) {
-    const gameId = 'connect4_v4'; // Version bump for lastMoveIndex
+    const gameId = 'connect4_v5'; // Version bump to clear corrupted state
     const { gameState, playerId, isHost, updateState } = useRealtimeGame(sessionId, gameId, INITIAL_STATE);
     const [localDifficulty, setLocalDifficulty] = useState(null);
     const [flashWin, setFlashWin] = useState(false);
@@ -230,6 +247,21 @@ export default function Connect4({ sessionId, onBack }) {
             setFlashWin(false);
         }
     }, [gameState?.winner]);
+
+    // Auto-reset corrupted board state (floating pieces)
+    useEffect(() => {
+        if (!gameState || gameState.status !== 'PLAYING') return;
+        const board = safeBoard(gameState.board);
+        if (!isBoardValid(board)) {
+            console.warn('[Connect4] Corrupted board detected - auto-resetting');
+            updateState({
+                ...INITIAL_STATE,
+                mode: gameState.mode,
+                difficulty: gameState.difficulty,
+                status: 'MENU'
+            });
+        }
+    }, [gameState?.board, gameState?.status, updateState]);
 
     // AI Turn
     useEffect(() => {
