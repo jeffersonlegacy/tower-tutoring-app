@@ -1,3 +1,4 @@
+// Standard Yahtzee Categories
 export const CATEGORIES = [
     { id: 'ones', label: 'Ones', desc: 'Sum 1s' },
     { id: 'twos', label: 'Twos', desc: 'Sum 2s' },
@@ -14,9 +15,48 @@ export const CATEGORIES = [
     { id: 'chance', label: 'Chance', desc: 'Sum All' },
 ];
 
+// MINIZEE Mode Categories (3 dice with values 1-3)
+export const MINIZEE_CATEGORIES = [
+    { id: 'sequence', label: 'Sequence', desc: '1-2-3 = 10 pts', icon: '📈' },
+    { id: 'three_kind_mini', label: '3 of Kind', desc: 'Sum all dice', icon: '🎯' },
+    { id: 'sum_choice', label: 'Number Sum', desc: 'Pick 1, 2, or 3', icon: '🔢' },
+];
+
+// Roll a Minizee die (1-3 only)
+export const rollMinizeeDie = () => Math.floor(Math.random() * 3) + 1;
+
+// Roll a standard die (1-6)
+export const rollStandardDie = () => Math.floor(Math.random() * 6) + 1;
+
+// Calculate Minizee score
+export const calculateMinizeeScore = (diceValues, category, chosenNumber = null) => {
+    const safeValues = diceValues.map(d => typeof d === 'number' ? d : d.value);
+    const counts = {};
+    let sum = 0;
+    safeValues.forEach(v => { counts[v] = (counts[v] || 0) + 1; sum += v; });
+
+    switch (category) {
+        case 'sequence':
+            // Must have exactly 1, 2, 3
+            return (counts[1] >= 1 && counts[2] >= 1 && counts[3] >= 1) ? 10 : 0;
+        case 'three_kind_mini':
+            // All three dice same value
+            return Object.values(counts).some(c => c >= 3) ? sum : 0;
+        case 'sum_choice':
+            // Sum of chosen number (1, 2, or 3)
+            if (chosenNumber && [1, 2, 3].includes(chosenNumber)) {
+                return (counts[chosenNumber] || 0) * chosenNumber;
+            }
+            return 0;
+        case 'pass':
+            return 0;
+        default:
+            return 0;
+    }
+};
+
+// Standard Yahtzee scoring
 export const calculateScore = (diceValues, category) => {
-    // Ensure diceValues is array of numbers
-    // Sometimes dice is array of objects {value, held}
     const safeValues = diceValues.map(d => typeof d === 'number' ? d : d.value);
 
     const counts = {};
@@ -39,10 +79,7 @@ export const calculateScore = (diceValues, category) => {
             let cons = 0;
             for (let i = 0; i < u.length - 1; i++) {
                 if (u[i + 1] === u[i] + 1) cons++; else cons = 0;
-                if (cons >= 3) return 30; // Small straight is 4 in a row! Wait.
-                // Standard Yahtzee: Small Straight is 4 dice. (e.g. 1-2-3-4).
-                // My old logic said `cons >= 3`? 
-                // index 0->1 (cons=1), 1->2 (cons=2), 2->3 (cons=3). 3 intervals = 4 numbers. Correct.
+                if (cons >= 3) return 30;
             }
             return 0;
         }
@@ -51,7 +88,7 @@ export const calculateScore = (diceValues, category) => {
             let cons = 0;
             for (let i = 0; i < u.length - 1; i++) {
                 if (u[i + 1] === u[i] + 1) cons++; else cons = 0;
-                if (cons >= 4) return 40; // 5 dice in row. 4 intervals. Correct.
+                if (cons >= 4) return 40;
             }
             return 0;
         }
