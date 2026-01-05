@@ -1,12 +1,16 @@
 /**
- * profileService.js - User Profile Management
+ * profileService.js - Enhanced User Profile Management v2
  * 
- * Handles username-based progress tracking with localStorage
- * and optional Firebase backup for cross-device sync.
+ * FEATURES:
+ * - XP and level tracking
+ * - Problem history for pattern detection
+ * - Session management
+ * - Achievement unlocking
  */
 
-const STORAGE_KEY = 'mathmind_profiles';
+const STORAGE_KEY = 'mathmind_profiles_v2';
 const ACTIVE_USER_KEY = 'mathmind_active_user';
+const MAX_HISTORY = 100; // Keep last 100 problems for pattern detection
 
 // ═══════════════════════════════════════════════════════════════
 // DEFAULT PROFILE STRUCTURE
@@ -16,25 +20,33 @@ const createDefaultProfile = (username) => ({
     username,
     created: new Date().toISOString(),
     lastActive: new Date().toISOString(),
+
     skills: {
-        addition: { level: 1, correct: 0, total: 0, streak: 0, accuracy: 0 },
-        subtraction: { level: 1, correct: 0, total: 0, streak: 0, accuracy: 0 },
-        multiplication: { level: 1, correct: 0, total: 0, streak: 0, accuracy: 0 },
-        division: { level: 1, correct: 0, total: 0, streak: 0, accuracy: 0 },
-        order_ops: { level: 1, correct: 0, total: 0, streak: 0, accuracy: 0 }
+        addition: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        subtraction: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        multiplication: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        division: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        order_ops: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null }
     },
+
     stats: {
         totalProblems: 0,
         totalCorrect: 0,
+        totalXP: 0,
         currentStreak: 0,
         longestStreak: 0,
-        totalTime: 0, // seconds
-        sessionsCount: 0
+        totalTime: 0,
+        sessionsCount: 0,
+        fastAnswers: 0 // Under 5 seconds
     },
+
     achievements: [],
+    problemHistory: [], // Last N problems for pattern detection
+
     settings: {
         soundEnabled: true,
-        animationsEnabled: true
+        animationsEnabled: true,
+        hintLevel: 'auto' // auto, always, never
     }
 });
 
@@ -55,7 +67,7 @@ const saveAllProfiles = (profiles) => {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
     } catch (e) {
-        console.error('[MathMind] Failed to save profiles:', e);
+        console.error('[MathMind] Save failed:', e);
     }
 };
 
@@ -63,21 +75,16 @@ const saveAllProfiles = (profiles) => {
 // PUBLIC API
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get all usernames that have profiles
- */
 export const getAvailableProfiles = () => {
     const profiles = getAllProfiles();
     return Object.keys(profiles).map(username => ({
         username,
         lastActive: profiles[username].lastActive,
+        totalXP: profiles[username].stats?.totalXP || 0,
         totalProblems: profiles[username].stats?.totalProblems || 0
-    }));
+    })).sort((a, b) => new Date(b.lastActive) - new Date(a.lastActive));
 };
 
-/**
- * Get the currently active user (from session)
- */
 export const getActiveUser = () => {
     try {
         return localStorage.getItem(ACTIVE_USER_KEY) || null;
@@ -86,22 +93,13 @@ export const getActiveUser = () => {
     }
 };
 
-/**
- * Set the active user
- */
 export const setActiveUser = (username) => {
     try {
-        if (username) {
-            localStorage.setItem(ACTIVE_USER_KEY, username);
-        } else {
-            localStorage.removeItem(ACTIVE_USER_KEY);
-        }
+        if (username) localStorage.setItem(ACTIVE_USER_KEY, username);
+        else localStorage.removeItem(ACTIVE_USER_KEY);
     } catch { }
 };
 
-/**
- * Get or create a profile for a username
- */
 export const getProfile = (username) => {
     if (!username) return null;
     const profiles = getAllProfiles();
@@ -114,9 +112,6 @@ export const getProfile = (username) => {
     return profiles[username];
 };
 
-/**
- * Update a user's profile
- */
 export const updateProfile = (username, updates) => {
     if (!username) return null;
     const profiles = getAllProfiles();
@@ -136,22 +131,26 @@ export const updateProfile = (username, updates) => {
 };
 
 /**
- * Record a problem attempt
+ * Record a problem attempt with full tracking
  */
-export const recordAttempt = (username, skillId, isCorrect, timeSpent = 0) => {
+export const recordAttempt = (username, problemData) => {
     const profiles = getAllProfiles();
     if (!profiles[username]) return null;
 
     const profile = profiles[username];
+    const { skillId, correct, timeSpent = 0, xpReward = 5, problem, answer, userAnswer } = problemData;
     const skill = profile.skills[skillId];
-
     if (!skill) return null;
 
     // Update skill stats
     skill.total++;
-    if (isCorrect) {
+    skill.lastPracticed = Date.now();
+
+    if (correct) {
         skill.correct++;
+        skill.xp += xpReward;
         skill.streak = Math.max(0, skill.streak) + 1;
+        profile.stats.totalXP += xpReward;
     } else {
         skill.streak = Math.min(0, skill.streak) - 1;
     }
@@ -159,7 +158,7 @@ export const recordAttempt = (username, skillId, isCorrect, timeSpent = 0) => {
 
     // Update global stats
     profile.stats.totalProblems++;
-    if (isCorrect) {
+    if (correct) {
         profile.stats.totalCorrect++;
         profile.stats.currentStreak++;
         profile.stats.longestStreak = Math.max(profile.stats.longestStreak, profile.stats.currentStreak);
@@ -167,6 +166,23 @@ export const recordAttempt = (username, skillId, isCorrect, timeSpent = 0) => {
         profile.stats.currentStreak = 0;
     }
     profile.stats.totalTime += timeSpent;
+    if (timeSpent < 5 && correct) profile.stats.fastAnswers++;
+
+    // Add to history (for pattern detection)
+    profile.problemHistory.push({
+        skillId,
+        problem,
+        answer,
+        userAnswer,
+        correct,
+        timeSpent,
+        timestamp: Date.now()
+    });
+
+    // Trim history
+    if (profile.problemHistory.length > MAX_HISTORY) {
+        profile.problemHistory = profile.problemHistory.slice(-MAX_HISTORY);
+    }
 
     profile.lastActive = new Date().toISOString();
     saveAllProfiles(profiles);
@@ -175,13 +191,16 @@ export const recordAttempt = (username, skillId, isCorrect, timeSpent = 0) => {
 };
 
 /**
- * Update a skill's level
+ * Update skill level and XP
  */
-export const updateSkillLevel = (username, skillId, newLevel) => {
+export const updateSkillLevel = (username, skillId, newLevel, xp = null) => {
     const profiles = getAllProfiles();
     if (!profiles[username]?.skills?.[skillId]) return null;
 
-    profiles[username].skills[skillId].level = Math.max(1, Math.min(4, newLevel));
+    const skill = profiles[username].skills[skillId];
+    skill.level = Math.max(1, Math.min(5, newLevel));
+    if (xp !== null) skill.xp = xp;
+
     profiles[username].lastActive = new Date().toISOString();
     saveAllProfiles(profiles);
 
@@ -189,87 +208,112 @@ export const updateSkillLevel = (username, skillId, newLevel) => {
 };
 
 /**
- * Add an achievement
+ * Unlock an achievement
  */
-export const addAchievement = (username, achievementId) => {
+export const unlockAchievement = (username, achievementId) => {
     const profiles = getAllProfiles();
     if (!profiles[username]) return null;
 
     if (!profiles[username].achievements.includes(achievementId)) {
         profiles[username].achievements.push(achievementId);
         saveAllProfiles(profiles);
+        return { unlocked: true, achievementId };
     }
 
-    return profiles[username];
+    return { unlocked: false };
 };
 
 /**
- * Reset a specific skill's progress
+ * Check for new achievements based on current state
  */
-export const resetSkill = (username, skillId) => {
-    const profiles = getAllProfiles();
-    if (!profiles[username]?.skills?.[skillId]) return null;
+export const checkAchievements = (profile) => {
+    const newAchievements = [];
+    const existing = new Set(profile.achievements || []);
 
-    profiles[username].skills[skillId] = {
-        level: 1,
-        correct: 0,
-        total: 0,
-        streak: 0,
-        accuracy: 0
-    };
-    saveAllProfiles(profiles);
+    // First problem
+    if (profile.stats.totalProblems >= 1 && !existing.has('first_problem')) {
+        newAchievements.push('first_problem');
+    }
 
-    return profiles[username];
+    // Streak achievements
+    if (profile.stats.currentStreak >= 5 && !existing.has('streak_5')) newAchievements.push('streak_5');
+    if (profile.stats.currentStreak >= 10 && !existing.has('streak_10')) newAchievements.push('streak_10');
+    if (profile.stats.currentStreak >= 25 && !existing.has('streak_25')) newAchievements.push('streak_25');
+
+    // Level achievements
+    const maxLevel = Math.max(...Object.values(profile.skills || {}).map(s => s.level || 1));
+    if (maxLevel >= 2 && !existing.has('level_up')) newAchievements.push('level_up');
+    if (maxLevel >= 5 && !existing.has('master')) newAchievements.push('master');
+
+    // All skills tried
+    const skillsTried = Object.values(profile.skills || {}).filter(s => s.total > 0).length;
+    if (skillsTried >= 5 && !existing.has('all_skills')) newAchievements.push('all_skills');
+
+    // Speed demon
+    if (profile.stats.fastAnswers >= 10 && !existing.has('speed_demon')) newAchievements.push('speed_demon');
+
+    // Perfectionist (20 in a row)
+    if (profile.stats.longestStreak >= 20 && !existing.has('perfectionist')) newAchievements.push('perfectionist');
+
+    return newAchievements;
 };
 
 /**
- * Delete a profile entirely
+ * Get problem history for pattern detection
  */
-export const deleteProfile = (username) => {
-    const profiles = getAllProfiles();
-    if (profiles[username]) {
-        delete profiles[username];
-        saveAllProfiles(profiles);
-    }
-
-    // Clear active user if it was this profile
-    if (getActiveUser() === username) {
-        setActiveUser(null);
-    }
+export const getProblemHistory = (username, limit = 50) => {
+    const profile = getProfile(username);
+    return profile?.problemHistory?.slice(-limit) || [];
 };
 
 /**
- * Get analytics summary for a user
+ * Get comprehensive analytics
  */
 export const getAnalytics = (username) => {
     const profile = getProfile(username);
     if (!profile) return null;
 
-    const skillsSummary = Object.entries(profile.skills).map(([id, data]) => ({
+    const skills = Object.entries(profile.skills).map(([id, data]) => ({
         id,
-        name: id.replace('_', ' '),
         level: data.level,
-        accuracy: Math.round(data.accuracy * 100),
+        xp: data.xp,
+        accuracy: Math.round((data.accuracy || 0) * 100),
         problems: data.total,
-        mastered: data.level >= 4 && data.accuracy >= 0.9
+        streak: data.streak,
+        mastered: data.level >= 5
     }));
 
-    const masteredCount = skillsSummary.filter(s => s.mastered).length;
-    const avgAccuracy = skillsSummary.length > 0
-        ? Math.round(skillsSummary.reduce((a, s) => a + s.accuracy, 0) / skillsSummary.length)
+    const avgAccuracy = skills.length > 0
+        ? Math.round(skills.reduce((a, s) => a + s.accuracy, 0) / skills.length)
         : 0;
 
     return {
         username: profile.username,
         totalProblems: profile.stats.totalProblems,
+        totalXP: profile.stats.totalXP,
+        currentStreak: profile.stats.currentStreak,
+        longestStreak: profile.stats.longestStreak,
         overallAccuracy: profile.stats.totalProblems > 0
             ? Math.round((profile.stats.totalCorrect / profile.stats.totalProblems) * 100)
             : 0,
-        currentStreak: profile.stats.currentStreak,
-        longestStreak: profile.stats.longestStreak,
-        masteredSkills: masteredCount,
-        totalSkills: skillsSummary.length,
-        skills: skillsSummary,
-        avgAccuracy
+        avgAccuracy,
+        skills,
+        achievementCount: profile.achievements?.length || 0,
+        masteredSkills: skills.filter(s => s.mastered).length,
+        totalSkills: skills.length
     };
+};
+
+/**
+ * Start a new session (increment counter)
+ */
+export const startSession = (username) => {
+    const profiles = getAllProfiles();
+    if (!profiles[username]) return null;
+
+    profiles[username].stats.sessionsCount++;
+    profiles[username].lastActive = new Date().toISOString();
+    saveAllProfiles(profiles);
+
+    return profiles[username];
 };

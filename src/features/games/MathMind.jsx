@@ -1,50 +1,173 @@
 /**
- * MathMind.jsx - AI-Powered Adaptive Math Tutor
+ * MathMind.jsx - Advanced AI Math Tutor v2
  * 
- * Features:
- * - Username-based progress tracking
- * - Adaptive difficulty (Zone of Proximal Development)
- * - Teaching moments with prior knowledge connections
- * - Visual feedback and animations
+ * VISUALLY STUNNING + ADVANCED AI
+ * - Glassmorphism UI with smooth animations
+ * - XP bars and level progression
+ * - Achievement popups
+ * - Session summaries with insights
+ * - 3-tier hint system
+ * - Pattern-based teaching
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
-    SKILLS,
-    SKILL_ORDER,
-    LEVELS,
-    generateProblem,
-    calculateNextDifficulty,
-    isSkillUnlocked,
-    getTeachingContent
+    SKILLS, SKILL_ORDER, LEVELS, ACHIEVEMENTS,
+    generateProblem, calculateNextDifficulty, isSkillUnlocked,
+    getTeachingContent, generateSessionSummary, detectStrugglePatterns
 } from './mathMind/adaptiveEngine';
 import {
-    getProfile,
-    setActiveUser,
-    getActiveUser,
-    recordAttempt,
-    updateSkillLevel,
-    getAnalytics,
-    getAvailableProfiles
+    getProfile, setActiveUser, getActiveUser, recordAttempt,
+    updateSkillLevel, getAnalytics, getAvailableProfiles,
+    getProblemHistory, unlockAchievement, checkAchievements, startSession
 } from './mathMind/profileService';
 
 // ═══════════════════════════════════════════════════════════════
-// STYLES
+// ANIMATIONS & STYLES
 // ═══════════════════════════════════════════════════════════════
 const styles = `
-    @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-    @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
-    @keyframes glow { 0%, 100% { box-shadow: 0 0 10px currentColor; } 50% { box-shadow: 0 0 25px currentColor; } }
-    .slide-in { animation: slideIn 0.4s ease-out; }
-    .pop { animation: pop 0.3s ease-out; }
-    .shake { animation: shake 0.4s ease-out; }
-    .glow { animation: glow 1.5s ease-in-out infinite; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes pop { 0% { transform: scale(0.8); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+    @keyframes glow { 0%, 100% { box-shadow: 0 0 20px currentColor; } 50% { box-shadow: 0 0 40px currentColor; } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    @keyframes xpFill { from { width: 0; } }
+    @keyframes sparkle { 0% { transform: scale(0) rotate(0deg); opacity: 1; } 100% { transform: scale(1) rotate(180deg); opacity: 0; } }
+    
+    .slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+    .slide-down { animation: slideDown 0.4s ease-out; }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    .pop { animation: pop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+    .shake { animation: shake 0.5s ease-out; }
+    .glow { animation: glow 2s ease-in-out infinite; }
+    .pulse { animation: pulse 1.5s ease-in-out infinite; }
+    .float { animation: float 3s ease-in-out infinite; }
+    .xp-fill { animation: xpFill 1s ease-out forwards; }
+    
+    .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+    .glass-light { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+    
+    .gradient-text { background: linear-gradient(135deg, #06b6d4, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .gradient-border { border-image: linear-gradient(135deg, #06b6d4, #8b5cf6) 1; }
 `;
 
 // ═══════════════════════════════════════════════════════════════
-// SCREEN: LOGIN
+// COMPONENTS
 // ═══════════════════════════════════════════════════════════════
+
+const XPBar = ({ current, max, level, color = 'cyan' }) => {
+    const percent = Math.min((current / max) * 100, 100);
+    return (
+        <div className="relative h-3 bg-slate-900/50 rounded-full overflow-hidden border border-white/10">
+            <div
+                className={`h-full bg-gradient-to-r from-${color}-500 to-${color}-400 xp-fill`}
+                style={{ width: `${percent}%` }}
+            />
+            <div className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white/80">
+                {current}/{max} XP
+            </div>
+        </div>
+    );
+};
+
+const AchievementPopup = ({ achievement, onClose }) => {
+    useEffect(() => {
+        const timer = setTimeout(onClose, 3000);
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.3 } });
+        return () => clearTimeout(timer);
+    }, [onClose]);
+
+    return (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 slide-down">
+            <div className="glass rounded-2xl p-4 flex items-center gap-4 shadow-2xl border-2 border-amber-500/50">
+                <div className="text-4xl pop">{achievement.icon}</div>
+                <div>
+                    <div className="text-xs text-amber-400 font-bold uppercase tracking-wider">Achievement Unlocked!</div>
+                    <div className="text-lg font-black text-white">{achievement.name}</div>
+                    <div className="text-xs text-slate-400">{achievement.desc}</div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const SkillCard = ({ skill, stats, unlocked, onClick }) => {
+    const level = LEVELS[stats?.level || 1];
+    const nextLevel = LEVELS[(stats?.level || 1) + 1];
+    const xpProgress = nextLevel ? stats?.xp || 0 : 0;
+    const xpMax = nextLevel?.xpRequired || 100;
+
+    return (
+        <button
+            onClick={() => unlocked && onClick()}
+            disabled={!unlocked}
+            className={`w-full p-4 rounded-2xl transition-all duration-300 ${unlocked
+                    ? `glass hover:bg-white/10 hover:scale-[1.02] hover:shadow-lg hover:shadow-${skill.color}-500/20`
+                    : 'bg-slate-900/30 opacity-40 cursor-not-allowed'
+                }`}
+        >
+            <div className="flex items-center gap-4">
+                <div className={`text-4xl ${unlocked ? 'float' : 'grayscale'}`}>{skill.icon}</div>
+                <div className="flex-1 text-left">
+                    <div className="flex items-center gap-2">
+                        <span className="font-black text-white">{skill.name}</span>
+                        {stats?.level >= 5 && <span className="text-amber-400">👑</span>}
+                    </div>
+                    <div className={`text-xs font-bold text-${skill.color}-400`}>
+                        {unlocked ? `Level ${stats?.level || 1} • ${level.name}` : '🔒 Locked'}
+                    </div>
+                    {unlocked && stats && (
+                        <div className="mt-2">
+                            <XPBar current={xpProgress} max={xpMax} level={stats.level} color={skill.color} />
+                        </div>
+                    )}
+                </div>
+                {unlocked && stats && (
+                    <div className="text-right">
+                        <div className={`text-2xl font-black ${stats.accuracy >= 0.8 ? 'text-emerald-400' : stats.accuracy >= 0.6 ? 'text-amber-400' : 'text-rose-400'}`}>
+                            {Math.round((stats.accuracy || 0) * 100)}%
+                        </div>
+                        <div className="text-xs text-slate-500">{stats.total} done</div>
+                    </div>
+                )}
+            </div>
+        </button>
+    );
+};
+
+const HintButton = ({ hints, onUseHint, usedHints }) => {
+    const [showHint, setShowHint] = useState(false);
+    const currentLevel = usedHints + 1;
+    const hint = hints?.[usedHints];
+
+    if (!hint || usedHints >= 3) return null;
+
+    return (
+        <div className="mt-4">
+            {showHint ? (
+                <div className="glass-light rounded-xl p-3 text-center slide-up">
+                    <div className="text-sm text-cyan-400 mb-1">💡 Hint {currentLevel}</div>
+                    <div className="text-white">{hint.text}</div>
+                </div>
+            ) : (
+                <button
+                    onClick={() => { setShowHint(true); onUseHint(); }}
+                    className="text-sm text-slate-500 hover:text-cyan-400 transition-colors"
+                >
+                    💡 Need a hint? ({3 - usedHints} left)
+                </button>
+            )}
+        </div>
+    );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SCREENS
+// ═══════════════════════════════════════════════════════════════
+
 const LoginScreen = ({ onLogin }) => {
     const [username, setUsername] = useState('');
     const [existingProfiles, setExistingProfiles] = useState([]);
@@ -53,49 +176,56 @@ const LoginScreen = ({ onLogin }) => {
         setExistingProfiles(getAvailableProfiles());
     }, []);
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (username.trim()) onLogin(username.trim());
-    };
-
     return (
-        <div className="flex flex-col items-center justify-center h-full p-6 slide-in">
-            <div className="text-6xl mb-4">🧠</div>
-            <h1 className="text-4xl font-black bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2">
-                MathMind
-            </h1>
-            <p className="text-slate-400 text-sm mb-8">Your AI Math Tutor</p>
+        <div className="flex flex-col items-center justify-center h-full p-6 slide-up">
+            <div className="text-7xl mb-6 float">🧠</div>
+            <h1 className="text-5xl font-black gradient-text mb-2">MathMind</h1>
+            <p className="text-slate-400 text-sm mb-2">AI-Powered Math Tutor</p>
+            <div className="flex gap-2 mb-8">
+                <span className="px-2 py-1 text-xs bg-cyan-500/20 text-cyan-400 rounded-full border border-cyan-500/30">Adaptive</span>
+                <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">Personalized</span>
+            </div>
 
-            <form onSubmit={handleSubmit} className="w-full max-w-xs space-y-4">
-                <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your name..."
-                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white text-center font-bold focus:border-cyan-500 focus:outline-none"
-                    autoFocus
-                />
+            <form onSubmit={(e) => { e.preventDefault(); if (username.trim()) onLogin(username.trim()); }} className="w-full max-w-xs space-y-4">
+                <div className="relative">
+                    <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="Enter your name..."
+                        className="w-full px-5 py-4 glass rounded-2xl text-white text-center font-bold text-lg focus:ring-2 focus:ring-cyan-500/50 focus:outline-none placeholder:text-slate-600"
+                        autoFocus
+                    />
+                </div>
                 <button
                     type="submit"
                     disabled={!username.trim()}
-                    className="w-full py-4 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl font-black text-lg text-white disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] transition-transform"
+                    className="w-full py-4 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-2xl font-black text-lg text-white disabled:opacity-30 hover:shadow-lg hover:shadow-cyan-500/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
                 >
-                    START LEARNING
+                    🚀 START LEARNING
                 </button>
             </form>
 
             {existingProfiles.length > 0 && (
-                <div className="mt-8 w-full max-w-xs">
-                    <div className="text-xs text-slate-500 mb-2">CONTINUE AS:</div>
-                    <div className="space-y-2 max-h-32 overflow-y-auto">
-                        {existingProfiles.slice(0, 5).map(p => (
+                <div className="mt-8 w-full max-w-xs fade-in">
+                    <div className="text-xs text-slate-600 mb-3 text-center">— or continue as —</div>
+                    <div className="grid gap-2 max-h-36 overflow-y-auto">
+                        {existingProfiles.slice(0, 4).map(p => (
                             <button
                                 key={p.username}
                                 onClick={() => onLogin(p.username)}
-                                className="w-full p-3 bg-slate-800/50 border border-slate-700 rounded-lg flex items-center justify-between hover:border-cyan-500/50"
+                                className="glass-light p-3 rounded-xl flex items-center justify-between hover:bg-white/10 transition-all"
                             >
-                                <span className="font-bold text-sm">{p.username}</span>
-                                <span className="text-xs text-slate-500">{p.totalProblems} problems</span>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center font-black text-white">
+                                        {p.username[0].toUpperCase()}
+                                    </div>
+                                    <span className="font-bold text-white">{p.username}</span>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-xs text-amber-400 font-bold">{p.totalXP} XP</div>
+                                    <div className="text-xs text-slate-500">{p.totalProblems} solved</div>
+                                </div>
                             </button>
                         ))}
                     </div>
@@ -105,106 +235,95 @@ const LoginScreen = ({ onLogin }) => {
     );
 };
 
-// ═══════════════════════════════════════════════════════════════
-// SCREEN: DASHBOARD
-// ═══════════════════════════════════════════════════════════════
 const DashboardScreen = ({ profile, analytics, onSelectSkill, onLogout }) => {
+    const welcomeMessages = ['Ready to learn?', 'Let\'s grow!', 'You\'re doing great!', 'Keep pushing!'];
+    const welcome = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
+
     return (
-        <div className="flex flex-col h-full p-4 overflow-y-auto slide-in">
+        <div className="flex flex-col h-full p-4 overflow-y-auto slide-up">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <div className="text-2xl font-black text-white">Hi, {profile.username}!</div>
-                    <div className="text-sm text-slate-400">🔥 {analytics.currentStreak} streak</div>
+                    <div className="text-2xl font-black text-white">Hey, {profile.username}! 👋</div>
+                    <div className="text-sm text-slate-400">{welcome}</div>
                 </div>
-                <button onClick={onLogout} className="text-xs text-slate-500 hover:text-white">
-                    Switch User
+                <button onClick={onLogout} className="text-xs text-slate-600 hover:text-white transition-colors">
+                    Switch
                 </button>
             </div>
 
-            {/* Stats */}
+            {/* Stats Cards */}
             <div className="grid grid-cols-3 gap-3 mb-6">
-                <div className="bg-slate-800/50 rounded-xl p-3 text-center border border-slate-700">
-                    <div className="text-2xl font-black text-cyan-400">{analytics.totalProblems}</div>
-                    <div className="text-xs text-slate-500">Problems</div>
+                <div className="glass rounded-2xl p-4 text-center">
+                    <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-cyan-300">
+                        {analytics.totalXP}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">Total XP</div>
                 </div>
-                <div className="bg-slate-800/50 rounded-xl p-3 text-center border border-slate-700">
-                    <div className="text-2xl font-black text-emerald-400">{analytics.overallAccuracy}%</div>
-                    <div className="text-xs text-slate-500">Accuracy</div>
+                <div className="glass rounded-2xl p-4 text-center">
+                    <div className="text-3xl font-black text-amber-400">
+                        🔥 {analytics.currentStreak}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">Streak</div>
                 </div>
-                <div className="bg-slate-800/50 rounded-xl p-3 text-center border border-slate-700">
-                    <div className="text-2xl font-black text-amber-400">{analytics.masteredSkills}/{analytics.totalSkills}</div>
-                    <div className="text-xs text-slate-500">Mastered</div>
+                <div className="glass rounded-2xl p-4 text-center">
+                    <div className={`text-3xl font-black ${analytics.overallAccuracy >= 80 ? 'text-emerald-400' : analytics.overallAccuracy >= 60 ? 'text-amber-400' : 'text-rose-400'}`}>
+                        {analytics.overallAccuracy}%
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">Accuracy</div>
                 </div>
             </div>
 
-            {/* Skills */}
-            <div className="text-xs text-slate-500 mb-2">CHOOSE A SKILL</div>
-            <div className="space-y-2">
-                {SKILL_ORDER.map(skillId => {
-                    const skill = SKILLS[skillId];
-                    const stats = profile.skills[skillId];
-                    const unlocked = isSkillUnlocked(skillId, profile);
-                    const level = LEVELS[stats?.level || 1];
+            {/* Achievements Preview */}
+            {analytics.achievementCount > 0 && (
+                <div className="glass-light rounded-xl p-3 mb-6 flex items-center gap-3">
+                    <div className="text-2xl">🏆</div>
+                    <div>
+                        <div className="text-sm font-bold text-white">{analytics.achievementCount} Achievements</div>
+                        <div className="text-xs text-slate-500">Keep playing to unlock more!</div>
+                    </div>
+                </div>
+            )}
 
-                    return (
-                        <button
-                            key={skillId}
-                            onClick={() => unlocked && onSelectSkill(skillId)}
-                            disabled={!unlocked}
-                            className={`w-full p-4 rounded-xl border-2 flex items-center gap-4 transition-all ${unlocked
-                                    ? 'bg-slate-800/50 border-slate-700 hover:border-cyan-500 hover:scale-[1.01]'
-                                    : 'bg-slate-900/50 border-slate-800 opacity-50 cursor-not-allowed'
-                                }`}
-                        >
-                            <div className={`text-3xl ${unlocked ? '' : 'grayscale'}`}>{skill.icon}</div>
-                            <div className="flex-1 text-left">
-                                <div className="font-bold text-white">{skill.name}</div>
-                                <div className="text-xs text-slate-400">
-                                    {unlocked ? `Level ${stats?.level || 1} • ${level.name}` : '🔒 Complete prerequisites'}
-                                </div>
-                            </div>
-                            {unlocked && stats && (
-                                <div className="text-right">
-                                    <div className={`text-sm font-bold ${stats.accuracy >= 0.8 ? 'text-emerald-400' : stats.accuracy >= 0.6 ? 'text-amber-400' : 'text-rose-400'}`}>
-                                        {Math.round(stats.accuracy * 100)}%
-                                    </div>
-                                    <div className="text-xs text-slate-500">{stats.total} done</div>
-                                </div>
-                            )}
-                        </button>
-                    );
-                })}
+            {/* Skills */}
+            <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">Choose a Skill</div>
+            <div className="space-y-3">
+                {SKILL_ORDER.map(skillId => (
+                    <SkillCard
+                        key={skillId}
+                        skill={SKILLS[skillId]}
+                        stats={profile.skills[skillId]}
+                        unlocked={isSkillUnlocked(skillId, profile)}
+                        onClick={() => onSelectSkill(skillId)}
+                    />
+                ))}
             </div>
         </div>
     );
 };
 
-// ═══════════════════════════════════════════════════════════════
-// SCREEN: PRACTICE
-// ═══════════════════════════════════════════════════════════════
 const PracticeScreen = ({ profile, skillId, onBack, onTeach, onUpdateProfile }) => {
     const [problem, setProblem] = useState(null);
-    const [feedback, setFeedback] = useState(null); // 'correct', 'wrong', null
-    const [showingAnswer, setShowingAnswer] = useState(false);
-    const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 });
+    const [feedback, setFeedback] = useState(null);
+    const [sessionHistory, setSessionHistory] = useState([]);
+    const [hintsUsed, setHintsUsed] = useState(0);
+    const [showSummary, setShowSummary] = useState(false);
     const startTime = useRef(Date.now());
 
     const skill = SKILLS[skillId];
     const stats = profile.skills[skillId];
+    const level = LEVELS[stats?.level || 1];
 
-    useEffect(() => {
-        loadNewProblem();
-    }, [skillId]);
+    useEffect(() => { loadNewProblem(); }, [skillId]);
 
     const loadNewProblem = useCallback(() => {
-        const level = stats?.level || 1;
-        const newProblem = generateProblem(skillId, level);
+        const history = getProblemHistory(profile.username, 20);
+        const newProblem = generateProblem(skillId, stats?.level || 1, history);
         setProblem(newProblem);
         setFeedback(null);
-        setShowingAnswer(false);
+        setHintsUsed(0);
         startTime.current = Date.now();
-    }, [skillId, stats?.level]);
+    }, [skillId, stats?.level, profile.username]);
 
     const handleAnswer = (selected) => {
         if (feedback) return;
@@ -212,55 +331,109 @@ const PracticeScreen = ({ profile, skillId, onBack, onTeach, onUpdateProfile }) 
         const isCorrect = selected === problem.answer;
         const timeSpent = Math.round((Date.now() - startTime.current) / 1000);
 
-        // Record attempt
-        const updatedProfile = recordAttempt(profile.username, skillId, isCorrect, timeSpent);
-        if (updatedProfile) onUpdateProfile(updatedProfile);
+        // Record with full data
+        const updatedProfile = recordAttempt(profile.username, {
+            skillId,
+            correct: isCorrect,
+            timeSpent,
+            xpReward: isCorrect ? problem.xpReward || 5 : 0,
+            problem: problem.problem,
+            answer: problem.answer,
+            userAnswer: selected
+        });
 
-        setSessionStats(s => ({
-            correct: s.correct + (isCorrect ? 1 : 0),
-            wrong: s.wrong + (isCorrect ? 0 : 1)
-        }));
+        onUpdateProfile(updatedProfile);
+
+        const historyEntry = { ...problem, correct: isCorrect, timeSpent, userAnswer: selected };
+        setSessionHistory(h => [...h, historyEntry]);
 
         if (isCorrect) {
             setFeedback('correct');
-            confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
+            confetti({ particleCount: 40, spread: 60, origin: { y: 0.7 } });
 
-            // Check for difficulty adjustment
-            const adjustment = calculateNextDifficulty({
-                ...stats,
-                correct: stats.correct + 1,
-                streak: stats.streak + 1
-            }, skill.levels);
+            // Check for level up
+            const adjustment = calculateNextDifficulty(
+                { ...stats, correct: stats.correct + 1, streak: stats.streak + 1, xp: (stats.xp || 0) + (problem.xpReward || 5) },
+                getProblemHistory(profile.username),
+                skill.levels
+            );
 
-            if (adjustment.action === 'INCREASE') {
+            if (adjustment.action === 'LEVEL_UP') {
                 updateSkillLevel(profile.username, skillId, adjustment.newLevel);
+                confetti({ particleCount: 100, spread: 90, origin: { y: 0.6 } });
             }
 
-            setTimeout(loadNewProblem, 1000);
+            setTimeout(loadNewProblem, 1200);
         } else {
             setFeedback('wrong');
-            setShowingAnswer(true);
 
-            // Check if we need to teach
-            const adjustment = calculateNextDifficulty({
-                ...stats,
-                streak: stats.streak - 1
-            }, skill.levels);
+            const adjustment = calculateNextDifficulty(
+                { ...stats, streak: stats.streak - 1 },
+                getProblemHistory(profile.username),
+                skill.levels
+            );
 
             if (adjustment.action === 'TEACH') {
-                setTimeout(() => onTeach(skillId), 2000);
-            } else if (adjustment.action === 'DECREASE') {
-                updateSkillLevel(profile.username, skillId, adjustment.newLevel);
-                setTimeout(loadNewProblem, 2000);
+                setTimeout(() => onTeach(skillId, adjustment.patterns || []), 2500);
             } else {
-                setTimeout(loadNewProblem, 2000);
+                setTimeout(loadNewProblem, 2500);
             }
         }
     };
 
-    if (!problem) return null;
+    const handleEndSession = () => {
+        setShowSummary(true);
+    };
 
-    const level = LEVELS[stats?.level || 1];
+    if (showSummary) {
+        const summary = generateSessionSummary(sessionHistory, profile);
+        return (
+            <div className="flex flex-col h-full p-6 items-center justify-center slide-up">
+                <div className="text-5xl mb-4">{summary.accuracy >= 80 ? '🌟' : summary.accuracy >= 60 ? '👍' : '💪'}</div>
+                <h2 className="text-2xl font-black text-white mb-2">Session Complete!</h2>
+                <p className="text-slate-400 mb-6">{summary.encouragement}</p>
+
+                <div className="glass rounded-2xl p-6 w-full max-w-sm mb-6">
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <div className="text-3xl font-black text-white">{summary.problemsSolved}</div>
+                            <div className="text-xs text-slate-500">Problems</div>
+                        </div>
+                        <div>
+                            <div className={`text-3xl font-black ${summary.accuracy >= 80 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                {summary.accuracy}%
+                            </div>
+                            <div className="text-xs text-slate-500">Accuracy</div>
+                        </div>
+                        <div>
+                            <div className="text-3xl font-black text-amber-400">+{summary.xpEarned}</div>
+                            <div className="text-xs text-slate-500">XP Earned</div>
+                        </div>
+                        <div>
+                            <div className="text-3xl font-black text-cyan-400">{summary.avgTime}s</div>
+                            <div className="text-xs text-slate-500">Avg Time</div>
+                        </div>
+                    </div>
+
+                    {summary.patterns.length > 0 && (
+                        <div className="mt-4 p-3 bg-amber-500/10 rounded-xl border border-amber-500/30">
+                            <div className="text-xs text-amber-400 font-bold mb-1">💡 Tip</div>
+                            <div className="text-sm text-white">{summary.patterns[0].message}</div>
+                        </div>
+                    )}
+                </div>
+
+                <button
+                    onClick={onBack}
+                    className="w-full max-w-sm py-4 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-2xl font-black text-white"
+                >
+                    Back to Skills
+                </button>
+            </div>
+        );
+    }
+
+    if (!problem) return null;
 
     return (
         <div className="flex flex-col h-full p-4">
@@ -268,115 +441,140 @@ const PracticeScreen = ({ profile, skillId, onBack, onTeach, onUpdateProfile }) 
 
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
-                <button onClick={onBack} className="text-sm text-slate-500 hover:text-white">← Back</button>
+                <button onClick={handleEndSession} className="text-sm text-slate-500 hover:text-white">← End</button>
                 <div className="text-center">
-                    <div className="font-bold text-white">{skill.name}</div>
-                    <div className={`text-xs text-${level.color}-400`}>Level {stats?.level || 1}: {level.name}</div>
+                    <div className="flex items-center gap-2 justify-center">
+                        <span className="text-xl">{skill.icon}</span>
+                        <span className="font-bold text-white">{skill.name}</span>
+                    </div>
+                    <div className={`text-xs text-${skill.color}-400`}>Level {stats?.level || 1} • {level.name}</div>
                 </div>
                 <div className="text-sm">
-                    <span className="text-emerald-400">✓{sessionStats.correct}</span>
+                    <span className="text-emerald-400">✓{sessionHistory.filter(h => h.correct).length}</span>
                     {' / '}
-                    <span className="text-rose-400">✗{sessionStats.wrong}</span>
+                    <span className="text-rose-400">✗{sessionHistory.filter(h => !h.correct).length}</span>
                 </div>
+            </div>
+
+            {/* XP Progress */}
+            <div className="mb-6">
+                <XPBar
+                    current={stats?.xp || 0}
+                    max={LEVELS[(stats?.level || 1) + 1]?.xpRequired || 100}
+                    level={stats?.level}
+                    color={skill.color}
+                />
             </div>
 
             {/* Problem */}
             <div className="flex-1 flex flex-col items-center justify-center">
-                <div className={`text-center mb-8 p-6 rounded-2xl border-2 transition-all ${feedback === 'correct' ? 'bg-emerald-500/20 border-emerald-500 pop' :
-                        feedback === 'wrong' ? 'bg-rose-500/20 border-rose-500 shake' :
-                            'bg-slate-800/50 border-slate-700'
+                <div className={`text-center mb-8 glass rounded-3xl p-8 w-full max-w-md transition-all ${feedback === 'correct' ? 'border-2 border-emerald-500 pop' :
+                        feedback === 'wrong' ? 'border-2 border-rose-500 shake' : ''
                     }`}>
-                    {/* Visual hint if available */}
-                    {problem.visual && !showingAnswer && (
+                    {problem.visual && !feedback && (
                         <div className="text-lg text-slate-400 mb-4">{problem.visual}</div>
                     )}
 
-                    {/* Problem text */}
-                    <div className="text-3xl font-black text-white mb-4">
+                    <div className="text-4xl font-black text-white mb-2">
                         {problem.equation || problem.problem}
                     </div>
 
-                    {/* If it's a word problem, show equation */}
                     {problem.equation && (
                         <div className="text-sm text-slate-400">{problem.problem}</div>
                     )}
 
-                    {/* Show correct answer when wrong */}
-                    {showingAnswer && (
-                        <div className="mt-4 text-emerald-400 font-bold slide-in">
-                            Correct answer: {problem.answer}
+                    {feedback === 'correct' && (
+                        <div className="mt-4 text-emerald-400 font-bold text-xl slide-up">
+                            ✓ Correct! +{problem.xpReward || 5} XP
+                        </div>
+                    )}
+
+                    {feedback === 'wrong' && (
+                        <div className="mt-4 slide-up">
+                            <div className="text-rose-400 font-bold">✗ Not quite</div>
+                            <div className="text-sm text-slate-400 mt-1">
+                                The answer was <span className="text-emerald-400 font-bold">{problem.answer}</span>
+                            </div>
                         </div>
                     )}
                 </div>
 
-                {/* Answer options */}
-                {!showingAnswer && (
-                    <div className="grid grid-cols-2 gap-3 w-full max-w-xs">
+                {/* Answer Options */}
+                {!feedback && (
+                    <div className="grid grid-cols-2 gap-3 w-full max-w-md">
                         {problem.options.map((opt, i) => (
                             <button
                                 key={i}
                                 onClick={() => handleAnswer(opt)}
-                                disabled={!!feedback}
-                                className={`py-4 rounded-xl font-black text-xl transition-all ${feedback === 'correct' && opt === problem.answer
-                                        ? 'bg-emerald-500 text-white scale-110'
-                                        : feedback === 'wrong' && opt === problem.answer
-                                            ? 'bg-emerald-500/50 text-white'
-                                            : 'bg-slate-800 border-2 border-slate-700 hover:border-cyan-500 text-white'
-                                    }`}
+                                className="py-5 glass rounded-2xl font-black text-2xl text-white hover:bg-white/10 hover:scale-[1.03] transition-all active:scale-[0.97]"
                             >
                                 {opt}
                             </button>
                         ))}
                     </div>
                 )}
+
+                {/* Hints */}
+                {!feedback && problem.hints && (
+                    <HintButton
+                        hints={problem.hints}
+                        usedHints={hintsUsed}
+                        onUseHint={() => setHintsUsed(h => h + 1)}
+                    />
+                )}
             </div>
 
-            {/* Streak indicator */}
-            <div className="text-center text-sm text-slate-500">
-                {stats.streak > 0 && <span className="text-amber-400">🔥 {stats.streak} streak!</span>}
+            {/* Streak */}
+            <div className="text-center text-sm">
+                {stats?.streak > 0 && (
+                    <span className="text-amber-400 font-bold pulse">🔥 {stats.streak} in a row!</span>
+                )}
             </div>
         </div>
     );
 };
 
-// ═══════════════════════════════════════════════════════════════
-// SCREEN: TEACHING
-// ═══════════════════════════════════════════════════════════════
-const TeachingScreen = ({ profile, skillId, onBack, onPractice }) => {
+const TeachingScreen = ({ profile, skillId, patterns, onBack, onPractice }) => {
     const [step, setStep] = useState(0);
-    const content = getTeachingContent(skillId, profile);
-    const skill = SKILLS[skillId];
+    const content = getTeachingContent(skillId, profile, patterns);
 
     if (!content) return null;
 
     const currentStep = content.steps[step];
-    const isLastStep = step >= content.steps.length - 1;
+    const isLast = step >= content.steps.length - 1;
 
     return (
-        <div className="flex flex-col h-full p-4 slide-in">
+        <div className="flex flex-col h-full p-6 slide-up">
             <style>{styles}</style>
 
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <button onClick={onBack} className="text-sm text-slate-500 hover:text-white">← Skip</button>
-                <div className="text-4xl">{content.icon}</div>
+                <div className="text-5xl float">{content.icon}</div>
                 <div className="text-sm text-slate-500">{step + 1}/{content.steps.length}</div>
             </div>
 
-            {/* Title */}
-            <h1 className="text-2xl font-black text-white text-center mb-8">{content.title}</h1>
+            <h1 className="text-2xl font-black text-white text-center mb-6">{content.title}</h1>
 
-            {/* Connection to prior knowledge */}
+            {/* Personal connection */}
             {content.personalMessage && step === 0 && (
-                <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 mb-6 text-center">
+                <div className="glass-light rounded-2xl p-4 mb-6 text-center border border-cyan-500/30 fade-in">
                     <div className="text-cyan-400 font-bold mb-1">💡 You already know this!</div>
                     <div className="text-sm text-slate-300">{content.personalMessage}</div>
                 </div>
             )}
 
+            {/* Pattern advice */}
+            {content.personalAdvice?.length > 0 && step === 0 && (
+                <div className="glass-light rounded-2xl p-4 mb-6 border border-amber-500/30 fade-in">
+                    <div className="text-amber-400 font-bold text-sm mb-1">🎯 Personalized Tip</div>
+                    <div className="text-sm text-white">{content.personalAdvice[0]}</div>
+                </div>
+            )}
+
             {/* Teaching content */}
             <div className="flex-1 flex flex-col items-center justify-center">
-                <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700 max-w-sm text-center slide-in" key={step}>
+                <div className="glass rounded-3xl p-8 max-w-sm text-center slide-up" key={step}>
                     <div className="text-xl text-white mb-4">{currentStep.text}</div>
                     {currentStep.visual && (
                         <div className="text-3xl tracking-widest">{currentStep.visual}</div>
@@ -389,16 +587,16 @@ const TeachingScreen = ({ profile, skillId, onBack, onPractice }) => {
                 {step > 0 && (
                     <button
                         onClick={() => setStep(s => s - 1)}
-                        className="flex-1 py-3 border border-slate-700 rounded-xl text-white hover:border-white"
+                        className="flex-1 py-4 glass rounded-2xl font-bold text-white hover:bg-white/10"
                     >
-                        ← Previous
+                        ← Back
                     </button>
                 )}
                 <button
-                    onClick={() => isLastStep ? onPractice() : setStep(s => s + 1)}
-                    className="flex-1 py-3 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl font-bold text-white"
+                    onClick={() => isLast ? onPractice() : setStep(s => s + 1)}
+                    className="flex-1 py-4 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-2xl font-black text-white hover:shadow-lg hover:shadow-cyan-500/30"
                 >
-                    {isLastStep ? "Let's Practice! →" : 'Next →'}
+                    {isLast ? "Let's Practice! 🚀" : 'Next →'}
                 </button>
             </div>
         </div>
@@ -409,100 +607,81 @@ const TeachingScreen = ({ profile, skillId, onBack, onPractice }) => {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════
 export default function MathMind({ onBack }) {
-    const [screen, setScreen] = useState('login'); // login, dashboard, practice, teaching
+    const [screen, setScreen] = useState('login');
     const [username, setUsername] = useState(getActiveUser());
     const [profile, setProfile] = useState(null);
     const [selectedSkill, setSelectedSkill] = useState(null);
+    const [teachPatterns, setTeachPatterns] = useState([]);
+    const [newAchievement, setNewAchievement] = useState(null);
 
-    // Load profile on mount or username change
     useEffect(() => {
         if (username) {
             const p = getProfile(username);
             setProfile(p);
             setActiveUser(username);
+            startSession(username);
             setScreen('dashboard');
+
+            // Check achievements
+            const newAchievements = checkAchievements(p);
+            if (newAchievements.length > 0) {
+                unlockAchievement(username, newAchievements[0]);
+                setNewAchievement(ACHIEVEMENTS[newAchievements[0]]);
+            }
         } else {
             setScreen('login');
         }
     }, [username]);
 
-    const handleLogin = (name) => {
-        setUsername(name);
-    };
+    useEffect(() => {
+        if (profile) {
+            const newAchievements = checkAchievements(profile);
+            if (newAchievements.length > 0) {
+                unlockAchievement(profile.username, newAchievements[0]);
+                setNewAchievement(ACHIEVEMENTS[newAchievements[0]]);
+            }
+        }
+    }, [profile?.stats?.currentStreak, profile?.stats?.totalProblems]);
 
-    const handleLogout = () => {
-        setActiveUser(null);
-        setUsername(null);
-        setProfile(null);
-        setScreen('login');
-    };
-
-    const handleSelectSkill = (skillId) => {
-        setSelectedSkill(skillId);
-        setScreen('practice');
-    };
-
-    const handleTeach = (skillId) => {
-        setSelectedSkill(skillId);
-        setScreen('teaching');
-    };
-
-    const handleBackToDashboard = () => {
-        setSelectedSkill(null);
-        setScreen('dashboard');
-        // Refresh profile
-        if (username) setProfile(getProfile(username));
-    };
+    const handleLogin = (name) => setUsername(name);
+    const handleLogout = () => { setActiveUser(null); setUsername(null); setProfile(null); setScreen('login'); };
+    const handleSelectSkill = (id) => { setSelectedSkill(id); setScreen('practice'); };
+    const handleTeach = (id, patterns = []) => { setSelectedSkill(id); setTeachPatterns(patterns); setScreen('teaching'); };
+    const handleBackToDashboard = () => { setSelectedSkill(null); setScreen('dashboard'); if (username) setProfile(getProfile(username)); };
 
     const analytics = profile ? getAnalytics(username) : null;
 
     return (
-        <div className="flex flex-col h-full bg-gradient-to-b from-slate-900 via-slate-950 to-black text-white overflow-hidden">
+        <div className="flex flex-col h-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden">
             <style>{styles}</style>
+
+            {/* Achievement popup */}
+            {newAchievement && (
+                <AchievementPopup achievement={newAchievement} onClose={() => setNewAchievement(null)} />
+            )}
 
             {/* Compact header */}
             {screen !== 'login' && (
-                <div className="shrink-0 p-3 flex items-center justify-between bg-slate-900/50 border-b border-white/5">
+                <div className="shrink-0 p-3 flex items-center justify-between glass border-0 border-b border-white/5">
                     <button onClick={onBack} className="text-xs text-slate-500 hover:text-white">← EXIT</button>
-                    <div className="text-sm font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-                        🧠 MathMind
-                    </div>
-                    <div className="text-xs text-slate-500">{username}</div>
+                    <div className="text-sm font-black gradient-text">🧠 MathMind</div>
+                    {analytics && (
+                        <div className="text-xs text-amber-400 font-bold">{analytics.totalXP} XP</div>
+                    )}
                 </div>
             )}
 
             {/* Content */}
             <div className="flex-1 overflow-hidden">
-                {screen === 'login' && (
-                    <LoginScreen onLogin={handleLogin} />
-                )}
-
+                {screen === 'login' && <LoginScreen onLogin={handleLogin} />}
                 {screen === 'dashboard' && profile && analytics && (
-                    <DashboardScreen
-                        profile={profile}
-                        analytics={analytics}
-                        onSelectSkill={handleSelectSkill}
-                        onLogout={handleLogout}
-                    />
+                    <DashboardScreen profile={profile} analytics={analytics} onSelectSkill={handleSelectSkill} onLogout={handleLogout} />
                 )}
-
                 {screen === 'practice' && profile && selectedSkill && (
-                    <PracticeScreen
-                        profile={profile}
-                        skillId={selectedSkill}
-                        onBack={handleBackToDashboard}
-                        onTeach={handleTeach}
-                        onUpdateProfile={setProfile}
-                    />
+                    <PracticeScreen profile={profile} skillId={selectedSkill} onBack={handleBackToDashboard} onTeach={handleTeach} onUpdateProfile={setProfile} />
                 )}
-
                 {screen === 'teaching' && profile && selectedSkill && (
-                    <TeachingScreen
-                        profile={profile}
-                        skillId={selectedSkill}
-                        onBack={handleBackToDashboard}
-                        onPractice={() => setScreen('practice')}
-                    />
+                    <TeachingScreen profile={profile} skillId={selectedSkill} patterns={teachPatterns} onBack={handleBackToDashboard} onPractice={() => setScreen('practice')} />
                 )}
             </div>
         </div>
