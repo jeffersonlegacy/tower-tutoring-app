@@ -13,6 +13,7 @@ const Yahtzee = lazy(() => import('./Yahtzee'));
 const Battleship = lazy(() => import('./Battleship'));
 const MathInvaders = lazy(() => import('./MathInvaders'));
 const EquationExplorer = lazy(() => import('./EquationExplorer'));
+const MathMind = lazy(() => import('./MathMind'));
 
 const GameLoader = () => (
     <div className="flex items-center justify-center h-full bg-slate-900">
@@ -85,6 +86,25 @@ export default function BrainBreak({ sessionId, onClose }) {
                         </button>
 
                         <div className="w-full h-px bg-slate-700/50 my-1"></div>
+
+                        {/* GAME: MathMind (AI TUTOR - FEATURED) */}
+                        <button
+                            onClick={() => setGame('mathmind')}
+                            className="group relative h-24 rounded-xl overflow-hidden border-2 border-cyan-500/50 hover:border-cyan-400 transition-all bg-slate-900 shadow-xl"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-br from-cyan-900 via-slate-900 to-purple-900 opacity-80 group-hover:opacity-60 transition-opacity"></div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-cyan-600/20 to-purple-600/20"></div>
+
+                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
+                                <div className="p-3 bg-black/50 rounded-lg border border-cyan-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(6,182,212,0.5)]">
+                                    <span className="text-3xl">🧠</span>
+                                </div>
+                                <div className="flex flex-col items-start">
+                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 text-xl uppercase tracking-tighter filter drop-shadow">MathMind</span>
+                                    <span className="text-[10px] font-bold text-white/80 bg-cyan-600/50 px-2 py-0.5 rounded-full border border-cyan-400/30">AI TUTOR ⭐</span>
+                                </div>
+                            </div>
+                        </button>
 
                         {/* GAME: Math Invaders (FEATURED) */}
                         <button
@@ -254,7 +274,8 @@ export default function BrainBreak({ sessionId, onClose }) {
                                                 game === 'battleship' ? 'Naval Command' :
                                                     game === 'mathinvaders' ? 'Math Invaders' :
                                                         game === 'offsetoperator' ? 'Equation Explorer' :
-                                                            'Arcade'
+                                                            game === 'mathmind' ? 'MathMind' :
+                                                                'Arcade'
                     }
                     onClose={closeGame}
                 >
@@ -268,6 +289,7 @@ export default function BrainBreak({ sessionId, onClose }) {
                         {game === 'battleship' && <GameErrorBoundary onBack={closeGame}><Battleship sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
                         {game === 'mathinvaders' && <GameErrorBoundary onBack={closeGame}><MathInvaders sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
                         {game === 'offsetoperator' && <GameErrorBoundary onBack={closeGame}><EquationExplorer onBack={closeGame} /></GameErrorBoundary>}
+                        {game === 'mathmind' && <GameErrorBoundary onBack={closeGame}><MathMind onBack={closeGame} /></GameErrorBoundary>}
                     </Suspense>
                 </GameOverlay>,
                 document.body
