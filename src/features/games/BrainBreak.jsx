@@ -12,7 +12,7 @@ const SwipeFight = lazy(() => import('./SwipeFight'));
 const Yahtzee = lazy(() => import('./Yahtzee'));
 const Battleship = lazy(() => import('./Battleship'));
 const MathInvaders = lazy(() => import('./MathInvaders'));
-const OffsetOperator = lazy(() => import('./OffsetOperator'));
+const EquationExplorer = lazy(() => import('./EquationExplorer'));
 
 const GameLoader = () => (
     <div className="flex items-center justify-center h-full bg-slate-900">
@@ -105,21 +105,21 @@ export default function BrainBreak({ sessionId, onClose }) {
                             </div>
                         </button>
 
-                        {/* GAME: Offset Operator (Math Maze) */}
+                        {/* GAME: Equation Explorer (Educational Math) */}
                         <button
                             onClick={() => setGame('offsetoperator')}
                             className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-cyan-500 transition-all bg-slate-900 shadow-xl"
                         >
-                            <div className="absolute inset-0 bg-gradient-to-br from-cyan-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
-                            <div className="absolute inset-0 bg-gradient-to-r from-cyan-600/20 to-transparent"></div>
+                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-transparent"></div>
 
                             <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-3 bg-black/50 rounded-lg border border-cyan-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(6,182,212,0.5)]">
-                                    <span className="text-3xl">🤖</span>
+                                <div className="p-3 bg-black/50 rounded-lg border border-purple-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(139,92,246,0.5)]">
+                                    <span className="text-3xl">🏰</span>
                                 </div>
                                 <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400 text-xl uppercase tracking-tighter filter drop-shadow">OFFSET OPERATOR</span>
-                                    <span className="text-[10px] font-bold text-white/80 bg-cyan-600/50 px-2 py-0.5 rounded-full border border-cyan-400/30">MATH MAZE</span>
+                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 text-xl uppercase tracking-tighter filter drop-shadow">EQUATION EXPLORER</span>
+                                    <span className="text-[10px] font-bold text-white/80 bg-purple-600/50 px-2 py-0.5 rounded-full border border-purple-400/30">LEARN MATH</span>
                                 </div>
                             </div>
                         </button>
@@ -253,7 +253,7 @@ export default function BrainBreak({ sessionId, onClose }) {
                                             game === 'yahtzee' ? 'Yahtzee' :
                                                 game === 'battleship' ? 'Naval Command' :
                                                     game === 'mathinvaders' ? 'Math Invaders' :
-                                                        game === 'offsetoperator' ? 'Offset Operator' :
+                                                        game === 'offsetoperator' ? 'Equation Explorer' :
                                                             'Arcade'
                     }
                     onClose={closeGame}
@@ -267,7 +267,7 @@ export default function BrainBreak({ sessionId, onClose }) {
                         {game === 'yahtzee' && <GameErrorBoundary onBack={closeGame}><Yahtzee sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
                         {game === 'battleship' && <GameErrorBoundary onBack={closeGame}><Battleship sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
                         {game === 'mathinvaders' && <GameErrorBoundary onBack={closeGame}><MathInvaders sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                        {game === 'offsetoperator' && <GameErrorBoundary onBack={closeGame}><OffsetOperator sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
+                        {game === 'offsetoperator' && <GameErrorBoundary onBack={closeGame}><EquationExplorer onBack={closeGame} /></GameErrorBoundary>}
                     </Suspense>
                 </GameOverlay>,
                 document.body
