@@ -80,8 +80,20 @@ export default function AirHockey({ sessionId, onBack }) {
         // Move puck
         s.puck.x += s.puck.vx;
         s.puck.y += s.puck.vy;
-        s.puck.vx *= 0.995;
-        s.puck.vy *= 0.995;
+        s.puck.vx *= 0.998; // Less friction
+        s.puck.vy *= 0.998;
+
+        // Prevent puck from stopping completely - give it a nudge
+        const speed = Math.sqrt(s.puck.vx ** 2 + s.puck.vy ** 2);
+        if (speed < 2 && speed > 0) {
+            const boost = 3 / speed;
+            s.puck.vx *= boost;
+            s.puck.vy *= boost;
+        } else if (speed === 0) {
+            // Restart with random direction
+            s.puck.vx = (Math.random() - 0.5) * 6;
+            s.puck.vy = (Math.random() > 0.5 ? 1 : -1) * 6;
+        }
 
         // Wall collisions (left/right)
         if (s.puck.x - PUCK_RADIUS < 0) {
@@ -148,10 +160,19 @@ export default function AirHockey({ sessionId, onBack }) {
     };
 
     const updateAI = (s) => {
-        // Predictive AI
+        const puckSpeed = Math.sqrt(s.puck.vx ** 2 + s.puck.vy ** 2);
+        const puckInAIHalf = s.puck.y < TABLE_HEIGHT / 2;
+
+        // Predictive AI - now also moves when puck is slow or in AI half
         const predictX = () => {
-            if (s.puck.vy >= 0) return TABLE_WIDTH / 2;
-            const frames = Math.abs((s.puck.y - 50) / s.puck.vy);
+            // If puck is moving toward player OR is slow, go to puck
+            if (s.puck.vy > 2 || puckSpeed < 5) {
+                // Puck moving away or slow - go toward it aggressively
+                return puckInAIHalf ? s.puck.x : TABLE_WIDTH / 2;
+            }
+
+            // Puck moving toward AI - predict where it will be
+            const frames = Math.abs((s.puck.y - 50) / (s.puck.vy || 1));
             let predX = s.puck.x + (s.puck.vx * frames);
 
             // Handle wall bounces
@@ -166,16 +187,20 @@ export default function AirHockey({ sessionId, onBack }) {
 
         const targetX = predictX();
         const error = targetX - s.opponentPaddle.x;
-        const maxSpeed = 10;
-        const move = Math.max(-maxSpeed, Math.min(maxSpeed, error * 0.15));
+        const maxSpeed = puckInAIHalf && puckSpeed < 5 ? 15 : 10; // Faster when chasing slow puck
+        const responsiveness = puckInAIHalf ? 0.25 : 0.15;
+        const move = Math.max(-maxSpeed, Math.min(maxSpeed, error * responsiveness));
         s.opponentPaddle.x += move;
 
-        // Y-axis movement
+        // Y-axis movement - more aggressive when puck is in AI half or slow
         let targetY = 50;
-        if (s.puck.y < 250 && s.puck.vy < 0) {
+        if (puckInAIHalf) {
+            // Move toward puck when it's in AI territory
+            targetY = Math.max(PADDLE_RADIUS + 10, Math.min(TABLE_HEIGHT / 2 - PADDLE_RADIUS, s.puck.y - 20));
+        } else if (s.puck.y < 300 && s.puck.vy < 0) {
             targetY = Math.min(180, s.puck.y - 30);
         }
-        s.opponentPaddle.y += (targetY - s.opponentPaddle.y) * 0.1;
+        s.opponentPaddle.y += (targetY - s.opponentPaddle.y) * 0.15;
     };
 
     const checkCollision = (puck, paddle) => {
@@ -341,21 +366,27 @@ export default function AirHockey({ sessionId, onBack }) {
             ctx.fill();
         }
 
-        // Player paddle (bottom, green)
-        ctx.fillStyle = '#10b981';
+        // Player paddle (bottom) - RED to match Team Red
+        ctx.fillStyle = '#ec4899'; // Pink/Red
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#ec4899';
         ctx.beginPath();
         ctx.arc(s.playerPaddle.x, s.playerPaddle.y, PADDLE_RADIUS, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
         ctx.stroke();
+        ctx.shadowBlur = 0;
 
-        // Opponent paddle (top, red/gray)
-        ctx.fillStyle = gameState?.mode === 'AI' ? '#94a3b8' : '#ef4444';
+        // Opponent paddle (top) - YELLOW to match Team Yellow
+        ctx.fillStyle = '#facc15'; // Yellow
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#facc15';
         ctx.beginPath();
         ctx.arc(s.opponentPaddle.x, s.opponentPaddle.y, PADDLE_RADIUS, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+        ctx.shadowBlur = 0;
     };
 
     if (!gameState) {
@@ -373,39 +404,39 @@ export default function AirHockey({ sessionId, onBack }) {
                 <div className={`absolute inset-0 z-50 pointer-events-none ${scoreFlash === 'player' ? 'bg-emerald-500/30' : 'bg-red-500/30'} animate-pulse`} />
             )}
 
-            {/* SCOREBOARD - Much bigger and clearer */}
-            <div className="w-full p-4 bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 border-b border-white/10 z-10">
-                <div className="flex justify-between items-center mb-2">
-                    <button onClick={onBack} className="text-xs text-slate-400 hover:text-white uppercase">Exit</button>
-                    <button onClick={() => updateState({ status: 'MENU', playerScore: 0, opponentScore: 0, winner: null })} className="text-xs text-red-400 hover:text-white">🔄 Reset</button>
+            {/* SCOREBOARD - Responsive for mobile */}
+            <div className="w-full p-2 sm:p-4 bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 border-b border-white/10 z-10">
+                <div className="flex justify-between items-center mb-1 sm:mb-2">
+                    <button onClick={onBack} className="text-[10px] sm:text-xs text-slate-400 hover:text-white uppercase">Exit</button>
+                    <button onClick={() => updateState({ status: 'MENU', playerScore: 0, opponentScore: 0, winner: null })} className="text-[10px] sm:text-xs text-red-400 hover:text-white">🔄</button>
                 </div>
 
-                {/* Big Score Display - Team Red (You) vs Team Yellow (Opponent) */}
-                <div className="flex items-center justify-center gap-6">
-                    <div className={`flex flex-col items-center transition-transform ${scoreFlash === 'player' ? 'scale-125' : ''}`}>
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_20px_#ec4899] flex items-center justify-center mb-1">
-                            <span className="text-white text-xs font-black">YOU</span>
+                {/* Compact Score Display - Team Red (You) vs Team Yellow (Opponent) */}
+                <div className="flex items-center justify-center gap-3 sm:gap-6">
+                    <div className={`flex flex-col items-center transition-transform ${scoreFlash === 'player' ? 'scale-110' : ''}`}>
+                        <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_15px_#ec4899] flex items-center justify-center">
+                            <span className="text-white text-[8px] sm:text-xs font-black">YOU</span>
                         </div>
-                        <span className="text-4xl font-black text-pink-400" style={{ textShadow: '0 0 30px rgba(236,72,153,0.6)' }}>
+                        <span className="text-2xl sm:text-4xl font-black text-pink-400" style={{ textShadow: '0 0 20px rgba(236,72,153,0.6)' }}>
                             {playerScore}
                         </span>
-                        <span className="text-xs text-pink-500 font-bold uppercase tracking-widest">TEAM RED</span>
+                        <span className="text-[8px] sm:text-xs text-pink-500 font-bold uppercase tracking-wider sm:tracking-widest">RED</span>
                     </div>
 
                     <div className="flex flex-col items-center">
-                        <span className="text-2xl text-slate-600 font-black">VS</span>
-                        <span className="text-[10px] text-slate-700 font-bold">FIRST TO {WIN_SCORE}</span>
+                        <span className="text-lg sm:text-2xl text-slate-600 font-black">VS</span>
+                        <span className="text-[8px] sm:text-[10px] text-slate-700 font-bold">TO {WIN_SCORE}</span>
                     </div>
 
-                    <div className={`flex flex-col items-center transition-transform ${scoreFlash === 'opponent' ? 'scale-125' : ''}`}>
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_20px_#facc15] flex items-center justify-center mb-1">
-                            <span className="text-slate-900 text-[10px] font-black">{gameState.mode === 'AI' ? 'CPU' : 'OPP'}</span>
+                    <div className={`flex flex-col items-center transition-transform ${scoreFlash === 'opponent' ? 'scale-110' : ''}`}>
+                        <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_15px_#facc15] flex items-center justify-center">
+                            <span className="text-slate-900 text-[8px] sm:text-[10px] font-black">{gameState.mode === 'AI' ? 'CPU' : 'OPP'}</span>
                         </div>
-                        <span className="text-4xl font-black text-yellow-400" style={{ textShadow: '0 0 30px rgba(250,204,21,0.6)' }}>
+                        <span className="text-2xl sm:text-4xl font-black text-yellow-400" style={{ textShadow: '0 0 20px rgba(250,204,21,0.6)' }}>
                             {opponentScore}
                         </span>
-                        <span className="text-xs text-yellow-500 font-bold uppercase tracking-widest">
-                            {gameState.mode === 'AI' ? 'CPU' : 'TEAM YELLOW'}
+                        <span className="text-[8px] sm:text-xs text-yellow-500 font-bold uppercase tracking-wider sm:tracking-widest">
+                            {gameState.mode === 'AI' ? 'CPU' : 'YELLOW'}
                         </span>
                     </div>
                 </div>
