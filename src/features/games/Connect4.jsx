@@ -14,6 +14,7 @@ const INITIAL_STATE = {
     winner: null,
     status: 'MENU',
     lastMoveTime: 0,
+    lastMoveIndex: null, // Track last dropped piece for visual indicator
     mode: 'PVP',
     difficulty: 'MEDIUM',
     scores: { red: 0, yellow: 0 },
@@ -207,10 +208,11 @@ const minimax = (board, depth, alpha, beta, maximizing, moveCount) => {
 };
 
 export default function Connect4({ sessionId, onBack }) {
-    const gameId = 'connect4_v3'; // Version bump for new state structure
+    const gameId = 'connect4_v4'; // Version bump for lastMoveIndex
     const { gameState, playerId, isHost, updateState } = useRealtimeGame(sessionId, gameId, INITIAL_STATE);
     const [localDifficulty, setLocalDifficulty] = useState(null);
     const [flashWin, setFlashWin] = useState(false);
+    const [hoveredCol, setHoveredCol] = useState(null); // Column hover for preview
     const isMounted = useRef(true);
     const aiThinking = useRef(false);
 
@@ -297,7 +299,8 @@ export default function Connect4({ sessionId, onBack }) {
         const row = getDropRow(board, col);
         if (row === -1) return;
 
-        board[row * COLS + col] = gameState.turn;
+        const dropIndex = row * COLS + col;
+        board[dropIndex] = gameState.turn;
         const result = checkWin(board);
 
         const newScores = { ...gameState.scores };
@@ -312,6 +315,7 @@ export default function Connect4({ sessionId, onBack }) {
             winningCells: result?.cells || [],
             status: result ? 'FINISHED' : 'PLAYING',
             lastMoveTime: Date.now(),
+            lastMoveIndex: dropIndex, // Track for visual pulse
             scores: newScores
         });
     }, [gameState, isHost, updateState]);
@@ -508,20 +512,22 @@ export default function Connect4({ sessionId, onBack }) {
                 )}
             </div>
 
-            {/* Drop Buttons */}
+            {/* Drop Buttons with hover preview */}
             {gameState.status === 'PLAYING' && (
                 <div className="grid grid-cols-7 gap-1.5 w-full max-w-md">
                     {[0, 1, 2, 3, 4, 5, 6].map(c => (
                         <button
                             key={c}
                             onClick={() => handleDrop(c)}
+                            onMouseEnter={() => setHoveredCol(c)}
+                            onMouseLeave={() => setHoveredCol(null)}
                             disabled={!isMyTurn && gameState.mode !== 'SOLO'}
-                            className={`h-8 flex items-center justify-center rounded-t-lg transition-all ${isMyTurn || gameState.mode === 'SOLO'
-                                ? 'bg-white/10 hover:bg-white/30 text-white cursor-pointer'
+                            className={`h-10 flex items-center justify-center rounded-t-lg transition-all ${isMyTurn || gameState.mode === 'SOLO'
+                                ? `bg-white/10 hover:bg-white/30 text-white cursor-pointer ${hoveredCol === c ? 'scale-110 bg-white/25' : ''}`
                                 : 'opacity-30 pointer-events-none'
                                 }`}
                         >
-                            <span className="text-xs">▼</span>
+                            <span className={`text-lg transition-transform ${hoveredCol === c ? 'animate-bounce' : ''}`}>▼</span>
                         </button>
                     ))}
                 </div>
@@ -550,9 +556,17 @@ export default function Connect4({ sessionId, onBack }) {
                     {safeBoard(gameState.board).map((cell, i) => {
                         const isWinning = winningCells.has(i);
                         const row = Math.floor(i / COLS);
+                        const col = i % COLS;
                         const dropStart = `-${(row + 1) * 100}%`;
                         const isFinished = gameState.status === 'FINISHED';
                         const hasWinningCells = winningCells.size > 0;
+                        const isLastMove = gameState.lastMoveIndex === i && !isFinished;
+
+                        // Calculate if this cell should show ghost preview
+                        const currentBoard = safeBoard(gameState.board);
+                        const previewRow = hoveredCol !== null && col === hoveredCol ? getDropRow(currentBoard, hoveredCol) : -1;
+                        const showGhost = !cell && previewRow === row && hoveredCol === col && (isMyTurn || gameState.mode === 'SOLO');
+                        const myColor = isHost ? 'red' : 'yellow';
 
                         // Determine styling based on win state
                         let pieceClass = 'animate-drop ';
@@ -579,13 +593,22 @@ export default function Connect4({ sessionId, onBack }) {
                         return (
                             <div
                                 key={i}
-                                className={`aspect-square rounded-full border-2 border-slate-900/50 flex items-center justify-center bg-slate-950 shadow-inner relative ${isWinning && isFinished ? 'z-10' : ''}`}
+                                className={`aspect-square rounded-full border-2 border-slate-900/50 flex items-center justify-center bg-slate-950 shadow-inner relative ${isWinning && isFinished ? 'z-10' : ''} ${showGhost ? 'bg-slate-900' : ''}`}
                             >
+                                {/* Ghost preview piece */}
+                                {showGhost && (
+                                    <div className={`w-[85%] h-[85%] rounded-full opacity-40 ${myColor === 'red' ? 'bg-gradient-to-br from-pink-400 to-pink-600' : 'bg-gradient-to-br from-yellow-300 to-yellow-500'}`} />
+                                )}
+
                                 {cell && (
                                     <div
                                         style={{ '--drop-start': dropStart }}
                                         className={`w-[85%] h-[85%] rounded-full shadow-lg ${pieceClass}`}
                                     >
+                                        {/* Last move pulse indicator */}
+                                        {isLastMove && (
+                                            <div className="absolute inset-[-4px] rounded-full border-2 border-white/60 animate-pulse" />
+                                        )}
                                         {/* Winning ring indicator */}
                                         {isWinning && isFinished && (
                                             <div className="absolute inset-[-6px] rounded-full border-4 border-white animate-ping opacity-75" />

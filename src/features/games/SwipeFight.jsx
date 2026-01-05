@@ -248,6 +248,7 @@ export default function SwipeFight({ sessionId, onBack }) {
     const [floatingPoints, setFloatingPoints] = useState(null);
     const [scoreAnimating, setScoreAnimating] = useState(false);
     const [isInputLocked, setIsInputLocked] = useState(false);
+    const [showCorrectAnswer, setShowCorrectAnswer] = useState(null); // Show answer was TRUE/FALSE
 
     // Telemetry Refs
     const sessionLog = useRef([]);
@@ -413,15 +414,19 @@ export default function SwipeFight({ sessionId, onBack }) {
             setFeedback('incorrect');
             setFloatingPoints('-200');
             setScoreAnimating(true);
+            setShowCorrectAnswer(currentProblem.isCorrect ? 'TRUE' : 'FALSE'); // Show what it should have been
         }
 
+        // Longer delay on wrong to show correct answer
+        const delay = isCorrectChoice ? 300 : 800;
         setTimeout(() => {
             setFeedback(null);
             setFloatingPoints(null);
             setScoreAnimating(false);
+            setShowCorrectAnswer(null);
             setCardKey(k => k + 1);
             nextProblem();
-        }, 300);
+        }, delay);
     };
 
     const handleStart = (mode = 'PVP') => {
@@ -471,9 +476,11 @@ export default function SwipeFight({ sessionId, onBack }) {
         if (!isDragging.current) return;
         isDragging.current = false;
 
-        // Threshold for swipe action
-        if (dragX > 100) handleAnswer(true);       // Swiped Right
-        else if (dragX < -100) handleAnswer(false); // Swiped Left
+        // Reduced threshold for mobile-friendly quick swipes (50px vs 100px)
+        const SWIPE_THRESHOLD = 50;
+
+        if (dragX > SWIPE_THRESHOLD) handleAnswer(true);       // Swiped Right
+        else if (dragX < -SWIPE_THRESHOLD) handleAnswer(false); // Swiped Left
 
         setDragX(0); // Reset card position
     };
@@ -702,6 +709,12 @@ export default function SwipeFight({ sessionId, onBack }) {
                                 <div className="text-6xl font-black text-white text-center leading-tight drop-shadow-xl z-10 break-words">
                                     {currentProblem.text}
                                 </div>
+                                {/* Show correct answer on wrong */}
+                                {showCorrectAnswer && (
+                                    <div className={`mt-6 text-2xl font-black animate-pulse ${showCorrectAnswer === 'TRUE' ? 'text-emerald-400' : 'text-pink-400'}`}>
+                                        It was {showCorrectAnswer}!
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

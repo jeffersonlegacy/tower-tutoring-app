@@ -36,37 +36,37 @@ export default function GameEndOverlay({
     }, [winner, isDraw]);
 
     return (
-        <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center animate-in fade-in duration-500">
-            {/* Visual Icon */}
-            <div className="text-[120px] mb-4 animate-bounce">
+        <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center animate-in fade-in duration-500 p-4 overflow-y-auto">
+            {/* Visual Icon - smaller on mobile */}
+            <div className="text-[80px] sm:text-[120px] mb-2 sm:mb-4 animate-bounce">
                 {icon || (isDraw ? '🤝' : (winner ? '👑' : '😢'))}
             </div>
 
-            {/* Title */}
-            <h1 className={`text-6xl font-black italic tracking-tighter mb-2 bg-clip-text text-transparent ${isDraw ? 'bg-gradient-to-r from-slate-400 to-white' :
+            {/* Title - responsive sizing */}
+            <h1 className={`text-4xl sm:text-6xl font-black italic tracking-tighter mb-2 bg-clip-text text-transparent text-center ${isDraw ? 'bg-gradient-to-r from-slate-400 to-white' :
                 (winner ? 'bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-200' : 'bg-gradient-to-r from-blue-400 to-indigo-500')
                 } filter drop-shadow-[0_4px_0_rgba(0,0,0,0.5)]`}>
                 {title || (isDraw ? 'DRAW GAME' : (winner ? 'VICTORY!' : 'DEFEAT'))}
             </h1>
 
-            {/* Score Display (Optional) */}
+            {/* Score Display (Optional) - compact on mobile */}
             {score !== undefined && (
-                <div className="text-2xl font-mono text-white mb-8 bg-white/10 px-6 py-2 rounded-full border border-white/10">
-                    FINAL SCORE: <span className="text-cyan-400 font-bold">{score}</span>
+                <div className="text-lg sm:text-2xl font-mono text-white mb-4 sm:mb-8 bg-white/10 px-4 sm:px-6 py-1.5 sm:py-2 rounded-full border border-white/10">
+                    SCORE: <span className="text-cyan-400 font-bold">{score}</span>
                 </div>
             )}
 
-            {/* Actions */}
-            <div className="flex gap-4 mt-8 w-full max-w-sm px-4">
+            {/* Actions - Stack on mobile, row on desktop */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4 sm:mt-8 w-full max-w-xs sm:max-w-sm">
                 <button
                     onClick={onRestart}
-                    className="flex-1 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black text-xl rounded-xl shadow-[0_4px_0_rgb(107,33,168)] active:shadow-none active:translate-y-[4px] transition-all uppercase tracking-widest border-2 border-purple-400"
+                    className="w-full py-3 sm:py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black text-lg sm:text-xl rounded-xl shadow-[0_4px_0_rgb(107,33,168)] active:shadow-none active:translate-y-[4px] transition-all uppercase tracking-wider sm:tracking-widest border-2 border-purple-400"
                 >
                     Play Again
                 </button>
                 <button
                     onClick={onExit}
-                    className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-bold text-xl rounded-xl border-2 border-slate-700 hover:border-slate-500 transition-colors uppercase tracking-widest"
+                    className="w-full py-3 sm:py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-bold text-lg sm:text-xl rounded-xl border-2 border-slate-700 hover:border-slate-500 transition-colors uppercase tracking-wider sm:tracking-widest"
                 >
                     Exit
                 </button>

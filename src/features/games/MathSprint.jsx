@@ -85,6 +85,8 @@ export default function MathSprint({ sessionId, onBack }) {
         }
     }, [gameState, question]);
 
+    const [showCorrectAnswer, setShowCorrectAnswer] = useState(null); // Show correct on wrong
+
     const handleSubmit = (e) => {
         e.preventDefault();
         const userVal = parseInt(answer);
@@ -110,8 +112,16 @@ export default function MathSprint({ sessionId, onBack }) {
         } else {
             setStreak(0);
             setFeedback('incorrect');
+            setShowCorrectAnswer(question.answer); // Show correct answer
             setAnswer('');
-            setTimeout(() => setFeedback(null), 500);
+
+            // Wait longer to show correct answer, then move on
+            setTimeout(() => {
+                setFeedback(null);
+                setShowCorrectAnswer(null);
+                setQuestionKey(k => k + 1);
+                setQuestion(generateQuestion());
+            }, 1200); // 1.2s to read the correct answer
         }
     };
 
@@ -340,20 +350,35 @@ export default function MathSprint({ sessionId, onBack }) {
                         `}
                     >
                         {question.text}
+                        {/* Show correct answer on wrong */}
+                        {showCorrectAnswer !== null && (
+                            <div className="text-emerald-400 text-2xl mt-2 animate-pulse">
+                                Answer: {showCorrectAnswer}
+                            </div>
+                        )}
                     </div>
 
                     <form onSubmit={handleSubmit} className="w-full max-w-xs relative">
-                        <input
-                            ref={inputRef}
-                            type="number"
-                            value={answer}
-                            onChange={(e) => setAnswer(e.target.value)}
-                            className={`w-full bg-transparent border-b-4 text-center text-4xl font-bold p-2 focus:outline-none transition-colors
-                                ${feedback === 'incorrect' ? 'border-red-500' : feedback === 'correct' ? 'border-emerald-500' : 'border-slate-600 focus:border-cyan-400'}
-                            `}
-                            placeholder="?"
-                            autoFocus
-                        />
+                        <div className="flex gap-2">
+                            <input
+                                ref={inputRef}
+                                type="number"
+                                value={answer}
+                                onChange={(e) => setAnswer(e.target.value)}
+                                className={`flex-1 bg-slate-800/50 border-b-4 text-center text-3xl sm:text-4xl font-bold p-3 focus:outline-none transition-colors rounded-lg
+                                    ${feedback === 'incorrect' ? 'border-red-500 bg-red-500/10' : feedback === 'correct' ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-600 focus:border-cyan-400'}
+                                `}
+                                placeholder="?"
+                                autoFocus
+                            />
+                            <button
+                                type="submit"
+                                disabled={!answer}
+                                className="px-4 sm:px-6 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-black text-lg rounded-lg transition-all active:scale-95"
+                            >
+                                GO
+                            </button>
+                        </div>
                     </form>
                 </div>
             )}
