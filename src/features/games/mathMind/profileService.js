@@ -22,11 +22,25 @@ const createDefaultProfile = (username) => ({
     lastActive: new Date().toISOString(),
 
     skills: {
+        // Elementary
         addition: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
         subtraction: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
         multiplication: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
         division: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
-        order_ops: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null }
+        // Middle School
+        fractions: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        decimals: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        percentages: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        order_ops: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        // High School
+        exponents: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        roots: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        algebra: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        equations: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        // College Prep
+        quadratics: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        trig: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null },
+        logarithms: { level: 1, xp: 0, correct: 0, total: 0, streak: 0, accuracy: 0, lastPracticed: null }
     },
 
     stats: {

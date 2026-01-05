@@ -10,6 +10,7 @@ const VideoChat = lazy(() => import("../features/session/VideoChat"));
 const BrainBreak = lazy(() => import("../features/games/BrainBreak"));
 const GeminiChat = lazy(() => import("../features/chat/GeminiChat"));
 const MathTools = lazy(() => import("../features/tools/MathTools"));
+const MathMind = lazy(() => import("../features/games/MathMind"));
 
 const ComponentLoader = () => (
     <div className="flex items-center justify-center h-full bg-slate-900/50">
@@ -24,7 +25,7 @@ export default function Session() {
     const [isDragging, setIsDragging] = useState(false);
     const [sessionEnded, setSessionEnded] = useState(false);
 
-    // Sidebar Mode: 'homework' | 'arcade' | 'ai' | 'tools'
+    // Sidebar Mode: 'homework' | 'mathcamp' | 'ai' | 'arcade' | 'tools'
     const [sidebarMode, setSidebarMode] = useState('homework');
 
     // Main Tab Mode (Mobile Only): 'board' | 'sidebar'
@@ -158,13 +159,19 @@ export default function Session() {
                             onClick={() => setSidebarMode('ai')}
                             className={`flex-1 p-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'ai' ? 'text-white bg-slate-800 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}
                         >
-                            Jefferson Intelligence
+                            AI Tutor
+                        </button>
+                        <button
+                            onClick={() => setSidebarMode('mathcamp')}
+                            className={`flex-1 p-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'mathcamp' ? 'text-white bg-slate-800 border-b-2 border-emerald-500' : 'text-slate-500 hover:text-slate-300'}`}
+                        >
+                            Math Camp
                         </button>
                         <button
                             onClick={() => setSidebarMode('arcade')}
                             className={`flex-1 p-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'arcade' ? 'text-white bg-slate-800 border-b-2 border-pink-500' : 'text-slate-500 hover:text-slate-300'}`}
                         >
-                            Brain Break
+                            Games
                         </button>
                         <button
                             onClick={() => setSidebarMode('tools')}
@@ -192,6 +199,9 @@ export default function Session() {
                         <Suspense fallback={<ComponentLoader />}>
                             {sidebarMode === 'ai' && (
                                 <GeminiChat sessionId={sessionId} mode="fullscreen" />
+                            )}
+                            {sidebarMode === 'mathcamp' && (
+                                <MathMind onBack={() => setSidebarMode('homework')} />
                             )}
                             {sidebarMode === 'arcade' && (
                                 <BrainBreak sessionId={sessionId} onClose={() => setSidebarMode('homework')} />

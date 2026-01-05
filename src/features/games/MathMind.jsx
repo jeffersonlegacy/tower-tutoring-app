@@ -1,8 +1,8 @@
 /**
- * MathMind.jsx - Advanced AI Math Tutor v2
+ * MathMind.jsx - Math Skills Camp v3
  * 
- * VISUALLY STUNNING + ADVANCED AI
- * - Glassmorphism UI with smooth animations
+ * COMPREHENSIVE MATH TUTOR: Elementary to College
+ * - 15 skills across 4 categories
  * - XP bars and level progression
  * - Achievement popups
  * - Session summaries with insights
@@ -12,7 +12,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
-    SKILLS, SKILL_ORDER, LEVELS, ACHIEVEMENTS,
+    SKILLS, SKILL_ORDER, LEVELS, ACHIEVEMENTS, CATEGORIES,
     generateProblem, calculateNextDifficulty, isSkillUnlocked,
     getTeachingContent, generateSessionSummary, detectStrugglePatterns
 } from './mathMind/adaptiveEngine';
@@ -105,8 +105,8 @@ const SkillCard = ({ skill, stats, unlocked, onClick }) => {
             onClick={() => unlocked && onClick()}
             disabled={!unlocked}
             className={`w-full p-4 rounded-2xl transition-all duration-300 ${unlocked
-                    ? `glass hover:bg-white/10 hover:scale-[1.02] hover:shadow-lg hover:shadow-${skill.color}-500/20`
-                    : 'bg-slate-900/30 opacity-40 cursor-not-allowed'
+                ? `glass hover:bg-white/10 hover:scale-[1.02] hover:shadow-lg hover:shadow-${skill.color}-500/20`
+                : 'bg-slate-900/30 opacity-40 cursor-not-allowed'
                 }`}
         >
             <div className="flex items-center gap-4">
@@ -178,12 +178,12 @@ const LoginScreen = ({ onLogin }) => {
 
     return (
         <div className="flex flex-col items-center justify-center h-full p-6 slide-up">
-            <div className="text-7xl mb-6 float">🧠</div>
-            <h1 className="text-5xl font-black gradient-text mb-2">MathMind</h1>
-            <p className="text-slate-400 text-sm mb-2">AI-Powered Math Tutor</p>
-            <div className="flex gap-2 mb-8">
-                <span className="px-2 py-1 text-xs bg-cyan-500/20 text-cyan-400 rounded-full border border-cyan-500/30">Adaptive</span>
-                <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">Personalized</span>
+            <div className="text-7xl mb-4 float">🏕️</div>
+            <h1 className="text-4xl font-black gradient-text mb-1">Math Skills Camp</h1>
+            <p className="text-slate-400 text-sm mb-2">Elementary to College</p>
+            <div className="flex gap-2 mb-6">
+                <span className="px-2 py-1 text-xs bg-emerald-500/20 text-emerald-400 rounded-full border border-emerald-500/30">15 Skills</span>
+                <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">Adaptive AI</span>
             </div>
 
             <form onSubmit={(e) => { e.preventDefault(); if (username.trim()) onLogin(username.trim()); }} className="w-full max-w-xs space-y-4">
@@ -285,19 +285,31 @@ const DashboardScreen = ({ profile, analytics, onSelectSkill, onLogout }) => {
                 </div>
             )}
 
-            {/* Skills */}
-            <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">Choose a Skill</div>
-            <div className="space-y-3">
-                {SKILL_ORDER.map(skillId => (
-                    <SkillCard
-                        key={skillId}
-                        skill={SKILLS[skillId]}
-                        stats={profile.skills[skillId]}
-                        unlocked={isSkillUnlocked(skillId, profile)}
-                        onClick={() => onSelectSkill(skillId)}
-                    />
-                ))}
-            </div>
+            {/* Skills by Category */}
+            {Object.entries(CATEGORIES).sort((a, b) => a[1].order - b[1].order).map(([categoryName, categoryInfo]) => {
+                const categorySkills = SKILL_ORDER.filter(id => SKILLS[id]?.category === categoryName);
+                if (categorySkills.length === 0) return null;
+
+                return (
+                    <div key={categoryName} className="mb-4">
+                        <div className={`flex items-center gap-2 mb-2 text-${categoryInfo.color}-400`}>
+                            <span>{categoryInfo.icon}</span>
+                            <span className="text-xs font-bold uppercase tracking-wider">{categoryName}</span>
+                        </div>
+                        <div className="grid gap-2">
+                            {categorySkills.map(skillId => (
+                                <SkillCard
+                                    key={skillId}
+                                    skill={SKILLS[skillId]}
+                                    stats={profile.skills[skillId]}
+                                    unlocked={isSkillUnlocked(skillId, profile)}
+                                    onClick={() => onSelectSkill(skillId)}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                );
+            })}
         </div>
     );
 };
@@ -469,7 +481,7 @@ const PracticeScreen = ({ profile, skillId, onBack, onTeach, onUpdateProfile }) 
             {/* Problem */}
             <div className="flex-1 flex flex-col items-center justify-center">
                 <div className={`text-center mb-8 glass rounded-3xl p-8 w-full max-w-md transition-all ${feedback === 'correct' ? 'border-2 border-emerald-500 pop' :
-                        feedback === 'wrong' ? 'border-2 border-rose-500 shake' : ''
+                    feedback === 'wrong' ? 'border-2 border-rose-500 shake' : ''
                     }`}>
                     {problem.visual && !feedback && (
                         <div className="text-lg text-slate-400 mb-4">{problem.visual}</div>
@@ -664,7 +676,7 @@ export default function MathMind({ onBack }) {
             {screen !== 'login' && (
                 <div className="shrink-0 p-3 flex items-center justify-between glass border-0 border-b border-white/5">
                     <button onClick={onBack} className="text-xs text-slate-500 hover:text-white">← EXIT</button>
-                    <div className="text-sm font-black gradient-text">🧠 MathMind</div>
+                    <div className="text-sm font-black gradient-text">🏕️ Math Skills Camp</div>
                     {analytics && (
                         <div className="text-xs text-amber-400 font-bold">{analytics.totalXP} XP</div>
                     )}
