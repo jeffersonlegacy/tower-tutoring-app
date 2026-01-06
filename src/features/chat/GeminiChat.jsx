@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { mindHive } from '../../services/MindHiveService';
+import { captureWhiteboard } from '../../utils/WhiteboardCapture';
 import jiLogo from '../../assets/ji_logo.jpg';
 
 
 export default function GeminiChat({ mode = 'widget', onHome, externalMessages, setExternalMessages }) {
     // If external state is provided (Lifting State Up), use it. Otherwise use local state.
     const [localMessages, setLocalMessages] = useState([
-        { role: 'model', text: 'Welcome to Jefferson Intelligence. I am your premium AI tutor. How can I assist your learning journey today?' },
+        { role: 'model', text: 'Welcome to Jefferson Intelligence. I can see your whiteboard! Draw something and click the 📷 button to share it with me, or just ask a question.' },
     ]);
 
     const messages = externalMessages || localMessages;
@@ -15,6 +16,8 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [currentModel, setCurrentModel] = useState(null);
+    const [whiteboardImage, setWhiteboardImage] = useState(null);
+    const [isCapturing, setIsCapturing] = useState(false);
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -25,15 +28,46 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
         scrollToBottom();
     }, [messages]);
 
-    const handleSend = async () => {
-        if (!input.trim() || isLoading) return;
+    // Capture whiteboard and attach to next message
+    const handleCaptureWhiteboard = async () => {
+        setIsCapturing(true);
+        try {
+            const imageData = await captureWhiteboard();
+            if (imageData) {
+                setWhiteboardImage(imageData);
+                // Auto-fill prompt if empty
+                if (!input.trim()) {
+                    setInput("Here's my whiteboard. What do you see? Can you help me with this?");
+                }
+            } else {
+                // If capture failed, show message
+                setMessages(prev => [...prev, {
+                    role: 'model',
+                    text: "I couldn't capture the whiteboard. Make sure you've drawn something first!"
+                }]);
+            }
+        } catch (error) {
+            console.error('Capture error:', error);
+        }
+        setIsCapturing(false);
+    };
 
-        const userText = input;
-        const userMessage = { role: 'user', text: userText };
+    const handleSend = async () => {
+        if ((!input.trim() && !whiteboardImage) || isLoading) return;
+
+        const userText = input || "Look at my whiteboard";
+        const images = whiteboardImage ? [whiteboardImage] : [];
+
+        const userMessage = {
+            role: 'user',
+            text: userText,
+            hasImage: !!whiteboardImage
+        };
 
         // Optimistic UI update
         setMessages((prev) => [...prev, userMessage]);
         setInput('');
+        setWhiteboardImage(null); // Clear attached image
         setIsLoading(true);
         setCurrentModel(null);
 
@@ -59,7 +93,8 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                     // Update active model indicator
                     const simplifiedName = modelName.split('/').pop().toUpperCase().replace(/-/g, ' ');
                     setCurrentModel(simplifiedName);
-                }
+                },
+                images // Pass the whiteboard image
             );
         } catch (error) {
             console.error("Mind Hive Error:", error);
@@ -109,7 +144,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]"></span>
                                 <span className="text-[10px] text-slate-400 font-medium tracking-wider">
-                                    {currentModel ? `CONNECTED: ${currentModel}` : 'ONLINE'}
+                                    {currentModel ? `CONNECTED: ${currentModel}` : 'ONLINE • CAN SEE WHITEBOARD'}
                                 </span>
                             </div>
                         </div>
@@ -140,6 +175,11 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                                         Jefferson AI {currentModel && idx === messages.length - 1 && <span className="text-[8px] px-1 bg-cyan-900/50 rounded text-cyan-300">{currentModel}</span>}
                                     </div>
                                 )}
+                                {msg.hasImage && (
+                                    <div className="text-[10px] text-blue-300 mb-1 flex items-center gap-1">
+                                        📷 Shared whiteboard
+                                    </div>
+                                )}
                                 <div className="markdown-body">
                                     {msg.text}
                                     {msg.isStreaming && <span className="inline-block w-1.5 h-4 ml-1 align-middle bg-cyan-400 animate-pulse rounded-full" />}
@@ -161,7 +201,39 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
 
             {/* Premium Input Area */}
             <div className="p-4 bg-slate-900 border-t border-white/5 relative z-20">
+                {/* Whiteboard Preview */}
+                {whiteboardImage && (
+                    <div className="mb-2 relative">
+                        <img src={whiteboardImage} alt="Whiteboard preview" className="h-16 rounded-lg border border-cyan-500/50" />
+                        <button
+                            onClick={() => setWhiteboardImage(null)}
+                            className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-400"
+                        >✕</button>
+                        <span className="absolute bottom-1 left-1 text-[8px] bg-black/70 text-cyan-400 px-1 rounded">📷 Attached</span>
+                    </div>
+                )}
+
                 <div className="relative flex gap-2 items-end">
+                    {/* Capture Whiteboard Button */}
+                    <button
+                        onClick={handleCaptureWhiteboard}
+                        disabled={isLoading || isCapturing}
+                        title="Share your whiteboard with the AI"
+                        className={`p-3 rounded-xl border transition-all ${whiteboardImage
+                                ? 'bg-cyan-600 border-cyan-500 text-white'
+                                : 'bg-slate-800 border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/50'
+                            } disabled:opacity-50`}
+                    >
+                        {isCapturing ? (
+                            <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        )}
+                    </button>
+
                     <textarea
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
@@ -172,12 +244,12 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                             }
                         }}
                         rows={1}
-                        placeholder="Ask anything..."
+                        placeholder={whiteboardImage ? "Ask about your whiteboard..." : "Ask anything..."}
                         className="flex-1 bg-slate-950/80 text-white text-sm rounded-xl px-4 py-3 border border-white/10 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 placeholder-slate-600 resize-none min-h-[44px] max-h-[120px] transition-all"
                     />
                     <button
                         onClick={handleSend}
-                        disabled={isLoading || !input.trim()}
+                        disabled={isLoading || (!input.trim() && !whiteboardImage)}
                         className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white p-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transform hover:-translate-y-0.5"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,7 +258,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                     </button>
                 </div>
                 <div className="text-center mt-2">
-                    <span className="text-[9px] text-slate-600 uppercase tracking-widest font-semibold">Jefferson Intelligence System v2.0</span>
+                    <span className="text-[9px] text-slate-600 uppercase tracking-widest font-semibold">Jefferson Intelligence v2.1 • Vision Enabled</span>
                 </div>
             </div>
         </div>
