@@ -166,12 +166,12 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                     setCurrentModel(simplifiedName);
                 },
                 images,
-                strokeContext // Pass stroke context to AI
+                strokeContext
             );
 
             lastAIResponseRef.current = fullResponse;
 
-            // Parse structured response
+            // Parse structured response and display ONLY the text_display (not raw JSON)
             const parsed = parseAIResponse(fullResponse);
             if (parsed.isStructured) {
                 console.log('[v3.0] Parsed AI response:', parsed);
@@ -179,6 +179,14 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                 if (parsed.whiteboardAction) {
                     setWhiteboardAction(parsed.whiteboardAction);
                 }
+
+                // Replace raw JSON with clean text display
+                const cleanText = parsed.textDisplay || parsed.voiceResponse || fullResponse;
+                setMessages(prev => prev.map(msg =>
+                    msg.id === placeholderId
+                        ? { ...msg, text: cleanText, nextStep: parsed.nextStep }
+                        : msg
+                ));
             }
 
             // Reset stroke analytics after successful exchange
@@ -327,8 +335,8 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                         disabled={isLoading || isCapturing}
                         title="Manually capture whiteboard"
                         className={`p-3 rounded-xl border transition-all ${whiteboardImage
-                                ? 'bg-cyan-600 border-cyan-500 text-white'
-                                : 'bg-slate-800 border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/50'
+                            ? 'bg-cyan-600 border-cyan-500 text-white'
+                            : 'bg-slate-800 border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/50'
                             } disabled:opacity-50`}
                     >
                         {isCapturing ? (
