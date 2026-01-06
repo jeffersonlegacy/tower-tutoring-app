@@ -1,19 +1,13 @@
 import React, { useState, Suspense, lazy } from 'react';
 import { createPortal } from 'react-dom';
 import GameOverlay from './GameOverlay';
-import GlobalLeaderboard from './GlobalLeaderboard';
 import GameErrorBoundary from './GameErrorBoundary';
 
-// Lazy load games for code splitting (~300KB+ each)
+// Lazy load games for code splitting
 const Connect4 = lazy(() => import('./Connect4'));
-const MathSprint = lazy(() => import('./MathSprint'));
-const AirHockey = lazy(() => import('./AirHockey'));
 const SwipeFight = lazy(() => import('./SwipeFight'));
-const Yahtzee = lazy(() => import('./Yahtzee'));
 const Battleship = lazy(() => import('./Battleship'));
-const MathInvaders = lazy(() => import('./MathInvaders'));
 const EquationExplorer = lazy(() => import('./EquationExplorer'));
-
 
 const GameLoader = () => (
     <div className="flex items-center justify-center h-full bg-slate-900">
@@ -25,7 +19,7 @@ const GameLoader = () => (
 );
 
 export default function BrainBreak({ sessionId, onClose }) {
-    const [game, setGame] = useState('menu'); // 'menu' | ... games
+    const [game, setGame] = useState('menu');
 
     const closeGame = () => setGame('menu');
 
@@ -73,39 +67,6 @@ export default function BrainBreak({ sessionId, onClose }) {
                             </button>
                         </div>
 
-                        {/* Leaderboard Button */}
-                        <button
-                            onClick={() => setGame('leaderboard')}
-                            className="bg-slate-800 border border-slate-700 p-3 rounded-xl flex items-center gap-3 hover:bg-slate-700 transition-colors shadow-sm group"
-                        >
-                            <span className="text-2xl group-hover:scale-110 transition-transform">🏆</span>
-                            <div className="flex flex-col items-start">
-                                <span className="font-bold text-white text-sm uppercase tracking-wide">Leaderboard</span>
-                                <span className="text-[10px] text-slate-400">View Session Stats</span>
-                            </div>
-                        </button>
-
-                        <div className="w-full h-px bg-slate-700/50 my-1"></div>
-
-                        {/* GAME: Math Invaders (FEATURED) */}
-                        <button
-                            onClick={() => setGame('mathinvaders')}
-                            className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-purple-500 transition-all bg-slate-900 shadow-xl"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
-                            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-transparent"></div>
-
-                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-3 bg-black/50 rounded-lg border border-purple-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(168,85,247,0.5)]">
-                                    <span className="text-3xl">👾</span>
-                                </div>
-                                <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 text-xl uppercase tracking-tighter filter drop-shadow">MATH INVADERS</span>
-                                    <span className="text-[10px] font-bold text-white/80 bg-purple-600/50 px-2 py-0.5 rounded-full border border-purple-400/30">NEON ARCADE</span>
-                                </div>
-                            </div>
-                        </button>
-
                         {/* GAME: Equation Explorer (Educational Math) */}
                         <button
                             onClick={() => setGame('offsetoperator')}
@@ -121,25 +82,6 @@ export default function BrainBreak({ sessionId, onClose }) {
                                 <div className="flex flex-col items-start">
                                     <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 text-xl uppercase tracking-tighter filter drop-shadow">EQUATION EXPLORER</span>
                                     <span className="text-[10px] font-bold text-white/80 bg-purple-600/50 px-2 py-0.5 rounded-full border border-purple-400/30">LEARN MATH</span>
-                                </div>
-                            </div>
-                        </button>
-
-                        {/* GAME: Math Sprint */}
-                        <button
-                            onClick={() => setGame('mathsprint')}
-                            className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-blue-500 transition-all bg-slate-900 shadow-xl"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
-                            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-transparent"></div>
-
-                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-3 bg-black/50 rounded-lg border border-blue-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(59,130,246,0.5)]">
-                                    <span className="text-3xl">⏱</span>
-                                </div>
-                                <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 text-xl uppercase tracking-tighter filter drop-shadow">MATH SPRINT</span>
-                                    <span className="text-[10px] font-bold text-white/80 bg-blue-600/50 px-2 py-0.5 rounded-full border border-blue-400/30">SPEED DRILLS</span>
                                 </div>
                             </div>
                         </button>
@@ -182,45 +124,7 @@ export default function BrainBreak({ sessionId, onClose }) {
                             </div>
                         </button>
 
-                        {/* GAME: Yahtzee */}
-                        <button
-                            onClick={() => setGame('yahtzee')}
-                            className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-yellow-500 transition-all bg-slate-900 shadow-xl"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-yellow-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
-                            <div className="absolute inset-0 bg-gradient-to-r from-yellow-600/20 to-transparent"></div>
-
-                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-3 bg-black/50 rounded-lg border border-yellow-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(234,179,8,0.5)]">
-                                    <span className="text-3xl">🎲</span>
-                                </div>
-                                <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400 text-xl uppercase tracking-tighter filter drop-shadow">YAHTZEE</span>
-                                    <span className="text-[10px] font-bold text-white/80 bg-yellow-600/50 px-2 py-0.5 rounded-full border border-yellow-400/30">CLASSIC DICE</span>
-                                </div>
-                            </div>
-                        </button>
-
-                        {/* GAME: Air Hockey */}
-                        <button
-                            onClick={() => setGame('airhockey')}
-                            className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-emerald-500 transition-all bg-slate-900 shadow-xl"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
-                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/20 to-transparent"></div>
-
-                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-3 bg-black/50 rounded-lg border border-emerald-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(52,211,153,0.5)]">
-                                    <span className="text-3xl">🏒</span>
-                                </div>
-                                <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400 text-xl uppercase tracking-tighter filter drop-shadow">AIR HOCKEY</span>
-                                    <span className="text-[10px] font-bold text-white/80 bg-emerald-600/50 px-2 py-0.5 rounded-full border border-emerald-400/30">PHYSICS ARENA</span>
-                                </div>
-                            </div>
-                        </button>
-
-                        {/* GAME: Neon Connect (Was Connect 4) */}
+                        {/* GAME: Neon Connect (Connect 4) */}
                         <button
                             onClick={() => setGame('connect4')}
                             className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-pink-500 transition-all bg-slate-900 shadow-xl"
@@ -242,32 +146,22 @@ export default function BrainBreak({ sessionId, onClose }) {
                 </div>
             </div>
 
-            {/* OVERLAY PORTAL - Renders outside the sidebar */}
+            {/* OVERLAY PORTAL */}
             {game !== 'menu' && createPortal(
                 <GameOverlay
                     title={
-                        game === 'leaderboard' ? 'Session Stats' :
-                            game === 'connect4' ? 'Neon Connect' :
-                                game === 'mathsprint' ? 'Math Sprint' :
-                                    game === 'swipefight' ? 'Swipe Fight' :
-                                        game === 'airhockey' ? 'Air Hockey Rush' :
-                                            game === 'yahtzee' ? 'Yahtzee' :
-                                                game === 'battleship' ? 'Naval Command' :
-                                                    game === 'mathinvaders' ? 'Math Invaders' :
-                                                        game === 'offsetoperator' ? 'Equation Explorer' :
-                                                            'Arcade'
+                        game === 'connect4' ? 'Neon Connect' :
+                            game === 'swipefight' ? 'Swipe Fight' :
+                                game === 'battleship' ? 'Naval Command' :
+                                    game === 'offsetoperator' ? 'Equation Explorer' :
+                                        'Arcade'
                     }
                     onClose={closeGame}
                 >
-                    {game === 'leaderboard' && <GlobalLeaderboard sessionId={sessionId} />}
                     <Suspense fallback={<GameLoader />}>
                         {game === 'connect4' && <GameErrorBoundary onBack={closeGame}><Connect4 sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                        {game === 'mathsprint' && <GameErrorBoundary onBack={closeGame}><MathSprint sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                        {game === 'airhockey' && <GameErrorBoundary onBack={closeGame}><AirHockey sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
                         {game === 'swipefight' && <GameErrorBoundary onBack={closeGame}><SwipeFight sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                        {game === 'yahtzee' && <GameErrorBoundary onBack={closeGame}><Yahtzee sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
                         {game === 'battleship' && <GameErrorBoundary onBack={closeGame}><Battleship sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                        {game === 'mathinvaders' && <GameErrorBoundary onBack={closeGame}><MathInvaders sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
                         {game === 'offsetoperator' && <GameErrorBoundary onBack={closeGame}><EquationExplorer onBack={closeGame} /></GameErrorBoundary>}
                     </Suspense>
                 </GameOverlay>,
