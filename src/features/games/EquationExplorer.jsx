@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import confetti from 'canvas-confetti';
+import { useMastery } from '../../context/MasteryContext';
 import {
     SKILLS,
     generateProblem,
@@ -37,7 +38,17 @@ const styles = `
     .mastery-burst { animation: masteryBurst 0.5s ease-out; }
 `;
 
+// Map internal game skill IDs to global curriculum node IDs
+const CURRICULUM_MAPPING = {
+    'one_step': 'alg_eq_one_step',
+    'two_step': 'alg_eq_two_step',
+    'complex': 'alg_eq_complex'
+};
+
 export default function EquationExplorer({ onBack }) {
+    // Context hooks
+    const { completeNode } = useMastery();
+
     // Game state
     const [screen, setScreen] = useState('menu'); // menu, skill_select, learning, playing, result
     const [selectedSkill, setSelectedSkill] = useState(null);
@@ -120,6 +131,14 @@ export default function EquationExplorer({ onBack }) {
             // Check for mastery unlock
             if (masteryResult.mastered && !selectedSkill.mastery.mastered) {
                 setJustMastered(true);
+
+                // SYNC WITH CURRICULUM GRAPH
+                const globalNodeId = CURRICULUM_MAPPING[selectedSkill.id];
+                if (globalNodeId) {
+                    completeNode(globalNodeId);
+                    console.log(`[MathCamp] Synced mastery for ${globalNodeId}`);
+                }
+
                 confetti({
                     particleCount: 150,
                     spread: 100,
@@ -227,8 +246,8 @@ export default function EquationExplorer({ onBack }) {
                                     key={skill.id}
                                     onClick={() => startPractice(skill)}
                                     className={`p-4 rounded-xl border-2 text-left transition-all hover:scale-[1.02] ${skill.mastery.mastered
-                                            ? 'bg-yellow-500/10 border-yellow-500/50 shadow-lg shadow-yellow-500/20'
-                                            : 'bg-slate-800/50 border-slate-700 hover:border-cyan-500/50'
+                                        ? 'bg-yellow-500/10 border-yellow-500/50 shadow-lg shadow-yellow-500/20'
+                                        : 'bg-slate-800/50 border-slate-700 hover:border-cyan-500/50'
                                         }`}
                                 >
                                     <div className="flex items-center gap-3">
@@ -342,8 +361,8 @@ export default function EquationExplorer({ onBack }) {
                     {/* Problem display */}
                     <div className={`flex-1 flex flex-col items-center justify-center ${feedback === 'wrong' ? 'wrong-shake' : feedback === 'correct' ? 'correct-pop' : ''}`}>
                         <div className={`text-4xl sm:text-5xl font-black mb-8 p-6 rounded-2xl border-2 transition-all ${feedback === 'correct' ? 'bg-emerald-500/20 border-emerald-500' :
-                                feedback === 'wrong' ? 'bg-rose-500/20 border-rose-500' :
-                                    'bg-slate-800/50 border-slate-700'
+                            feedback === 'wrong' ? 'bg-rose-500/20 border-rose-500' :
+                                'bg-slate-800/50 border-slate-700'
                             }`}>
                             {currentProblem.problem}
                         </div>
@@ -389,10 +408,10 @@ export default function EquationExplorer({ onBack }) {
                                         onClick={() => handleAnswer(opt)}
                                         disabled={!!feedback}
                                         className={`py-4 rounded-xl font-black text-xl transition-all ${feedback === 'correct' && opt === currentProblem.answer
-                                                ? 'bg-emerald-500 text-white scale-110'
-                                                : feedback === 'wrong' && opt === currentProblem.answer
-                                                    ? 'bg-emerald-500/50 text-white'
-                                                    : 'bg-slate-800 hover:bg-slate-700 border-2 border-slate-700 hover:border-cyan-500'
+                                            ? 'bg-emerald-500 text-white scale-110'
+                                            : feedback === 'wrong' && opt === currentProblem.answer
+                                                ? 'bg-emerald-500/50 text-white'
+                                                : 'bg-slate-800 hover:bg-slate-700 border-2 border-slate-700 hover:border-cyan-500'
                                             } disabled:cursor-not-allowed`}
                                     >
                                         {opt}

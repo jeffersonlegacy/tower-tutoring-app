@@ -5,13 +5,16 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import './index.css'
 import { AuthProvider } from './context/AuthContext'
+import { MasteryProvider } from './context/MasteryContext'
 import ErrorBoundary from './components/ErrorBoundary'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
         <ErrorBoundary>
             <AuthProvider>
-                <App />
+                <MasteryProvider>
+                    <App />
+                </MasteryProvider>
                 <Analytics />
                 <SpeedInsights />
             </AuthProvider>

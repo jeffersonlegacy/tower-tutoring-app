@@ -10,11 +10,13 @@ import '@tldraw/tldraw/tldraw.css';
 import { useWhiteboardSync } from '../../hooks/useWhiteboardSync';
 import { setWhiteboardEditor } from '../../utils/WhiteboardCapture';
 import WhiteboardOverlay from '../../components/WhiteboardOverlay';
+import { optimizeImage } from '../../services/OCRService';
 
 const Whiteboard = memo(({ sessionId }) => {
   const [editor, setEditor] = useState(null);
   const [isReady, setIsReady] = useState(false);
   const [aiAction, setAiAction] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Initialize sync when editor is ready
   useWhiteboardSync(editor, sessionId);
@@ -40,6 +42,27 @@ const Whiteboard = memo(({ sessionId }) => {
     // Small delay to ensure editor is fully initialized
     setTimeout(() => setIsReady(true), 100);
   }, [sessionId]);
+
+  const handleSnap = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    try {
+      const optimizedUrl = await optimizeImage(file);
+
+      // Dispatch to AI Chat
+      window.dispatchEvent(new CustomEvent('ai-vision-upload', {
+        detail: optimizedUrl
+      }));
+
+      console.log('[Whiteboard] Snapped & Sent to AI:', optimizedUrl);
+    } catch (err) {
+      console.error('Snap failed:', err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   // Cleanup on unmount
   useEffect(() => {
@@ -72,6 +95,27 @@ const Whiteboard = memo(({ sessionId }) => {
           hideUi={false}
           autoFocus
         />
+      </div>
+
+      {/* Snap-to-Solve Button (Bottom Left) */}
+      <div className="absolute bottom-4 left-4 z-50">
+        <label className={`
+            flex items-center gap-2 px-4 py-3 rounded-full font-bold shadow-lg transition-all cursor-pointer border border-white/10
+            ${isProcessing ? 'bg-slate-800 text-slate-500 scale-95' : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:scale-105 hover:shadow-emerald-500/30'}
+          `}>
+          <input type="file" accept="image/*" className="hidden" onChange={handleSnap} disabled={isProcessing} />
+          {isProcessing ? (
+            <>
+              <div className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-xs uppercase tracking-wide">Scanning...</span>
+            </>
+          ) : (
+            <>
+              <span className="text-xl">📸</span>
+              <span className="text-xs uppercase tracking-wide">Snap Homework</span>
+            </>
+          )}
+        </label>
       </div>
 
       {/* Status Banner */}

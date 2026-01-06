@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { mindHive, parseAIResponse } from '../../services/MindHiveService';
 import { captureWhiteboard } from '../../utils/WhiteboardCapture';
 import { strokeAnalytics } from '../../utils/StrokeAnalytics';
+import { useMastery } from '../../context/MasteryContext';
 import ScanningOverlay from '../../components/ScanningOverlay';
 import jiLogo from '../../assets/ji_logo.jpg';
 
@@ -21,9 +22,33 @@ const INSTRUCTION_PATTERNS = [
 ];
 
 export default function GeminiChat({ mode = 'widget', onHome, externalMessages, setExternalMessages }) {
+    const { curriculum, getNodeStatus, logEvent } = useMastery();
+
     const [localMessages, setLocalMessages] = useState([
         { role: 'model', text: 'Welcome to Jefferson Intelligence v3.0. I can see your whiteboard and understand how you\'re working. Just tell me what you need help with!' },
     ]);
+
+    // Log session start once on mount
+    useEffect(() => {
+        logEvent('session_start', { mode });
+    }, []);
+
+    // Listen for Snap-to-Solve events from Whiteboard
+    useEffect(() => {
+        const handleSnapUpload = (e) => {
+            console.log('[GeminiChat] Received Snap upload:', e.detail);
+            setIsOpen(true);
+            setWhiteboardImage(e.detail);
+            // Auto-send with scaffolding prompt
+            sendMessage(
+                "I've uploaded a picture of my homework. Can you help me scaffold the solution? Please don't give me the answer, but help me identify the first step.",
+                [e.detail]
+            );
+        };
+
+        window.addEventListener('ai-vision-upload', handleSnapUpload);
+        return () => window.removeEventListener('ai-vision-upload', handleSnapUpload);
+    }, []);
 
     const messages = externalMessages || localMessages;
     const setMessages = setExternalMessages || setLocalMessages;
@@ -36,6 +61,23 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
     const [isCapturing, setIsCapturing] = useState(false);
     const [autoCapture, setAutoCapture] = useState(true);
     const [emotionalState, setEmotionalState] = useState('neutral');
+
+    // Track previous emotion to detect changes
+    const prevEmotionRef = useRef('neutral');
+
+    // Log emotional shifts
+    useEffect(() => {
+        if (emotionalState !== prevEmotionRef.current) {
+            if (['frustrated', 'confused'].includes(emotionalState)) {
+                logEvent('frustration_detected', {
+                    emotion: emotionalState,
+                    context: messages[messages.length - 1]?.text?.substring(0, 50)
+                });
+            }
+            prevEmotionRef.current = emotionalState;
+        }
+    }, [emotionalState, logEvent, messages]);
+
     const [whiteboardAction, setWhiteboardAction] = useState(null);
     const messagesEndRef = useRef(null);
     const lastAIResponseRef = useRef('');
@@ -100,15 +142,39 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
         setIsCapturing(false);
     };
 
-    const handleSend = async () => {
+    const sendMessage = async (textOverride = null, imagesOverride = null) => {
         if ((!input.trim() && !whiteboardImage) || isLoading) return;
 
-        const userText = input || "Look at my whiteboard";
-        let images = whiteboardImage ? [whiteboardImage] : [];
+        const userText = textOverride || input || "Look at my whiteboard";
+        let images = imagesOverride || (whiteboardImage ? [whiteboardImage] : []);
 
-        // Get stroke analytics context
+        // === CONTEXT INJECTION ===
+        // 1. Stroke Analytics
         const strokeContext = strokeAnalytics.getContextString();
-        console.log('[v3.0] Stroke context:', strokeContext);
+
+        // 2. Mastery Context (Curriculum Awareness)
+        const currentUrlParams = window.location.pathname.split('/');
+        const currentSessionId = currentUrlParams[2];
+        const currentNode = currentSessionId ? curriculum.nodes[currentSessionId] : null;
+
+        const masteredNodes = Object.values(curriculum.nodes)
+            .filter(n => getNodeStatus(n.id) === 'completed')
+            .map(n => n.title);
+
+        const unlockedNodes = Object.values(curriculum.nodes)
+            .filter(n => getNodeStatus(n.id) === 'unlocked')
+            .map(n => n.title);
+
+        const masteryContext = `
+[SYSTEM_DATA: STUDENT_MASTERY]
+Mastered Skills: ${masteredNodes.join(', ') || 'None'}
+Unlocked/Available: ${unlockedNodes.join(', ') || 'Intro'}
+Current Focus: ${currentNode ? `${currentNode.title} (Status: ${getNodeStatus(currentNode.id)})` : 'General Chat'}
+Associated Game: ${currentNode?.associatedGame || 'None'}
+`;
+
+        const fullContext = `${strokeContext}\n${masteryContext}`;
+        console.log('[v3.0] Full Context:', fullContext);
 
         // AUTO-CAPTURE LOGIC
         if (!whiteboardImage && shouldAutoCaptureOnSend(userText)) {
@@ -168,7 +234,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                     setCurrentModel(simplifiedName);
                 },
                 images,
-                strokeContext
+                fullContext
             );
 
             lastAIResponseRef.current = fullResponse;
@@ -211,6 +277,8 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
             ));
         }
     };
+
+    const handleSend = () => sendMessage();
 
     // Emotional state badge
     const getEmotionBadge = () => {
