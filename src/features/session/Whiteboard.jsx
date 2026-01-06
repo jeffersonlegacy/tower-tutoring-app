@@ -24,7 +24,7 @@ const Whiteboard = memo(({ sessionId }) => {
   // Listen for AI whiteboard actions (from GeminiChat)
   useEffect(() => {
     const handleAIAction = (e) => {
-      console.log('[Whiteboard] Received AI action:', e.detail);
+      // console.log('[Whiteboard] Received AI action:', e.detail);
       setAiAction(e.detail);
     };
 

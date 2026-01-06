@@ -44,7 +44,7 @@ export default function SkillTree() {
                                 onClick={() => handleNodeClick(node.id)}
                                 disabled={isLocked}
                                 className={`
-                                    group relative w-full max-w-lg bg-slate-900/80 backdrop-blur-xl border-2 rounded-2xl p-6 text-left transition-all duration-300
+                                    group relative w-full max-w-lg glass-panel border-2 rounded-2xl p-6 text-left transition-all duration-300
                                     ${isCompleted ? 'border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
                                         isLocked ? 'border-slate-800 cursor-not-allowed' :
                                             'border-cyan-500/50 shadow-[0_0_30px_rgba(6,182,212,0.2)] hover:scale-105 hover:border-cyan-400'}

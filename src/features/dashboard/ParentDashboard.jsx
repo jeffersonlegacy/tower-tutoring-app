@@ -44,7 +44,7 @@ export default function ParentDashboard() {
             <main className="max-w-6xl mx-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
 
                 {/* WEEKLY DIGEST */}
-                <div className="bg-slate-900 rounded-2xl p-6 border border-white/5">
+                <div className="glass-panel rounded-2xl p-6">
                     <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                         <span className="text-xl">📰</span> Weekly Digest
                     </h2>
@@ -77,7 +77,7 @@ export default function ParentDashboard() {
                 </div>
 
                 {/* EMOTIONAL HEATMAP */}
-                <div className="bg-slate-900 rounded-2xl p-6 border border-white/5">
+                <div className="glass-panel rounded-2xl p-6">
                     <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                         <span className="text-xl">🧠</span> Emotional Calibration
                     </h2>

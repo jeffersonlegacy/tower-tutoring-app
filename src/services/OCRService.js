@@ -17,6 +17,10 @@ export const PROCESS_CONFIG = {
  */
 export async function optimizeImage(file) {
     return new Promise((resolve, reject) => {
+        if (file.size > 10 * 1024 * 1024) {
+            reject(new Error('File too large (Max 10MB)'));
+            return;
+        }
         const reader = new FileReader();
         reader.readAsDataURL(file);
 

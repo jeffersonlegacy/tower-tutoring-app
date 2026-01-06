@@ -36,7 +36,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
     // Listen for Snap-to-Solve events from Whiteboard
     useEffect(() => {
         const handleSnapUpload = (e) => {
-            console.log('[GeminiChat] Received Snap upload:', e.detail);
+            // console.log('[GeminiChat] Received Snap upload:', e.detail);
             setIsOpen(true);
             setWhiteboardImage(e.detail);
             // Auto-send with scaffolding prompt
@@ -174,7 +174,7 @@ Associated Game: ${currentNode?.associatedGame || 'None'}
 `;
 
         const fullContext = `${strokeContext}\n${masteryContext}`;
-        console.log('[v3.0] Full Context:', fullContext);
+        // console.log('[v3.0] Full Context:', fullContext);
 
         // AUTO-CAPTURE LOGIC
         if (!whiteboardImage && shouldAutoCaptureOnSend(userText)) {
@@ -242,7 +242,7 @@ Associated Game: ${currentNode?.associatedGame || 'None'}
             // Parse structured response and display ONLY the text_display (not raw JSON)
             const parsed = parseAIResponse(fullResponse);
             if (parsed.isStructured) {
-                console.log('[v3.0] Parsed AI response:', parsed);
+                // console.log('[v3.0] Parsed AI response:', parsed);
                 setEmotionalState(parsed.emotionalState);
                 if (parsed.whiteboardAction) {
                     setWhiteboardAction(parsed.whiteboardAction);
