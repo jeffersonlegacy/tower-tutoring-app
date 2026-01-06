@@ -101,10 +101,16 @@ class MindHiveService {
         }
 
         // Build chat history (exclude the last user message which is the current prompt)
-        const chatHistory = history.slice(0, -1).map(msg => ({
+        // IMPORTANT: Gemini requires first message to be from 'user', not 'model'
+        let chatHistory = history.slice(0, -1).map(msg => ({
             role: msg.role === 'model' ? 'model' : 'user',
             parts: [{ text: msg.text }]
         }));
+
+        // Filter out leading model messages (Gemini requirement: must start with user)
+        while (chatHistory.length > 0 && chatHistory[0].role === 'model') {
+            chatHistory.shift();
+        }
 
         // Handle multimodal (text + images)
         let parts = [{ text: prompt }];
