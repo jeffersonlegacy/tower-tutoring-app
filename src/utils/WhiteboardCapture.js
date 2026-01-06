@@ -2,89 +2,127 @@
  * WhiteboardCapture.js - Capture whiteboard canvas as image
  * 
  * Used to let the AI "see" what the student has drawn.
+ * Uses html2canvas for reliable screenshot of the entire whiteboard area.
  */
+import html2canvas from 'html2canvas';
+
+// Global reference to the tldraw editor (set by Whiteboard component)
+let globalEditor = null;
 
 /**
- * Capture the tldraw canvas as a base64 data URL
- * @returns {Promise<string|null>} Base64 image data URL or null if failed
+ * Set the global editor reference (called by Whiteboard component)
  */
-export async function captureWhiteboard() {
-    try {
-        // Find the tldraw canvas element
-        const canvas = document.querySelector('.tl-canvas');
-        if (!canvas) {
-            console.warn('Whiteboard canvas not found');
-            return null;
-        }
-
-        // Use html2canvas-like approach with native canvas
-        // The tldraw canvas is an SVG, so we need to convert it
-        const svg = canvas.querySelector('svg');
-        if (!svg) {
-            // Try finding a direct canvas element
-            const directCanvas = document.querySelector('.tldraw__editor canvas');
-            if (directCanvas) {
-                return directCanvas.toDataURL('image/png');
-            }
-            console.warn('No SVG or canvas found in whiteboard');
-            return null;
-        }
-
-        // Clone and serialize SVG
-        const svgClone = svg.cloneNode(true);
-        const svgData = new XMLSerializer().serializeToString(svgClone);
-        const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-        const url = URL.createObjectURL(svgBlob);
-
-        // Draw to canvas
-        const img = new Image();
-        const canvas2d = document.createElement('canvas');
-
-        return new Promise((resolve) => {
-            img.onload = () => {
-                canvas2d.width = img.width || 800;
-                canvas2d.height = img.height || 600;
-                const ctx = canvas2d.getContext('2d');
-                ctx.fillStyle = 'white';
-                ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
-                ctx.drawImage(img, 0, 0);
-                URL.revokeObjectURL(url);
-                resolve(canvas2d.toDataURL('image/png'));
-            };
-            img.onerror = () => {
-                URL.revokeObjectURL(url);
-                resolve(null);
-            };
-            img.src = url;
-        });
-    } catch (error) {
-        console.error('Whiteboard capture error:', error);
-        return null;
-    }
+export function setWhiteboardEditor(editor) {
+    globalEditor = editor;
+    console.log('[WhiteboardCapture] Editor reference set');
 }
 
 /**
- * Alternative: Use tldraw's built-in export if available
+ * Capture the whiteboard as a base64 PNG data URL
+ * Uses multiple strategies for reliability
  */
-export async function captureWhiteboardViaEditor(editor) {
-    if (!editor) return null;
+export async function captureWhiteboard() {
+    console.log('[WhiteboardCapture] Attempting capture...');
 
-    try {
-        // Get the current page shapes
-        const shapes = editor.getCurrentPageShapes();
-        if (shapes.length === 0) {
-            return null; // Nothing to capture
+    // Strategy 1: Use tldraw's built-in export (best quality)
+    if (globalEditor) {
+        try {
+            const result = await captureViaEditor();
+            if (result) {
+                console.log('[WhiteboardCapture] ✅ Captured via editor export');
+                return result;
+            }
+        } catch (e) {
+            console.warn('[WhiteboardCapture] Editor export failed:', e.message);
         }
+    }
 
-        // Export as SVG data URL
-        const svg = await editor.getSvg(shapes);
-        if (!svg) return null;
+    // Strategy 2: Use html2canvas on the whiteboard container
+    try {
+        const result = await captureViaHtml2Canvas();
+        if (result) {
+            console.log('[WhiteboardCapture] ✅ Captured via html2canvas');
+            return result;
+        }
+    } catch (e) {
+        console.warn('[WhiteboardCapture] html2canvas failed:', e.message);
+    }
 
-        const svgData = new XMLSerializer().serializeToString(svg);
-        const base64 = btoa(unescape(encodeURIComponent(svgData)));
-        return `data:image/svg+xml;base64,${base64}`;
-    } catch (error) {
-        console.error('Editor capture error:', error);
+    console.error('[WhiteboardCapture] ❌ All capture methods failed');
+    return null;
+}
+
+/**
+ * Capture using tldraw editor's built-in export
+ */
+async function captureViaEditor() {
+    if (!globalEditor) return null;
+
+    const shapes = globalEditor.getCurrentPageShapes();
+    if (!shapes || shapes.length === 0) {
+        console.log('[WhiteboardCapture] No shapes to capture');
         return null;
     }
+
+    // Use tldraw's getSvg with all shapes
+    const shapeIds = shapes.map(s => s.id);
+    const svg = await globalEditor.getSvg(shapeIds, {
+        background: true,
+        padding: 20,
+    });
+
+    if (!svg) return null;
+
+    // Convert SVG to PNG via canvas
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    return new Promise((resolve) => {
+        const img = new Image();
+        const canvas = document.createElement('canvas');
+
+        img.onload = () => {
+            canvas.width = img.width || 800;
+            canvas.height = img.height || 600;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL('image/png', 0.9));
+        };
+
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve(null);
+        };
+
+        img.src = url;
+    });
+}
+
+/**
+ * Capture using html2canvas (fallback)
+ */
+async function captureViaHtml2Canvas() {
+    // Find the whiteboard container
+    const container = document.querySelector('.tl-container')
+        || document.querySelector('[data-testid="whiteboard"]')
+        || document.querySelector('.tldraw');
+
+    if (!container) {
+        console.warn('[WhiteboardCapture] No whiteboard container found');
+        return null;
+    }
+
+    const canvas = await html2canvas(container, {
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        scale: 1, // Keep it 1:1 for speed
+        logging: false,
+    });
+
+    return canvas.toDataURL('image/png', 0.9);
 }

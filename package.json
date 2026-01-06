@@ -38,6 +38,7 @@
     "canvas-confetti": "^1.9.4",
     "dotenv": "^17.2.3",
     "firebase": "^12.3.0",
+    "html2canvas": "^1.4.1",
     "lodash": "^4.17.21",
     "playroomkit": "^0.0.94",
     "react": "^18.3.1",

@@ -8,6 +8,7 @@ import { memo, useState, useCallback, useEffect } from 'react';
 import { Tldraw } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import { useWhiteboardSync } from '../../hooks/useWhiteboardSync';
+import { setWhiteboardEditor } from '../../utils/WhiteboardCapture';
 
 const Whiteboard = memo(({ sessionId }) => {
   const [editor, setEditor] = useState(null);
@@ -19,6 +20,9 @@ const Whiteboard = memo(({ sessionId }) => {
   const handleMount = useCallback((editorInstance) => {
     console.log('[Whiteboard] Editor mounted for session:', sessionId);
     setEditor(editorInstance);
+
+    // Expose editor to WhiteboardCapture utility for AI vision
+    setWhiteboardEditor(editorInstance);
 
     // Small delay to ensure editor is fully initialized
     setTimeout(() => setIsReady(true), 100);
