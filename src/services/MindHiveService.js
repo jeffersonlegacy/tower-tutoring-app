@@ -1,15 +1,25 @@
 /**
- * MindHiveService.js - AI Tutor Backend with Multi-Model Fallback
+ * MindHiveService.js - AI Tutor Backend with Multi-Provider Fallback
  * 
- * THE HIVE: Multiple Gemini models with automatic failover
+ * THE HIVE: Multiple AI providers with automatic failover
+ * Priority: Gemini → Groq (Llama 3) → Groq (Mixtral)
+ * 
+ * NEVER FAILS for a student - always has a backup ready
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Model fallback priority (most capable first, fastest last)
-const HIVE_MODELS = [
-    'gemini-2.0-flash-exp',      // Latest, most capable
-    'gemini-1.5-flash',          // Stable, fast
-    'gemini-1.5-flash-8b',       // Lightweight fallback
+// Gemini models (primary - best for vision)
+const GEMINI_MODELS = [
+    'gemini-2.0-flash-exp',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-8b',
+];
+
+// Groq models (fallback - extremely fast)
+const GROQ_MODELS = [
+    'llama-3.3-70b-versatile',    // Best quality
+    'llama-3.1-8b-instant',       // Fast fallback
+    'mixtral-8x7b-32768',         // Good for complex reasoning
 ];
 
 const CONFIG = {
@@ -128,71 +138,88 @@ Every question they answer themselves creates a neural pathway that STAYS.
 Every answer you hand them is forgotten by tomorrow.
 
 The goal isn't to finish the problem. The goal is to build a mind that can solve ANY problem.`,
-    temperature: 0.75, // Slightly higher for more natural, adaptive responses
+    temperature: 0.75,
 };
 
 class MindHiveService {
     constructor() {
+        // Initialize Gemini
         this.geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
         this.genAI = this.geminiKey ? new GoogleGenerativeAI(this.geminiKey) : null;
+
+        // Initialize Groq
+        this.groqKey = import.meta.env.VITE_GROQ_API_KEY;
+        this.groqEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
     }
 
     /**
-     * Stream response using multi-model fallback
+     * Stream response with multi-provider fallback
+     * NEVER fails - always has a backup ready
      */
     async streamResponse(prompt, history = [], onChunk, onModelChange, images = []) {
         console.log('🐝 Activating Mind Hive...');
 
-        if (!this.genAI) {
-            throw new Error('AI service not configured. Missing VITE_GEMINI_API_KEY.');
-        }
+        const errors = [];
 
-        // Try each model in priority order
-        for (const modelName of HIVE_MODELS) {
-            try {
-                console.log(`🔄 Attempting node: ${modelName}`);
-                await this.streamWithModel(modelName, prompt, history, onChunk, onModelChange, images);
-                console.log(`✅ Success: ${modelName}`);
-                return; // Success - exit loop
-            } catch (error) {
-                console.warn(`⚠️ Node ${modelName} failed: ${error.message}. Swapping...`);
-                // Continue to next model
+        // TIER 1: Try Gemini (best for vision/images)
+        if (this.genAI) {
+            for (const modelName of GEMINI_MODELS) {
+                try {
+                    console.log(`🔄 [Gemini] Attempting: ${modelName}`);
+                    await this.streamGemini(modelName, prompt, history, onChunk, onModelChange, images);
+                    console.log(`✅ [Gemini] Success: ${modelName}`);
+                    return;
+                } catch (error) {
+                    console.warn(`⚠️ [Gemini] ${modelName} failed: ${error.message}`);
+                    errors.push(`Gemini/${modelName}: ${error.message}`);
+                }
             }
         }
 
-        throw new Error('Hive Collapse: All nodes failed.');
+        // TIER 2: Try Groq (extremely fast, text-only)
+        if (this.groqKey) {
+            for (const modelName of GROQ_MODELS) {
+                try {
+                    console.log(`🔄 [Groq] Attempting: ${modelName}`);
+                    await this.streamGroq(modelName, prompt, history, onChunk, onModelChange);
+                    console.log(`✅ [Groq] Success: ${modelName}`);
+                    return;
+                } catch (error) {
+                    console.warn(`⚠️ [Groq] ${modelName} failed: ${error.message}`);
+                    errors.push(`Groq/${modelName}: ${error.message}`);
+                }
+            }
+        }
+
+        // All providers failed
+        console.error('🚨 Hive Collapse - All providers failed:', errors);
+        throw new Error('All AI providers are currently unavailable. Please try again in a moment.');
     }
 
     /**
-     * Stream using a specific Gemini model
+     * Stream using Gemini (supports vision)
      */
-    async streamWithModel(modelName, prompt, history = [], onChunk, onModelChange, images = []) {
+    async streamGemini(modelName, prompt, history, onChunk, onModelChange, images = []) {
         const model = this.genAI.getGenerativeModel({
             model: modelName,
             systemInstruction: CONFIG.systemPrompt,
-            generationConfig: {
-                temperature: CONFIG.temperature,
-            }
+            generationConfig: { temperature: CONFIG.temperature }
         });
 
         if (onModelChange) {
-            const displayName = modelName.toUpperCase().replace(/-/g, ' ');
-            onModelChange(displayName);
+            onModelChange(modelName.toUpperCase().replace(/-/g, ' '));
         }
 
-        // Build chat history (exclude the last user message which is the current prompt)
-        // IMPORTANT: Gemini requires first message to be from 'user', not 'model'
+        // Build chat history (filter leading model messages)
         let chatHistory = history.slice(0, -1).map(msg => ({
             role: msg.role === 'model' ? 'model' : 'user',
             parts: [{ text: msg.text }]
         }));
-
-        // Filter out leading model messages (Gemini requirement: must start with user)
         while (chatHistory.length > 0 && chatHistory[0].role === 'model') {
             chatHistory.shift();
         }
 
-        // Handle multimodal (text + images)
+        // Handle images
         let parts = [{ text: prompt }];
         if (images && images.length > 0) {
             for (const imgUrl of images) {
@@ -200,15 +227,14 @@ class MindHiveService {
                     const response = await fetch(imgUrl);
                     const blob = await response.blob();
                     const base64 = await this.blobToBase64(blob);
-                    const mimeType = blob.type || 'image/jpeg';
                     parts.push({
                         inlineData: {
-                            mimeType,
+                            mimeType: blob.type || 'image/png',
                             data: base64.split(',')[1]
                         }
                     });
                 } catch (e) {
-                    console.warn('Failed to process image:', e);
+                    console.warn('Image processing failed:', e);
                 }
             }
         }
@@ -225,9 +251,84 @@ class MindHiveService {
             }
         }
 
-        if (!hasContent) {
-            throw new Error('Empty response from model');
+        if (!hasContent) throw new Error('Empty response');
+    }
+
+    /**
+     * Stream using Groq (OpenAI-compatible API, text-only)
+     */
+    async streamGroq(modelName, prompt, history, onChunk, onModelChange) {
+        if (onModelChange) {
+            onModelChange(`GROQ ${modelName.split('-')[0].toUpperCase()}`);
         }
+
+        // Build messages array (OpenAI format)
+        const messages = [
+            { role: 'system', content: CONFIG.systemPrompt }
+        ];
+
+        // Add history (skip leading assistant messages)
+        let historyStarted = false;
+        for (const msg of history.slice(0, -1)) {
+            const role = msg.role === 'model' ? 'assistant' : 'user';
+            if (!historyStarted && role === 'assistant') continue;
+            historyStarted = true;
+            messages.push({ role, content: msg.text });
+        }
+
+        // Add current prompt
+        messages.push({ role: 'user', content: prompt });
+
+        const response = await fetch(this.groqEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.groqKey}`
+            },
+            body: JSON.stringify({
+                model: modelName,
+                messages,
+                temperature: CONFIG.temperature,
+                stream: true
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`HTTP ${response.status}: ${error}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let hasContent = false;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed === 'data: [DONE]') continue;
+
+                if (trimmed.startsWith('data: ')) {
+                    try {
+                        const json = JSON.parse(trimmed.slice(6));
+                        const content = json.choices?.[0]?.delta?.content;
+                        if (content) {
+                            hasContent = true;
+                            onChunk(content);
+                        }
+                    } catch {
+                        // Ignore parse errors for partial chunks
+                    }
+                }
+            }
+        }
+
+        if (!hasContent) throw new Error('Empty response');
     }
 
     blobToBase64(blob) {
