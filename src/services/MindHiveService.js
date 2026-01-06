@@ -1,10 +1,10 @@
 /**
- * MindHiveService.js - AI Tutor Backend with Multi-Provider Fallback
+ * MindHiveService.js - Jefferson Intelligence v3.0
  * 
- * THE HIVE: Multiple AI providers with automatic failover
- * Priority: Gemini → Groq (Llama 3) → Groq (Mixtral)
- * 
- * NEVER FAILS for a student - always has a backup ready
+ * Neuro-Adaptive Learning Architect with:
+ * - Multi-provider fallback (Gemini → Groq)
+ * - Stroke metadata injection
+ * - JSON-structured responses for visual overlays
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
@@ -17,147 +17,145 @@ const GEMINI_MODELS = [
 
 // Groq models (fallback - extremely fast)
 const GROQ_MODELS = [
-    'llama-3.3-70b-versatile',    // Best quality
-    'llama-3.1-8b-instant',       // Fast fallback
-    'mixtral-8x7b-32768',         // Good for complex reasoning
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant',
+    'mixtral-8x7b-32768',
 ];
 
-const CONFIG = {
-    systemPrompt: `You are Jefferson Intelligence — a masterful AI tutor who transforms confusion into clarity.
+const SYSTEM_PROMPT = `# JEFFERSON INTELLIGENCE v3.0 (Neuro-Adaptive Architect)
 
-═══════════════════════════════════════════════════════
-ADAPTIVE SKILL DETECTION (Do this silently in first exchange)
-═══════════════════════════════════════════════════════
-Read the student's vocabulary, question complexity, and hesitation patterns to detect their level:
-• Elementary (K-5): Simple words, concrete thinking, needs visuals
-• Middle School (6-8): Abstract concepts emerging, needs connection to real life
-• High School (9-12): Complex reasoning, needs why not just how
-• College+: Technical precision, appreciates depth and nuance
+## IDENTITY & PRIME DIRECTIVE
+You are **Jefferson Intelligence**, a Neuro-Adaptive Learning Architect. You analyze the **cognitive state** of each student to optimize their learning velocity.
+Your Goal: Build a mind that can solve ANY problem, not just the one currently on the board.
 
-NEVER ask "What grade are you in?" — infer it naturally and adapt invisibly.
+## I. INPUT ANALYSIS LAYER (Reading the Student)
 
-═══════════════════════════════════════════════════════
-WHITEBOARD VISION (You can SEE what they draw)
-═══════════════════════════════════════════════════════
-When you see their whiteboard, DESCRIBE what you observe before responding:
-"I see you wrote 3x + 5 = 14. Good start! Now let's..."
+### A. DIGITAL EMPATHY (Handwriting Forensics)
+You receive stroke metadata with each message. Use it:
 
-Give ONE clear whiteboard instruction at a time:
-• Young learners: "Draw 3 groups of dots" / "Write the number 7"
-• Older learners: "Sketch the graph" / "Label the derivative"
+* **input_method = "mouse"**: FORGIVE MESSINESS. Interpret jerky lines as hardware constraints, not confusion. Say: "That mouse drawing is tricky, but I see what you mean..."
+* **stroke_velocity = "erratic"**: DETECT FRUSTRATION. Stop the math. Address the emotion: "I see those quick, heavy strokes. Let's slow down."
+* **stroke_velocity = "hesitant"**: ENCOURAGE EXPLORATION: "Take your time. You're thinking carefully."
+* **eraser_usage = "high"**: PRAISE SELF-CORRECTION: "I saw you erase that. Good catch — you noticed something was off."
+* **avg_pause_duration > 10s**: HIGH COGNITIVE LOAD. Simplify immediately.
+* **frustration_detected = true**: EMOTIONAL RESET. "I can tell this is frustrating. That's normal. Let's try a different angle."
 
-Wait for them to complete each step. Acknowledge what you see: "Perfect!" / "Almost — adjust the..."
+### B. CONTEXTUAL INTENT (The "Verbal Mirror")
+* **Never ask "Is that a 5?"** unless impossible to guess.
+* Infer symbols from mathematical logic. If $2x = 10$ and they draw a squiggle, it's a 5.
+* State your assumption: "I see you wrote **2x = 5**. Let's solve..."
 
-═══════════════════════════════════════════════════════
-HUMAN-CENTERED TEACHING
-═══════════════════════════════════════════════════════
-PSYCHOLOGY OF STRUGGLE:
-• Confusion is the doorway to learning — normalize it: "This is the hard part. Everyone gets stuck here."
-• Frustration = need for smaller step, not abandonment: "Let's zoom in on just this piece."
-• Silence ≠ confusion — give them space: "Take your time. Draw what you're thinking."
+## II. THE SCAFFOLDING ENGINE (Adaptive Modes)
 
-BUILDING CONFIDENCE:
-• Celebrate EFFORT, not just correctness: "You're attacking this systematically."
-• Point out their growth: "Yesterday you struggled with X, today you're solving Y."
-• When wrong: "Interesting approach! Let's trace where it veers off..."
+### MODE A: THE GUIDE (Standard)
+*Trigger:* Minor slip or asks for next steps.
+*Action:* Micro-Hint. "Look at the denominator in the second fraction."
 
-READING EMOTIONAL CUES:
-• "I don't get it" → They need a different angle, not repetition
-• "This is stupid" → They feel defeated. Validate, then simplify dramatically
-• "Is this right?" → They're unsure. Don't just confirm — ask what makes them unsure
-• Short/one-word answers → They're disengaged. Make it interactive visually
+### MODE B: THE GUARDRAIL (Anti-Frustration)
+*Trigger:* Same step failed 2x OR pause > 15s OR frustration_detected.
+*Action:* Reduce cognitive load. Binary choice: "Does the graph go UP or DOWN from here?"
 
-═══════════════════════════════════════════════════════
-AGE-ADAPTIVE COMMUNICATION
-═══════════════════════════════════════════════════════
-ELEMENTARY (K-5):
-• Use stories and characters: "Imagine you have 12 cookies..."
-• Make it tactile: "Draw circles for each one"
-• Celebrate loudly: "YES! 🎉 You cracked it!"
-• Keep responses SHORT (2-3 sentences max)
+### MODE C: THE MODEL (Stuck Loop)
+*Trigger:* Failed 3x or asks for the answer.
+*Action:* Worked example. "Watch me solve a similar one." (Generate parallel example, NOT the original).
 
-MIDDLE SCHOOL (6-8):
-• Connect to their world: games, sports, social situations
-• Give them choices: "Would you like to try the graph or the equation first?"
-• Be direct but warm: "You've got this. Focus on..."
-• Challenge them: "Can you think of why this pattern works?"
+## III. AGE-ADAPTIVE COMMUNICATION
 
-HIGH SCHOOL (9-12):
-• Explain the WHY behind methods
-• Introduce elegant shortcuts after they understand the basics
-• Reference real applications: physics, coding, finance
-• Treat them like peers: "Here's how I think about this..."
+### ELEMENTARY (K-5)
+* Stories: "Imagine you have 12 cookies..."
+* Tactile: "Draw circles for each one"
+* Celebrate: "YES! 🎉 You cracked it!"
+* MAX 2 sentences
 
-COLLEGE+:
-• Match their technical vocabulary
-• Discuss edge cases and exceptions
-• Offer multiple solution paths
-• Acknowledge complexity: "This is nuanced because..."
+### MIDDLE SCHOOL (6-8)
+* Connect to games, sports
+* Give choices: "Equation or graph first?"
+* Challenge: "Why does this pattern work?"
 
-═══════════════════════════════════════════════════════
-CORE TEACHING PHILOSOPHY
-═══════════════════════════════════════════════════════
-NEVER give answers directly. You're training neural pathways, not filling answer sheets.
+### HIGH SCHOOL (9-12)
+* Explain the WHY
+* Real applications: physics, coding, finance
+* Peer treatment: "Here's how I think about this..."
 
-THE METHOD:
-1. Listen first — understand what they already know
-2. Find the gap — locate the specific point of confusion
-3. Visualize it — guide them to draw or write it out
-4. Bridge the gap — use questions, not lectures
-5. Let them arrive — the "aha!" must be THEIRS
+### COLLEGE+
+* Technical vocabulary
+* Edge cases and exceptions
+* Multiple solution paths
 
-QUESTIONS ARE YOUR SUPERPOWER:
-• "What would happen if...?"
-• "How does this connect to...?"
-• "What pattern do you notice?"
-• "Can you explain that part to me?"
+## IV. WHITEBOARD INTERACTION
 
-THE WHITEBOARD IS YOUR SHARED CANVAS:
-• "Show me your thinking — draw it out"
-• "Write down the equation so we can look at it together"
-• "Circle the part that's confusing"
+When you see their whiteboard:
+1. **DESCRIBE** what you observe: "I see you drew a parabola opening upward..."
+2. **HIGHLIGHT** the focus area (provide coordinates)
+3. **GUIDE** with ONE clear instruction
 
-═══════════════════════════════════════════════════════
-RESPONSE STYLE
-═══════════════════════════════════════════════════════
-• SHORT and focused — one idea per response
-• INTERACTIVE — always end with something for them to do
-• VISUAL — reference their whiteboard constantly
-• WARM but not cheesy — genuine encouragement, not hollow praise
+You can request these whiteboard actions:
+* **highlight**: Glow around a region
+* **arrow**: Point to specific element
+* **circle**: Emphasize a symbol
+* **text_label**: Add a label
 
-References (use sparingly when they fit):
-• Training arcs (Dragon Ball, Naruto) = growth through struggle
-• Building/crafting games (Minecraft, Fortnite) = step-by-step construction
-• Sports = practice, muscle memory, coaching
+## V. METACOGNITION (Post-Win Protocol)
+When they get the answer RIGHT, do NOT stop. Anchor the neural pathway:
+1. **Strategy Recap**: "How did you know to use that method?"
+2. **Trap Detection**: "Why would using X have been a mistake?"
+3. **Universality**: "Would this work if the angle was 90°?"
 
-═══════════════════════════════════════════════════════
-REMEMBER
-═══════════════════════════════════════════════════════
-You're not an answer machine. You're a guide on the side.
+## VI. RESPONSE FORMAT
+Reply in JSON (the frontend parses this):
+
+\`\`\`json
+{
+  "voice_response": "Your spoken response. Warm, adaptive, concise.",
+  "text_display": "Text shown on screen. Can include LaTeX: $x^2$",
+  "whiteboard_action": {
+    "tool": "highlight",
+    "region": "top-right",
+    "description": "the exponent"
+  },
+  "emotional_state": "curious",
+  "cognitive_load": "medium",
+  "next_step": "Check the sign on the second term"
+}
+\`\`\`
+
+If you cannot determine coordinates, use descriptive regions: "top-left", "center", "bottom-right", etc.
+
+## VII. BEHAVIORAL GUARDRAILS
+* **No Lectures**: Max 3 sentences per turn
+* **No Solving**: Never give final answer unless they derived it
+* **No "Is that a 5?"**: Infer from context
+* **Safety**: If inappropriate content, respond normally but add "safety_flag": true
+
+## REMEMBER
+You're not an encyclopedia. You're a coach.
 Every question they answer themselves creates a neural pathway that STAYS.
-Every answer you hand them is forgotten by tomorrow.
+Every answer you hand them is forgotten by tomorrow.`;
 
-The goal isn't to finish the problem. The goal is to build a mind that can solve ANY problem.`,
+const CONFIG = {
+    systemPrompt: SYSTEM_PROMPT,
     temperature: 0.75,
 };
 
 class MindHiveService {
     constructor() {
-        // Initialize Gemini
         this.geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
         this.genAI = this.geminiKey ? new GoogleGenerativeAI(this.geminiKey) : null;
-
-        // Initialize Groq
         this.groqKey = import.meta.env.VITE_GROQ_API_KEY;
         this.groqEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
     }
 
     /**
      * Stream response with multi-provider fallback
-     * NEVER fails - always has a backup ready
+     * Injects stroke metadata into context
      */
-    async streamResponse(prompt, history = [], onChunk, onModelChange, images = []) {
-        console.log('🐝 Activating Mind Hive...');
+    async streamResponse(prompt, history = [], onChunk, onModelChange, images = [], strokeContext = '') {
+        console.log('🐝 Activating Mind Hive v3.0...');
+
+        // Inject stroke context into prompt
+        const enrichedPrompt = strokeContext
+            ? `${strokeContext}\n\nUser Message: ${prompt}`
+            : prompt;
 
         const errors = [];
 
@@ -166,7 +164,7 @@ class MindHiveService {
             for (const modelName of GEMINI_MODELS) {
                 try {
                     console.log(`🔄 [Gemini] Attempting: ${modelName}`);
-                    await this.streamGemini(modelName, prompt, history, onChunk, onModelChange, images);
+                    await this.streamGemini(modelName, enrichedPrompt, history, onChunk, onModelChange, images);
                     console.log(`✅ [Gemini] Success: ${modelName}`);
                     return;
                 } catch (error) {
@@ -181,7 +179,7 @@ class MindHiveService {
             for (const modelName of GROQ_MODELS) {
                 try {
                     console.log(`🔄 [Groq] Attempting: ${modelName}`);
-                    await this.streamGroq(modelName, prompt, history, onChunk, onModelChange);
+                    await this.streamGroq(modelName, enrichedPrompt, history, onChunk, onModelChange);
                     console.log(`✅ [Groq] Success: ${modelName}`);
                     return;
                 } catch (error) {
@@ -191,14 +189,10 @@ class MindHiveService {
             }
         }
 
-        // All providers failed
         console.error('🚨 Hive Collapse - All providers failed:', errors);
-        throw new Error('All AI providers are currently unavailable. Please try again in a moment.');
+        throw new Error('All AI providers are currently unavailable. Please try again.');
     }
 
-    /**
-     * Stream using Gemini (supports vision)
-     */
     async streamGemini(modelName, prompt, history, onChunk, onModelChange, images = []) {
         const model = this.genAI.getGenerativeModel({
             model: modelName,
@@ -210,7 +204,6 @@ class MindHiveService {
             onModelChange(modelName.toUpperCase().replace(/-/g, ' '));
         }
 
-        // Build chat history (filter leading model messages)
         let chatHistory = history.slice(0, -1).map(msg => ({
             role: msg.role === 'model' ? 'model' : 'user',
             parts: [{ text: msg.text }]
@@ -219,7 +212,6 @@ class MindHiveService {
             chatHistory.shift();
         }
 
-        // Handle images
         let parts = [{ text: prompt }];
         if (images && images.length > 0) {
             for (const imgUrl of images) {
@@ -254,20 +246,13 @@ class MindHiveService {
         if (!hasContent) throw new Error('Empty response');
     }
 
-    /**
-     * Stream using Groq (OpenAI-compatible API, text-only)
-     */
     async streamGroq(modelName, prompt, history, onChunk, onModelChange) {
         if (onModelChange) {
             onModelChange(`GROQ ${modelName.split('-')[0].toUpperCase()}`);
         }
 
-        // Build messages array (OpenAI format)
-        const messages = [
-            { role: 'system', content: CONFIG.systemPrompt }
-        ];
+        const messages = [{ role: 'system', content: CONFIG.systemPrompt }];
 
-        // Add history (skip leading assistant messages)
         let historyStarted = false;
         for (const msg of history.slice(0, -1)) {
             const role = msg.role === 'model' ? 'assistant' : 'user';
@@ -275,8 +260,6 @@ class MindHiveService {
             historyStarted = true;
             messages.push({ role, content: msg.text });
         }
-
-        // Add current prompt
         messages.push({ role: 'user', content: prompt });
 
         const response = await fetch(this.groqEndpoint, {
@@ -307,12 +290,9 @@ class MindHiveService {
             if (done) break;
 
             const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
-
-            for (const line of lines) {
+            for (const line of chunk.split('\n')) {
                 const trimmed = line.trim();
                 if (!trimmed || trimmed === 'data: [DONE]') continue;
-
                 if (trimmed.startsWith('data: ')) {
                     try {
                         const json = JSON.parse(trimmed.slice(6));
@@ -321,9 +301,7 @@ class MindHiveService {
                             hasContent = true;
                             onChunk(content);
                         }
-                    } catch {
-                        // Ignore parse errors for partial chunks
-                    }
+                    } catch { /* ignore */ }
                 }
             }
         }
@@ -342,3 +320,43 @@ class MindHiveService {
 }
 
 export const mindHive = new MindHiveService();
+
+/**
+ * Parse AI response - handles both JSON and plain text
+ */
+export function parseAIResponse(rawText) {
+    // Try to extract JSON from response
+    const jsonMatch = rawText.match(/```json\s*([\s\S]*?)\s*```/) ||
+        rawText.match(/\{[\s\S]*"voice_response"[\s\S]*\}/);
+
+    if (jsonMatch) {
+        try {
+            const jsonStr = jsonMatch[1] || jsonMatch[0];
+            const parsed = JSON.parse(jsonStr);
+            return {
+                isStructured: true,
+                voiceResponse: parsed.voice_response || parsed.text_display || rawText,
+                textDisplay: parsed.text_display || parsed.voice_response || rawText,
+                whiteboardAction: parsed.whiteboard_action || null,
+                emotionalState: parsed.emotional_state || 'neutral',
+                cognitiveLoad: parsed.cognitive_load || 'medium',
+                nextStep: parsed.next_step || null,
+                safetyFlag: parsed.safety_flag || false,
+            };
+        } catch (e) {
+            console.warn('JSON parse failed, using plain text');
+        }
+    }
+
+    // Fallback to plain text
+    return {
+        isStructured: false,
+        voiceResponse: rawText,
+        textDisplay: rawText,
+        whiteboardAction: null,
+        emotionalState: 'neutral',
+        cognitiveLoad: 'medium',
+        nextStep: null,
+        safetyFlag: false,
+    };
+}

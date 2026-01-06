@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { mindHive } from '../../services/MindHiveService';
+import { mindHive, parseAIResponse } from '../../services/MindHiveService';
 import { captureWhiteboard } from '../../utils/WhiteboardCapture';
+import { strokeAnalytics } from '../../utils/StrokeAnalytics';
+import ScanningOverlay from '../../components/ScanningOverlay';
 import jiLogo from '../../assets/ji_logo.jpg';
 
 // Patterns that suggest the student completed a whiteboard task
@@ -18,18 +20,21 @@ const INSTRUCTION_PATTERNS = [
 
 export default function GeminiChat({ mode = 'widget', onHome, externalMessages, setExternalMessages }) {
     const [localMessages, setLocalMessages] = useState([
-        { role: 'model', text: 'Welcome to Jefferson Intelligence. I can see your whiteboard! Just tell me what you need help with, and I\'ll guide you step by step.' },
+        { role: 'model', text: 'Welcome to Jefferson Intelligence v3.0. I can see your whiteboard and understand how you\'re working. Just tell me what you need help with!' },
     ]);
 
     const messages = externalMessages || localMessages;
     const setMessages = setExternalMessages || setLocalMessages;
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [currentModel, setCurrentModel] = useState(null);
     const [whiteboardImage, setWhiteboardImage] = useState(null);
     const [isCapturing, setIsCapturing] = useState(false);
-    const [autoCapture, setAutoCapture] = useState(true); // Auto-capture enabled by default
+    const [autoCapture, setAutoCapture] = useState(true);
+    const [emotionalState, setEmotionalState] = useState('neutral');
+    const [whiteboardAction, setWhiteboardAction] = useState(null);
     const messagesEndRef = useRef(null);
     const lastAIResponseRef = useRef('');
 
@@ -41,7 +46,18 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
         scrollToBottom();
     }, [messages]);
 
-    // Auto-capture whiteboard silently
+    // Broadcast whiteboard action to parent for overlay rendering
+    useEffect(() => {
+        if (whiteboardAction) {
+            window.dispatchEvent(new CustomEvent('ai-whiteboard-action', {
+                detail: whiteboardAction
+            }));
+            // Clear after 4 seconds
+            const timer = setTimeout(() => setWhiteboardAction(null), 4000);
+            return () => clearTimeout(timer);
+        }
+    }, [whiteboardAction]);
+
     const silentCapture = useCallback(async () => {
         try {
             const imageData = await captureWhiteboard();
@@ -52,18 +68,15 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
         }
     }, []);
 
-    // Check if user's message suggests they completed a task
     const shouldAutoCaptureOnSend = useCallback((userText) => {
         if (!autoCapture) return false;
         return COMPLETION_PATTERNS.some(pattern => pattern.test(userText));
     }, [autoCapture]);
 
-    // Check if AI's response contained a whiteboard instruction
     const aiGaveWhiteboardInstruction = useCallback((aiResponse) => {
         return INSTRUCTION_PATTERNS.some(pattern => pattern.test(aiResponse));
     }, []);
 
-    // Manual capture with UI feedback
     const handleCaptureWhiteboard = async () => {
         setIsCapturing(true);
         try {
@@ -91,22 +104,32 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
         const userText = input || "Look at my whiteboard";
         let images = whiteboardImage ? [whiteboardImage] : [];
 
-        // AUTO-CAPTURE LOGIC: If user's message suggests they completed something, capture whiteboard
+        // Get stroke analytics context
+        const strokeContext = strokeAnalytics.getContextString();
+        console.log('[v3.0] Stroke context:', strokeContext);
+
+        // AUTO-CAPTURE LOGIC
         if (!whiteboardImage && shouldAutoCaptureOnSend(userText)) {
             console.log('[AI Vision] Auto-capturing whiteboard (completion detected)');
+            setIsScanning(true);
             const autoCaptured = await silentCapture();
             if (autoCaptured) {
                 images = [autoCaptured];
             }
         }
 
-        // Also auto-capture if the last AI response gave a whiteboard instruction
         if (!images.length && aiGaveWhiteboardInstruction(lastAIResponseRef.current)) {
             console.log('[AI Vision] Auto-capturing whiteboard (following instruction)');
+            setIsScanning(true);
             const autoCaptured = await silentCapture();
             if (autoCaptured) {
                 images = [autoCaptured];
             }
+        }
+
+        // Show scanning if we have images
+        if (images.length > 0) {
+            setIsScanning(true);
         }
 
         const userMessage = {
@@ -142,27 +165,55 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                     const simplifiedName = modelName.split('/').pop().toUpperCase().replace(/-/g, ' ');
                     setCurrentModel(simplifiedName);
                 },
-                images
+                images,
+                strokeContext // Pass stroke context to AI
             );
 
-            // Store AI response for next turn's auto-capture logic
             lastAIResponseRef.current = fullResponse;
+
+            // Parse structured response
+            const parsed = parseAIResponse(fullResponse);
+            if (parsed.isStructured) {
+                console.log('[v3.0] Parsed AI response:', parsed);
+                setEmotionalState(parsed.emotionalState);
+                if (parsed.whiteboardAction) {
+                    setWhiteboardAction(parsed.whiteboardAction);
+                }
+            }
+
+            // Reset stroke analytics after successful exchange
+            strokeAnalytics.reset();
 
         } catch (error) {
             console.error("Mind Hive Error:", error);
             setMessages(prev => prev.map(msg =>
                 msg.id === placeholderId
-                    ? { ...msg, text: "The Swarm is currently unreachable. Please check your connection." }
+                    ? { ...msg, text: "I'm having trouble connecting right now. Please try again in a moment." }
                     : msg
             ));
         } finally {
             setIsLoading(false);
+            setIsScanning(false);
             setMessages(prev => prev.map(msg =>
                 msg.id === placeholderId
                     ? { ...msg, isStreaming: false }
                     : msg
             ));
         }
+    };
+
+    // Emotional state badge
+    const getEmotionBadge = () => {
+        const emotions = {
+            frustrated: { color: 'bg-red-500/20 text-red-400', icon: '😤' },
+            confused: { color: 'bg-yellow-500/20 text-yellow-400', icon: '🤔' },
+            curious: { color: 'bg-blue-500/20 text-blue-400', icon: '🧐' },
+            confident: { color: 'bg-green-500/20 text-green-400', icon: '😊' },
+            bored: { color: 'bg-slate-500/20 text-slate-400', icon: '😐' },
+            flow: { color: 'bg-purple-500/20 text-purple-400', icon: '🚀' },
+            neutral: { color: 'bg-slate-500/20 text-slate-400', icon: '🎯' },
+        };
+        return emotions[emotionalState] || emotions.neutral;
     };
 
     if (!isOpen && mode === 'widget') {
@@ -181,21 +232,29 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
         ? "w-full h-full flex flex-col bg-slate-950"
         : "w-[400px] h-[650px] bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden font-sans ring-1 ring-white/5 animation-slide-up-fade";
 
+    const emotionBadge = getEmotionBadge();
+
     return (
         <div className={containerClasses}>
+            {/* Scanning Overlay */}
+            <ScanningOverlay isActive={isScanning} />
+
             {/* Header */}
             <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-4 flex justify-between items-center border-b border-white/5 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
 
                 <div className="flex flex-col z-10 w-full">
                     <div className="flex items-center gap-3">
-                        <img src={jiLogo} alt="JI Logo" className="w-14 h-14 rounded-full border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/20" />
+                        <img src={jiLogo} alt="JI Logo" className="w-12 h-12 rounded-full border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/20" />
                         <div>
                             <span className="font-extrabold text-white text-sm tracking-wide uppercase">Jefferson Intelligence</span>
-                            <div className="flex items-center gap-1.5 mt-0.5">
+                            <div className="flex items-center gap-2 mt-0.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]"></span>
                                 <span className="text-[10px] text-slate-400 font-medium tracking-wider">
-                                    {currentModel ? `${currentModel}` : 'VISION ACTIVE'} • {autoCapture ? 'AUTO-SYNC' : 'MANUAL'}
+                                    {currentModel || 'v3.0'} • {autoCapture ? 'VISION' : 'MANUAL'}
+                                </span>
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${emotionBadge.color}`}>
+                                    {emotionBadge.icon}
                                 </span>
                             </div>
                         </div>
@@ -231,7 +290,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                                         👁️ Viewing whiteboard
                                     </div>
                                 )}
-                                <div className="markdown-body">
+                                <div className="markdown-body whitespace-pre-wrap">
                                     {msg.text}
                                     {msg.isStreaming && <span className="inline-block w-1.5 h-4 ml-1 align-middle bg-cyan-400 animate-pulse rounded-full" />}
                                 </div>
@@ -243,7 +302,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                     <div className="flex justify-center py-4">
                         <div className="flex items-center gap-2 px-4 py-2 bg-slate-900/80 rounded-full border border-white/5 text-xs text-cyan-400 animate-pulse">
                             <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-                            Analyzing...
+                            {isScanning ? 'Analyzing whiteboard...' : 'Thinking...'}
                         </div>
                     </div>
                 )}
@@ -312,7 +371,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                     >
                         {autoCapture ? '👁️ Auto-Vision ON' : '👁️ Auto-Vision OFF'}
                     </button>
-                    <span className="text-[9px] text-slate-600 uppercase tracking-widest font-semibold">v2.1</span>
+                    <span className="text-[9px] text-slate-600 uppercase tracking-widest font-semibold">v3.0 Neuro-Adaptive</span>
                 </div>
             </div>
         </div>
