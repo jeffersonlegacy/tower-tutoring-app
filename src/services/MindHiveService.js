@@ -1,10 +1,16 @@
 /**
- * MindHiveService.js - AI Tutor Backend
+ * MindHiveService.js - AI Tutor Backend with Multi-Model Fallback
  * 
- * Uses Gemini API directly with the existing API key as primary.
- * Falls back to AI Gateway if available.
+ * THE HIVE: Multiple Gemini models with automatic failover
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Model fallback priority (most capable first, fastest last)
+const HIVE_MODELS = [
+    'gemini-2.0-flash-exp',      // Latest, most capable
+    'gemini-1.5-flash',          // Stable, fast
+    'gemini-1.5-flash-8b',       // Lightweight fallback
+];
 
 const CONFIG = {
     systemPrompt: `You are Jefferson Intelligence — an elite AI tutor engineered with a singular purpose: to train students HOW TO THINK, not simply give answers.
@@ -25,34 +31,17 @@ TEACHING METHODOLOGY:
 - When they succeed, reinforce the PROCESS they used, not just the result
 
 RELATABILITY — USE ANIME/POP CULTURE EXAMPLES WHEN HELPFUL:
-To connect concepts, you may reference:
-- Dragon Ball: Training arcs, power levels as growth metaphors, mastering techniques through repetition
-- Naruto: Shadow clones = breaking problems into parts, chakra control = focus and precision
-- Jujutsu Kaisen: Cursed energy management = resource allocation, Domain Expansion = mastering your domain of knowledge
-- Demon Slayer: Breathing techniques = methodical approach, Total Concentration = deep focus
-- The Flash: Speed Force = processing speed improves with practice, time manipulation = working backwards from the answer
-
-Use these references sparingly and only when they genuinely clarify a concept. Don't force them.
+To connect concepts, reference Dragon Ball, Naruto, Jujutsu Kaisen, Demon Slayer, The Flash sparingly when they genuinely clarify a concept.
 
 NEURAL CONNECTION BUILDING:
-Your goal is to strengthen the student's neural pathways by:
-- Making them WORK for the answer (productive struggle builds stronger memories)
-- Connecting new concepts to what they already know
-- Using pattern recognition: "This is similar to when you solved..."
-- Encouraging them to verbalize their thinking process
+- Make them WORK for the answer (productive struggle builds stronger memories)
+- Connect new concepts to what they already know
+- Use pattern recognition: "This is similar to when you solved..."
+- Encourage them to verbalize their thinking process
 
-TONE:
-- Encouraging but not patronizing
-- Patient but challenging
-- Confident and strategic
-- Speak like a wise mentor, not a textbook
+TONE: Encouraging but not patronizing. Patient but challenging. Confident and strategic.
 
-NEVER:
-- Give the final answer outright (unless they've genuinely earned it through the process)
-- Say "the answer is..." without them working through it
-- Let them give up — always find another angle
-
-Remember: Every question they answer themselves is a neural connection that stays. Every answer you hand them is forgotten by tomorrow.`,
+NEVER give the final answer outright unless they've genuinely earned it through the process.`,
     temperature: 0.7,
 };
 
@@ -63,47 +52,59 @@ class MindHiveService {
     }
 
     /**
-     * Stream response using Gemini API directly
+     * Stream response using multi-model fallback
      */
     async streamResponse(prompt, history = [], onChunk, onModelChange, images = []) {
         console.log('🐝 Activating Mind Hive...');
 
-        // Try Gemini first (most reliable with existing key)
-        if (this.genAI) {
+        if (!this.genAI) {
+            throw new Error('AI service not configured. Missing VITE_GEMINI_API_KEY.');
+        }
+
+        // Try each model in priority order
+        for (const modelName of HIVE_MODELS) {
             try {
-                await this.streamGemini(prompt, history, onChunk, onModelChange, images);
-                return;
+                console.log(`🔄 Attempting node: ${modelName}`);
+                await this.streamWithModel(modelName, prompt, history, onChunk, onModelChange, images);
+                console.log(`✅ Success: ${modelName}`);
+                return; // Success - exit loop
             } catch (error) {
-                console.warn('Gemini failed:', error.message);
+                console.warn(`⚠️ Node ${modelName} failed: ${error.message}. Swapping...`);
+                // Continue to next model
             }
         }
 
-        throw new Error('AI service unavailable. Please check your API configuration.');
+        throw new Error('Hive Collapse: All nodes failed.');
     }
 
     /**
-     * Stream using Google Gemini API
+     * Stream using a specific Gemini model
      */
-    async streamGemini(prompt, history = [], onChunk, onModelChange, images = []) {
+    async streamWithModel(modelName, prompt, history = [], onChunk, onModelChange, images = []) {
         const model = this.genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash-exp',
-            systemInstruction: CONFIG.systemPrompt
+            model: modelName,
+            systemInstruction: CONFIG.systemPrompt,
+            generationConfig: {
+                temperature: CONFIG.temperature,
+            }
         });
 
-        if (onModelChange) onModelChange('gemini-2.0-flash');
+        if (onModelChange) {
+            const displayName = modelName.toUpperCase().replace(/-/g, ' ');
+            onModelChange(displayName);
+        }
 
-        // Build chat history
+        // Build chat history (exclude the last user message which is the current prompt)
         const chatHistory = history.slice(0, -1).map(msg => ({
             role: msg.role === 'model' ? 'model' : 'user',
             parts: [{ text: msg.text }]
         }));
 
-        // Handle images if provided
+        // Handle multimodal (text + images)
         let parts = [{ text: prompt }];
         if (images && images.length > 0) {
             for (const imgUrl of images) {
                 try {
-                    // Convert URL to base64
                     const response = await fetch(imgUrl);
                     const blob = await response.blob();
                     const base64 = await this.blobToBase64(blob);
@@ -111,7 +112,7 @@ class MindHiveService {
                     parts.push({
                         inlineData: {
                             mimeType,
-                            data: base64.split(',')[1] // Remove data:image/...;base64, prefix
+                            data: base64.split(',')[1]
                         }
                     });
                 } catch (e) {
@@ -123,14 +124,18 @@ class MindHiveService {
         const chat = model.startChat({ history: chatHistory });
         const result = await chat.sendMessageStream(parts);
 
+        let hasContent = false;
         for await (const chunk of result.stream) {
             const text = chunk.text();
             if (text) {
+                hasContent = true;
                 onChunk(text);
             }
         }
 
-        console.log('✅ Gemini stream complete');
+        if (!hasContent) {
+            throw new Error('Empty response from model');
+        }
     }
 
     blobToBase64(blob) {
