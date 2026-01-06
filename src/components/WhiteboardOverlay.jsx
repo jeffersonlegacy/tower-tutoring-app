@@ -59,10 +59,13 @@ export default function WhiteboardOverlay({ action, onComplete }) {
         };
     }
 
+    // Default to center if no region specified
     if (!region) {
-        // Default to center if no region specified
+        console.warn('[Overlay] No valid region found, defaulting to center');
         region = REGION_MAP['center'];
     }
+
+    console.log('[Overlay] Rendering at:', region);
 
     const color = action.color || 'cyan';
     const tool = action.tool || 'highlight';
@@ -74,7 +77,7 @@ export default function WhiteboardOverlay({ action, onComplete }) {
         width: `${region.width}%`,
         height: `${region.height}%`,
         pointerEvents: 'none',
-        zIndex: 100,
+        zIndex: 9999, // Ensure it's on top of standard Tldraw UI
         transition: 'opacity 0.5s ease-out',
         opacity: fading ? 0 : 1,
     };
@@ -83,6 +86,8 @@ export default function WhiteboardOverlay({ action, onComplete }) {
     if (tool === 'highlight') {
         return (
             <div
+                data-testid="whiteboard-overlay"
+                className="ai-overlay-container"
                 style={{
                     ...baseStyle,
                     background: `radial-gradient(ellipse at center, ${color}33 0%, transparent 70%)`,
