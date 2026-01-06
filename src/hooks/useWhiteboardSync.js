@@ -1,84 +1,67 @@
 /**
- * useWhiteboardSync.js - Bulletproof Real-Time Sync
+ * useWhiteboardSync.js - FIXED for tldraw v3
  * 
- * COMPLETE REWRITE for flawless multi-participant sync.
- * 
- * KEY DESIGN DECISIONS:
- * 1. Use Yjs-style operation-based sync (record diffs, not full snapshots)
- * 2. Batch changes with RAF for 60fps performance
- * 3. Unique instance ID prevents self-updates
- * 4. Merge remote changes instead of replacing
+ * ROOT CAUSE: editor.store.loadSnapshot() API changed in tldraw v3.
+ * FIX: Use record-level operations (put/remove) instead of full snapshots.
  */
 import { useEffect, useRef, useCallback } from 'react';
 import { db } from '../services/firebase';
-import { doc, onSnapshot, setDoc, getDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
-// Generate unique instance ID per browser tab
+// Unique ID per browser tab (prevents self-echo)
 const INSTANCE_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 export function useWhiteboardSync(editor, sessionId) {
     const isApplyingRemote = useRef(false);
-    const pendingSync = useRef(false);
-    const lastSyncedHash = useRef('');
-    const rafId = useRef(null);
+    const lastSyncedData = useRef(null);
+    const syncTimeout = useRef(null);
 
-    // Hash function for quick comparison
-    const hashRecords = (records) => {
-        try {
-            return JSON.stringify(records);
-        } catch {
-            return '';
-        }
-    };
-
-    // Sync local state to Firebase
-    const syncToFirebase = useCallback(async () => {
+    // Sync local changes to Firebase
+    const pushToFirebase = useCallback(async () => {
         if (!editor || !sessionId || isApplyingRemote.current) return;
 
         try {
-            const records = editor.store.serialize();
-            const hash = hashRecords(records);
+            // Get all records from the store
+            const allRecords = editor.store.allRecords();
+
+            // Convert to a plain object keyed by ID
+            const recordsObj = {};
+            for (const record of allRecords) {
+                recordsObj[record.id] = record;
+            }
+
+            const dataStr = JSON.stringify(recordsObj);
 
             // Skip if nothing changed
-            if (hash === lastSyncedHash.current) {
-                pendingSync.current = false;
-                return;
-            }
+            if (dataStr === lastSyncedData.current) return;
+
+            lastSyncedData.current = dataStr;
 
             const docRef = doc(db, 'whiteboards', sessionId);
             await setDoc(docRef, {
-                records,
+                records: recordsObj,
                 instanceId: INSTANCE_ID,
                 updatedAt: serverTimestamp()
-            }, { merge: false });
+            });
 
-            lastSyncedHash.current = hash;
-            pendingSync.current = false;
-            console.log('[Sync] Pushed to Firebase');
+            console.log('[Sync] Pushed', Object.keys(recordsObj).length, 'records to Firebase');
         } catch (err) {
             if (!err.message?.includes('offline')) {
                 console.error('[Sync] Push error:', err);
             }
-            pendingSync.current = false;
         }
     }, [editor, sessionId]);
 
-    // Schedule sync on next animation frame (batches rapid changes)
+    // Debounced sync
     const scheduleSync = useCallback(() => {
-        if (pendingSync.current) return;
-        pendingSync.current = true;
-
-        cancelAnimationFrame(rafId.current);
-        rafId.current = requestAnimationFrame(() => {
-            // Additional 100ms debounce for drawing stability
-            setTimeout(syncToFirebase, 100);
-        });
-    }, [syncToFirebase]);
+        clearTimeout(syncTimeout.current);
+        syncTimeout.current = setTimeout(pushToFirebase, 150);
+    }, [pushToFirebase]);
 
     useEffect(() => {
         if (!editor || !sessionId) return;
 
-        console.log('[Sync] Starting for session:', sessionId, '| Instance:', INSTANCE_ID);
+        console.log('[Sync] Starting | Session:', sessionId, '| Instance:', INSTANCE_ID);
         const docRef = doc(db, 'whiteboards', sessionId);
 
         // Load initial state
@@ -88,33 +71,37 @@ export function useWhiteboardSync(editor, sessionId) {
                 if (snapshot.exists()) {
                     const data = snapshot.data();
                     if (data.records && typeof data.records === 'object') {
-                        const recordKeys = Object.keys(data.records);
-                        if (recordKeys.length > 0) {
-                            console.log('[Sync] Loading', recordKeys.length, 'records from Firebase');
+                        const recordsArray = Object.values(data.records);
+                        if (recordsArray.length > 0) {
+                            console.log('[Sync] Loading', recordsArray.length, 'records from Firebase');
                             isApplyingRemote.current = true;
+
                             try {
-                                editor.store.loadSnapshot({
-                                    document: { id: 'td-document', records: data.records },
-                                    schema: editor.store.schema.serialize()
-                                });
-                                lastSyncedHash.current = hashRecords(data.records);
+                                // TLDRAW V3 FIX: Use put() for each record
+                                editor.store.put(recordsArray);
+                                lastSyncedData.current = JSON.stringify(data.records);
                             } catch (e) {
-                                console.warn('[Sync] Initial load failed:', e.message);
+                                console.warn('[Sync] Initial load error:', e.message);
                             }
+
                             isApplyingRemote.current = false;
                         }
                     }
                 } else {
-                    // Create fresh doc
-                    console.log('[Sync] Creating new whiteboard doc');
-                    const records = editor.store.serialize();
+                    // Create initial document
+                    console.log('[Sync] Creating new whiteboard');
+                    const allRecords = editor.store.allRecords();
+                    const recordsObj = {};
+                    for (const record of allRecords) {
+                        recordsObj[record.id] = record;
+                    }
                     await setDoc(docRef, {
-                        records,
+                        records: recordsObj,
                         instanceId: INSTANCE_ID,
                         createdAt: serverTimestamp(),
                         updatedAt: serverTimestamp()
                     });
-                    lastSyncedHash.current = hashRecords(records);
+                    lastSyncedData.current = JSON.stringify(recordsObj);
                 }
             } catch (err) {
                 if (!err.message?.includes('offline')) {
@@ -127,95 +114,91 @@ export function useWhiteboardSync(editor, sessionId) {
 
         // Listen to local changes
         const unlistenStore = editor.store.listen((entry) => {
-            // Skip if we're applying remote changes
             if (isApplyingRemote.current) return;
 
-            // Trigger sync on any meaningful change
-            const hasChanges = (
+            // Check if there are actual shape changes
+            const hasChanges =
                 Object.keys(entry.changes.added || {}).length > 0 ||
                 Object.keys(entry.changes.updated || {}).length > 0 ||
-                Object.keys(entry.changes.removed || {}).length > 0
-            );
+                Object.keys(entry.changes.removed || {}).length > 0;
 
             if (hasChanges) {
                 scheduleSync();
             }
         });
 
-        // Listen to remote changes from Firebase
+        // Listen to remote changes
         const unsubscribeSnapshot = onSnapshot(docRef, (snapshot) => {
-            if (!snapshot.exists()) {
-                console.warn('[Sync] Document deleted remotely');
-                return;
-            }
+            if (!snapshot.exists()) return;
 
             const data = snapshot.data();
 
-            // CRITICAL: Skip if this update came from us
+            // Skip our own updates
             if (data.instanceId === INSTANCE_ID) {
                 return;
             }
 
-            if (!data.records || typeof data.records !== 'object') {
-                return;
-            }
+            if (!data.records || typeof data.records !== 'object') return;
 
-            const remoteHash = hashRecords(data.records);
+            const remoteDataStr = JSON.stringify(data.records);
+            if (remoteDataStr === lastSyncedData.current) return;
 
-            // Skip if same as what we have
-            if (remoteHash === lastSyncedHash.current) {
-                return;
-            }
-
-            console.log('[Sync] Applying remote changes from instance:', data.instanceId);
+            console.log('[Sync] Applying remote changes from:', data.instanceId);
             isApplyingRemote.current = true;
-            lastSyncedHash.current = remoteHash;
+            lastSyncedData.current = remoteDataStr;
 
             try {
-                editor.store.loadSnapshot({
-                    document: { id: 'td-document', records: data.records },
-                    schema: editor.store.schema.serialize()
+                const remoteRecords = Object.values(data.records);
+                const localRecords = editor.store.allRecords();
+
+                // Find records to add/update
+                const localIds = new Set(localRecords.map(r => r.id));
+                const remoteIds = new Set(Object.keys(data.records));
+
+                // Records to add or update
+                const toUpsert = remoteRecords.filter(r => {
+                    const local = localRecords.find(l => l.id === r.id);
+                    if (!local) return true; // new record
+                    return JSON.stringify(local) !== JSON.stringify(r); // changed
                 });
+
+                // Records to remove (exist locally but not remotely)
+                const toRemove = localRecords
+                    .filter(r => !remoteIds.has(r.id))
+                    .filter(r => r.typeName === 'shape') // Only remove shapes, not camera/page
+                    .map(r => r.id);
+
+                if (toUpsert.length > 0) {
+                    editor.store.put(toUpsert);
+                    console.log('[Sync] Added/updated', toUpsert.length, 'records');
+                }
+
+                if (toRemove.length > 0) {
+                    editor.store.remove(toRemove);
+                    console.log('[Sync] Removed', toRemove.length, 'records');
+                }
             } catch (e) {
-                console.warn('[Sync] Remote apply failed:', e.message);
+                console.warn('[Sync] Apply error:', e.message);
             }
 
             isApplyingRemote.current = false;
         }, (err) => {
-            console.error('[Sync] Snapshot listener error:', err);
+            console.error('[Sync] Listener error:', err);
         });
 
-        // Sync on window blur (user switching tabs)
+        // Sync on blur
         const handleBlur = () => {
-            if (pendingSync.current) {
-                cancelAnimationFrame(rafId.current);
-                syncToFirebase();
-            }
+            clearTimeout(syncTimeout.current);
+            pushToFirebase();
         };
         window.addEventListener('blur', handleBlur);
 
-        // Sync before unload
-        const handleBeforeUnload = () => {
-            if (pendingSync.current) {
-                const records = editor.store.serialize();
-                const docRef = doc(db, 'whiteboards', sessionId);
-                // Use sendBeacon for more reliable unload sync
-                navigator.sendBeacon?.('/api/sync-whiteboard', JSON.stringify({
-                    sessionId,
-                    records,
-                    instanceId: INSTANCE_ID
-                }));
-            }
-        };
-        window.addEventListener('beforeunload', handleBeforeUnload);
-
         return () => {
             console.log('[Sync] Cleanup');
-            cancelAnimationFrame(rafId.current);
+            clearTimeout(syncTimeout.current);
             unlistenStore();
             unsubscribeSnapshot();
             window.removeEventListener('blur', handleBlur);
-            window.removeEventListener('beforeunload', handleBeforeUnload);
         };
-    }, [editor, sessionId, scheduleSync, syncToFirebase]);
+    }, [editor, sessionId, scheduleSync, pushToFirebase]);
 }
