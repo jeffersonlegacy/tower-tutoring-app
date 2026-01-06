@@ -19,8 +19,8 @@ const Whiteboard = memo(({ sessionId }) => {
       <div className="w-full h-full tldraw__editor">
         <Tldraw
           onMount={handleMount}
-          persistenceKey={`tower-whiteboard-${sessionId}`}
           hideUi={false}
+          autoFocus
         />
       </div>
 

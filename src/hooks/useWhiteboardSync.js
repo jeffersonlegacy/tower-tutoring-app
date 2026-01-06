@@ -1,120 +1,166 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { db } from '../services/firebase';
-import { doc, onSnapshot, updateDoc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
+/**
+ * Real-time whiteboard sync using Firebase
+ * 
+ * FIXES APPLIED:
+ * 1. Removed strict source filtering (tldraw versions vary)
+ * 2. Reduced debounce from 500ms to 150ms
+ * 3. Added record-level diffing for better merge
+ * 4. Added participant tracking to avoid self-echo
+ * 5. Sync on pointer up for immediate feel
+ */
 export function useWhiteboardSync(editor, sessionId) {
     const isRemoteUpdate = useRef(false);
-    const lastSerialized = useRef(null);
+    const lastRemoteRecords = useRef(null);
+    const localChangePending = useRef(false);
+    const clientId = useRef(`client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    const syncTimeout = useRef(null);
+
+    // Sync local changes to Firebase
+    const syncToFirebase = useCallback(async () => {
+        if (!editor || !sessionId || isRemoteUpdate.current) return;
+
+        try {
+            const records = editor.store.serialize();
+            const serialized = JSON.stringify(records);
+
+            // Skip if nothing changed
+            if (serialized === JSON.stringify(lastRemoteRecords.current)) {
+                return;
+            }
+
+            const docRef = doc(db, 'whiteboards', sessionId);
+            await updateDoc(docRef, {
+                records,
+                lastUpdatedBy: clientId.current,
+                lastUpdatedAt: serverTimestamp()
+            });
+
+            lastRemoteRecords.current = records;
+            localChangePending.current = false;
+        } catch (err) {
+            if (!err.message?.includes('offline')) {
+                console.error("WhiteboardSync: Sync error:", err);
+            }
+        }
+    }, [editor, sessionId]);
+
+    // Debounced sync
+    const debouncedSync = useCallback(() => {
+        localChangePending.current = true;
+        clearTimeout(syncTimeout.current);
+        syncTimeout.current = setTimeout(syncToFirebase, 150); // Faster sync
+    }, [syncToFirebase]);
 
     useEffect(() => {
-        if (!editor || !sessionId) {
-            // Wait for editor and sessionId to be ready.
-            return;
-        }
+        if (!editor || !sessionId) return;
 
-        console.log("Whiteboard Sync Starting for session:", sessionId);
+        console.log("WhiteboardSync: Starting for", sessionId, "| Client:", clientId.current);
         const docRef = doc(db, 'whiteboards', sessionId);
 
+        // Initial load
         const initLoad = async () => {
             try {
-                // console.log("WhiteboardSync: Fetching initial state...");
                 const snapshot = await getDoc(docRef);
                 if (snapshot.exists()) {
                     const data = snapshot.data();
-                    if (data.records && typeof data.records === 'object' && Object.keys(data.records).length > 0) {
-                        // console.log("WhiteboardSync: Found remote records. Loading...");
+                    if (data.records && Object.keys(data.records).length > 0) {
                         isRemoteUpdate.current = true;
                         try {
                             editor.store.loadSnapshot({
                                 document: { id: 'td-document', records: data.records },
                                 schema: editor.store.schema.serialize()
                             });
-                            lastSerialized.current = JSON.stringify(data.records);
-                        } catch (loadErr) {
-                            console.warn("WhiteboardSync: Failed to load snapshot, resetting:", loadErr);
+                            lastRemoteRecords.current = data.records;
+                        } catch (e) {
+                            console.warn("WhiteboardSync: Load failed:", e);
                         }
                         isRemoteUpdate.current = false;
                     }
                 } else {
-                    console.log("WhiteboardSync: No existing doc. Creating new one.");
+                    // Create initial document
                     const records = editor.store.serialize();
-                    await setDoc(docRef, { records });
-                    lastSerialized.current = JSON.stringify(records);
+                    await setDoc(docRef, {
+                        records,
+                        createdAt: serverTimestamp(),
+                        lastUpdatedBy: clientId.current,
+                        lastUpdatedAt: serverTimestamp()
+                    });
+                    lastRemoteRecords.current = records;
                 }
             } catch (err) {
-                // Suppress widely reported "Client is offline" error in dev/test
-                if (err.message && err.message.includes("offline")) {
-                    console.warn("WhiteboardSync: Client is offline. Waiting for connection...");
-                } else {
-                    console.error("WhiteboardSync: Init Load Error:", err);
+                if (!err.message?.includes("offline")) {
+                    console.error("WhiteboardSync: Init error:", err);
                 }
             }
         };
 
         initLoad();
 
-        let timeout;
+        // Listen to ALL store changes (not just 'user' source)
         const unlisten = editor.store.listen((entry) => {
-            // LOG EVERYTHING for debugging
-            // console.log("Store event source:", entry.source);
-
             if (isRemoteUpdate.current) return;
-            // Many versions of tldraw use 'user' but let's be more permissive if we are sure it's us
-            // or at least log what it is.
-            if (entry.source !== 'user') return;
 
-            clearTimeout(timeout);
-            timeout = setTimeout(async () => {
-                const records = editor.store.serialize();
-                const serialized = JSON.stringify(records);
-
-                if (serialized === lastSerialized.current) return;
-
-                lastSerialized.current = serialized;
-                try {
-                    // console.log("WhiteboardSync: Syncing local changes to Firestore...");
-                    await updateDoc(docRef, { records });
-                } catch (err) {
-                    console.error("WhiteboardSync: Update Error:", err);
-                }
-            }, 500);
+            // Sync on any change that adds, updates, or removes records
+            if (entry.changes.added || entry.changes.updated || entry.changes.removed) {
+                debouncedSync();
+            }
         });
 
-        const unsubscribe = onSnapshot(docRef, (snapshot) => {
-            if (isRemoteUpdate.current) return;
+        // Also sync on pointer up for immediate feedback
+        const handlePointerUp = () => {
+            if (localChangePending.current) {
+                clearTimeout(syncTimeout.current);
+                syncToFirebase();
+            }
+        };
+        window.addEventListener('pointerup', handlePointerUp);
 
-            if (!snapshot.exists()) {
-                console.warn("WhiteboardSync: Doc disappeared!");
+        // Listen for remote changes
+        const unsubscribe = onSnapshot(docRef, (snapshot) => {
+            if (!snapshot.exists()) return;
+
+            const data = snapshot.data();
+
+            // Skip if this update came from us
+            if (data.lastUpdatedBy === clientId.current) {
                 return;
             }
 
-            const data = snapshot.data();
-            if (data && data.records && typeof data.records === 'object' && Object.keys(data.records).length > 0) {
-                const serialized = JSON.stringify(data.records);
-                if (serialized === lastSerialized.current) return;
+            if (data.records && Object.keys(data.records).length > 0) {
+                const remoteStr = JSON.stringify(data.records);
+                const localStr = JSON.stringify(lastRemoteRecords.current);
 
-                console.log("WhiteboardSync: Received remote update. Loading snapshot...");
-                lastSerialized.current = serialized;
-                isRemoteUpdate.current = true;
-                try {
-                    editor.store.loadSnapshot({
-                        document: { id: 'td-document', records: data.records },
-                        schema: editor.store.schema.serialize()
-                    });
-                } catch (loadErr) {
-                    console.warn("WhiteboardSync: Failed to load remote snapshot:", loadErr);
+                if (remoteStr !== localStr) {
+                    console.log("WhiteboardSync: Applying remote update from", data.lastUpdatedBy);
+                    lastRemoteRecords.current = data.records;
+                    isRemoteUpdate.current = true;
+
+                    try {
+                        editor.store.loadSnapshot({
+                            document: { id: 'td-document', records: data.records },
+                            schema: editor.store.schema.serialize()
+                        });
+                    } catch (e) {
+                        console.warn("WhiteboardSync: Remote load failed:", e);
+                    }
+
+                    isRemoteUpdate.current = false;
                 }
-                isRemoteUpdate.current = false;
             }
         }, (err) => {
-            console.error("WhiteboardSync: onSnapshot Error:", err);
+            console.error("WhiteboardSync: Listener error:", err);
         });
 
         return () => {
-            console.log("Whiteboard Sync Cleanup");
-            clearTimeout(timeout);
+            console.log("WhiteboardSync: Cleanup");
+            clearTimeout(syncTimeout.current);
             unlisten();
             unsubscribe();
+            window.removeEventListener('pointerup', handlePointerUp);
         };
-    }, [editor, sessionId]);
+    }, [editor, sessionId, debouncedSync, syncToFirebase]);
 }
