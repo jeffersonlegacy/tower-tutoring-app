@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { mindHive, parseAIResponse } from '../../services/MindHiveService';
 import { captureWhiteboard } from '../../utils/WhiteboardCapture';
 import { strokeAnalytics } from '../../utils/StrokeAnalytics';
@@ -298,8 +300,25 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                                         👁️ Viewing whiteboard
                                     </div>
                                 )}
-                                <div className="markdown-body whitespace-pre-wrap">
-                                    {msg.text}
+                                <div className="markdown-body">
+                                    {msg.role === 'model' ? (
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                                ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+                                                ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+                                                li: ({ children }) => <li>{children}</li>,
+                                                strong: ({ children }) => <strong className="font-bold text-cyan-300">{children}</strong>,
+                                                a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">{children}</a>,
+                                                code: ({ children }) => <code className="bg-slate-900/50 px-1 py-0.5 rounded text-xs font-mono text-emerald-400">{children}</code>,
+                                            }}
+                                        >
+                                            {msg.text}
+                                        </ReactMarkdown>
+                                    ) : (
+                                        <div className="whitespace-pre-wrap">{msg.text}</div>
+                                    )}
                                     {msg.isStreaming && <span className="inline-block w-1.5 h-4 ml-1 align-middle bg-cyan-400 animate-pulse rounded-full" />}
                                 </div>
                             </div>

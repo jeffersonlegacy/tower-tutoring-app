@@ -325,13 +325,26 @@ export const mindHive = new MindHiveService();
  * Parse AI response - handles both JSON and plain text
  */
 export function parseAIResponse(rawText) {
-    // Try to extract JSON from response
-    const jsonMatch = rawText.match(/```json\s*([\s\S]*?)\s*```/) ||
-        rawText.match(/\{[\s\S]*"voice_response"[\s\S]*\}/);
+    if (!rawText) return { isStructured: false, textDisplay: '' };
 
-    if (jsonMatch) {
+    // 1. Try to extract JSON from code blocks
+    const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+
+    // 2. Try to find the raw JSON object structure if regex fails
+    let jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : null;
+
+    if (!jsonStr) {
+        const firstParen = rawText.indexOf('{');
+        const lastParen = rawText.lastIndexOf('}');
+        if (firstParen !== -1 && lastParen !== -1 && lastParen > firstParen) {
+            jsonStr = rawText.substring(firstParen, lastParen + 1);
+        }
+    }
+
+    if (jsonStr) {
         try {
-            const jsonStr = jsonMatch[1] || jsonMatch[0];
+            // Clean up any potential trailing commas or comments if we wanted to be fancy,
+            // but for now just standard parse
             const parsed = JSON.parse(jsonStr);
             return {
                 isStructured: true,
@@ -344,7 +357,7 @@ export function parseAIResponse(rawText) {
                 safetyFlag: parsed.safety_flag || false,
             };
         } catch (e) {
-            console.warn('JSON parse failed, using plain text');
+            console.warn('JSON parse failed, falling back to plain text', e);
         }
     }
 
