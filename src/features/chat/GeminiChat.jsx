@@ -240,7 +240,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
 
     const containerClasses = mode === 'fullscreen'
         ? "w-full h-full flex flex-col bg-slate-950"
-        : "w-[400px] h-[650px] bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden font-sans ring-1 ring-white/5 animation-slide-up-fade";
+        : "fixed bottom-4 right-4 md:right-6 w-[95vw] md:w-[400px] h-[80vh] md:h-[650px] bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden font-sans ring-1 ring-white/5 animation-slide-up-fade";
 
     const emotionBadge = getEmotionBadge();
 
