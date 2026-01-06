@@ -1,10 +1,10 @@
-// THE HIVE: Prioritized list of validated models
-// Updated to prioritize Mistral (Proven connectivity)
-const HIVE_MODELS = [
-    'openai/gpt-4o-mini',
-    'mistral/ministral-3b',
-    'deepseek/deepseek-v3'
-];
+/**
+ * MindHiveService.js - AI Tutor Backend
+ * 
+ * Uses Gemini API directly with the existing API key as primary.
+ * Falls back to AI Gateway if available.
+ */
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const CONFIG = {
     systemPrompt: `You are Jefferson Intelligence — an elite AI tutor engineered with a singular purpose: to train students HOW TO THINK, not simply give answers.
@@ -58,124 +58,88 @@ Remember: Every question they answer themselves is a neural connection that stay
 
 class MindHiveService {
     constructor() {
-        // In dev mode, we might hit the gateway directly if the proxy /api is not available
-        this.isDev = import.meta.env.DEV;
-        this.gatewayUrl = 'https://ai-gateway.vercel.sh/v1/chat/completions';
-        this.proxyUrl = window.location.origin + '/api/chat/completions';
+        this.geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+        this.genAI = this.geminiKey ? new GoogleGenerativeAI(this.geminiKey) : null;
     }
 
     /**
-     * Streams a response from the hive using direct fetch to bypass SDK complexities.
-     * Supports Multimodal Inputs (Text + Images).
+     * Stream response using Gemini API directly
      */
     async streamResponse(prompt, history = [], onChunk, onModelChange, images = []) {
-        console.log(`🐝 activating mind hive...`);
+        console.log('🐝 Activating Mind Hive...');
 
-        // Format User Message (Multimodal support)
-        let userContent = prompt;
-        if (images && images.length > 0) {
-            userContent = [
-                { type: "text", text: prompt },
-                ...images.map(url => ({
-                    type: "image_url",
-                    image_url: { url: url }
-                }))
-            ];
-        }
-
-        const messages = [
-            { role: 'system', content: CONFIG.systemPrompt },
-            ...history.map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.text })),
-            { role: 'user', content: userContent }
-        ];
-
-        for (const modelName of HIVE_MODELS) {
+        // Try Gemini first (most reliable with existing key)
+        if (this.genAI) {
             try {
-                console.log(`Attempting Node: ${modelName}`);
-
-                // Try proxy first, then gateway if in dev
-                let targetUrl = this.proxyUrl;
-                let headers = { 'Content-Type': 'application/json' };
-
-                if (this.isDev) {
-                    const devKey = import.meta.env.VITE_AI_GATEWAY_API_KEY;
-                    if (devKey) {
-                        targetUrl = this.gatewayUrl;
-                        headers['Authorization'] = `Bearer ${devKey}`;
-                    }
-                }
-
-                const response = await fetch(targetUrl, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify({
-                        model: modelName,
-                        messages: messages,
-                        temperature: CONFIG.temperature,
-                        stream: true
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text().catch(() => response.statusText);
-                    console.warn(`Node ${modelName} returned HTTP ${response.status}: ${errorText}`);
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                // Notify UI which model connected
-                if (onModelChange) onModelChange(modelName);
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let hasContent = false;
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    const chunk = decoder.decode(value, { stream: true });
-                    // Vercel Gateway returns SSE format "data: ...". 
-                    // To keep it simple, we'll strip "data: " and json parse if we can,
-                    // or just dump the raw text if it's not SSE.
-                    // Actually, since we are proxying, we might receive raw chunks if we didn't handle SSE in proxy.
-                    // But our proxy pipes raw.
-
-                    // Simple parser for Vercel/OpenAI SSE
-                    const lines = chunk.split('\n');
-                    for (const line of lines) {
-                        const trimmed = line.trim();
-                        if (!trimmed || trimmed === 'data: [DONE]') continue;
-
-                        if (trimmed.startsWith('data: ')) {
-                            try {
-                                const json = JSON.parse(trimmed.substring(6));
-                                const content = json.choices?.[0]?.delta?.content;
-                                if (content) {
-                                    hasContent = true;
-                                    onChunk(content);
-                                }
-                            } catch {
-                                // ignore parse errors for partial chunks
-                            }
-                        }
-                    }
-                }
-
-                if (!hasContent) {
-                    // Fallback: maybe it wasn't SSE? Just send raw chunk?
-                    // No, assume connection worked.
-                }
-
-                console.log(`✅ Success Node: ${modelName}`);
-                return; // Success!
-
+                await this.streamGemini(prompt, history, onChunk, onModelChange, images);
+                return;
             } catch (error) {
-                console.warn(`⚠️ Node ${modelName} failed/unresponsive. Swapping...`, error);
-                // Loop continues to next model
+                console.warn('Gemini failed:', error.message);
             }
         }
 
-        throw new Error("Hive Collapse: All nodes failed.");
+        throw new Error('AI service unavailable. Please check your API configuration.');
+    }
+
+    /**
+     * Stream using Google Gemini API
+     */
+    async streamGemini(prompt, history = [], onChunk, onModelChange, images = []) {
+        const model = this.genAI.getGenerativeModel({
+            model: 'gemini-2.0-flash-exp',
+            systemInstruction: CONFIG.systemPrompt
+        });
+
+        if (onModelChange) onModelChange('gemini-2.0-flash');
+
+        // Build chat history
+        const chatHistory = history.slice(0, -1).map(msg => ({
+            role: msg.role === 'model' ? 'model' : 'user',
+            parts: [{ text: msg.text }]
+        }));
+
+        // Handle images if provided
+        let parts = [{ text: prompt }];
+        if (images && images.length > 0) {
+            for (const imgUrl of images) {
+                try {
+                    // Convert URL to base64
+                    const response = await fetch(imgUrl);
+                    const blob = await response.blob();
+                    const base64 = await this.blobToBase64(blob);
+                    const mimeType = blob.type || 'image/jpeg';
+                    parts.push({
+                        inlineData: {
+                            mimeType,
+                            data: base64.split(',')[1] // Remove data:image/...;base64, prefix
+                        }
+                    });
+                } catch (e) {
+                    console.warn('Failed to process image:', e);
+                }
+            }
+        }
+
+        const chat = model.startChat({ history: chatHistory });
+        const result = await chat.sendMessageStream(parts);
+
+        for await (const chunk of result.stream) {
+            const text = chunk.text();
+            if (text) {
+                onChunk(text);
+            }
+        }
+
+        console.log('✅ Gemini stream complete');
+    }
+
+    blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
     }
 }
 
