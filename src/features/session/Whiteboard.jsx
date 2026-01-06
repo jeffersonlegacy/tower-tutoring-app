@@ -9,13 +9,26 @@ import { Tldraw } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import { useWhiteboardSync } from '../../hooks/useWhiteboardSync';
 import { setWhiteboardEditor } from '../../utils/WhiteboardCapture';
+import WhiteboardOverlay from '../../components/WhiteboardOverlay';
 
 const Whiteboard = memo(({ sessionId }) => {
   const [editor, setEditor] = useState(null);
   const [isReady, setIsReady] = useState(false);
+  const [aiAction, setAiAction] = useState(null);
 
   // Initialize sync when editor is ready
   useWhiteboardSync(editor, sessionId);
+
+  // Listen for AI whiteboard actions (from GeminiChat)
+  useEffect(() => {
+    const handleAIAction = (e) => {
+      console.log('[Whiteboard] Received AI action:', e.detail);
+      setAiAction(e.detail);
+    };
+
+    window.addEventListener('ai-whiteboard-action', handleAIAction);
+    return () => window.removeEventListener('ai-whiteboard-action', handleAIAction);
+  }, []);
 
   const handleMount = useCallback((editorInstance) => {
     console.log('[Whiteboard] Editor mounted for session:', sessionId);
@@ -39,6 +52,12 @@ const Whiteboard = memo(({ sessionId }) => {
 
   return (
     <div className="w-full h-full bg-slate-900 relative overflow-hidden flex flex-col">
+      {/* AI Visual Overlay */}
+      <WhiteboardOverlay
+        action={aiAction}
+        onComplete={() => setAiAction(null)}
+      />
+
       {/* Loading indicator while editor initializes */}
       {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-50">
