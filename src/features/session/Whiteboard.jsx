@@ -1,22 +1,20 @@
-/**
- * Whiteboard.jsx - Real-time collaborative whiteboard
- * 
- * Uses Tldraw with Firebase sync for multi-participant drawing.
- * NO local persistence - Firebase is the single source of truth.
- */
 import { memo, useState, useCallback, useEffect } from 'react';
 import { Tldraw } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import { useWhiteboardSync } from '../../hooks/useWhiteboardSync';
 import { setWhiteboardEditor } from '../../utils/WhiteboardCapture';
 import WhiteboardOverlay from '../../components/WhiteboardOverlay';
-import { optimizeImage } from '../../services/OCRService';
+import { useHomeworkUpload } from '../../hooks/useHomeworkUpload';
 
 const Whiteboard = memo(({ sessionId }) => {
   const [editor, setEditor] = useState(null);
   const [isReady, setIsReady] = useState(false);
   const [aiAction, setAiAction] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showUploadToast, setShowUploadToast] = useState(false);
+
+  // Hook for uploading to homework tray
+  const { uploadFile } = useHomeworkUpload(sessionId);
 
   // Initialize sync when editor is ready
   useWhiteboardSync(editor, sessionId);
@@ -24,7 +22,6 @@ const Whiteboard = memo(({ sessionId }) => {
   // Listen for AI whiteboard actions (from GeminiChat)
   useEffect(() => {
     const handleAIAction = (e) => {
-      // console.log('[Whiteboard] Received AI action:', e.detail);
       setAiAction(e.detail);
     };
 
@@ -35,11 +32,7 @@ const Whiteboard = memo(({ sessionId }) => {
   const handleMount = useCallback((editorInstance) => {
     console.log('[Whiteboard] Editor mounted for session:', sessionId);
     setEditor(editorInstance);
-
-    // Expose editor to WhiteboardCapture utility for AI vision
     setWhiteboardEditor(editorInstance);
-
-    // Small delay to ensure editor is fully initialized
     setTimeout(() => setIsReady(true), 100);
   }, [sessionId]);
 
@@ -49,25 +42,26 @@ const Whiteboard = memo(({ sessionId }) => {
 
     setIsProcessing(true);
     try {
-      const optimizedUrl = await optimizeImage(file);
+      // Upload directly to homework tray (Firebase)
+      const success = await uploadFile(file);
 
-      // Dispatch to AI Chat
-      window.dispatchEvent(new CustomEvent('ai-vision-upload', {
-        detail: optimizedUrl
-      }));
-
-      console.log('[Whiteboard] Snapped & Sent to AI:', optimizedUrl);
+      if (success) {
+        // Show toast notification
+        setShowUploadToast(true);
+        setTimeout(() => setShowUploadToast(false), 4000);
+      }
     } catch (err) {
-      console.error('Snap failed:', err);
+      console.error('Snap upload failed:', err);
+      alert('Upload failed. Please try again.');
     } finally {
       setIsProcessing(false);
+      e.target.value = ''; // Reset input
     }
   };
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      console.log('[Whiteboard] Unmounting');
       setEditor(null);
       setIsReady(false);
     };
@@ -97,22 +91,36 @@ const Whiteboard = memo(({ sessionId }) => {
         />
       </div>
 
-      {/* Snap-to-Solve Button (Bottom Left) */}
-      <div className="absolute bottom-4 left-4 z-50">
+      {/* Upload Success Toast */}
+      {showUploadToast && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-4 fade-in duration-300">
+          <div className="bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 border border-emerald-400/30">
+            <span className="text-xl">✅</span>
+            <div>
+              <div className="font-bold text-sm">Photo Uploaded!</div>
+              <div className="text-xs text-emerald-100">Tap ← Menu → Upload to view</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Snap-to-Solve Button (Bottom-right on mobile to avoid tldraw toolbar at bottom-left and nav toggle at top-right) */}
+      <div className="absolute bottom-20 right-4 sm:bottom-4 sm:left-4 sm:right-auto z-50">
         <label className={`
-            flex items-center gap-2 px-4 py-3 rounded-full font-bold shadow-lg transition-all cursor-pointer border border-white/10
-            ${isProcessing ? 'bg-slate-800 text-slate-500 scale-95' : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:scale-105 hover:shadow-emerald-500/30'}
+            flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-full font-bold shadow-lg transition-all cursor-pointer border border-white/10
+            ${isProcessing ? 'bg-slate-800 text-slate-500 scale-95' : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:scale-105 hover:shadow-emerald-500/30 active:scale-95'}
           `}>
-          <input type="file" accept="image/*" className="hidden" onChange={handleSnap} disabled={isProcessing} />
+          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleSnap} disabled={isProcessing} />
           {isProcessing ? (
             <>
-              <div className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-xs uppercase tracking-wide">Scanning...</span>
+              <div className="w-5 h-5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-sm uppercase tracking-wide">Scanning...</span>
             </>
           ) : (
             <>
-              <span className="text-xl">📸</span>
-              <span className="text-xs uppercase tracking-wide">Snap Homework</span>
+              <span className="text-2xl">📸</span>
+              <span className="text-sm uppercase tracking-wide hidden sm:inline">Snap Homework</span>
+              <span className="text-sm uppercase tracking-wide sm:hidden">Snap</span>
             </>
           )}
         </label>

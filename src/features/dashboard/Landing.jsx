@@ -56,7 +56,7 @@ export default function Landing() {
       </div>
 
       {/* --- HERO SECTION --- */}
-      <main className="flex-1 flex flex-col items-center justify-start md:justify-center relative z-10 p-6 pt-32 md:pt-0 pb-12 w-full max-w-7xl mx-auto">
+      <main className="flex-1 flex flex-col items-center justify-start md:justify-center relative z-10 p-6 pt-[max(2rem,env(safe-area-inset-top))] sm:pt-32 md:pt-0 pb-12 w-full max-w-7xl mx-auto">
 
         {/* Branding */}
         <div className="text-center mb-8 md:mb-12 animate-in fade-in slide-in-from-bottom-4 duration-1000">

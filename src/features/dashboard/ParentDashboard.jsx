@@ -26,25 +26,25 @@ export default function ParentDashboard() {
     return (
         <div className="min-h-screen bg-slate-950 text-white font-sans">
             {/* Header */}
-            <header className="bg-slate-900 border-b border-white/10 p-6">
-                <div className="max-w-6xl mx-auto flex justify-between items-center">
+            <header className="bg-slate-900 border-b border-white/10 p-4 sm:p-6">
+                <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h1 className="text-2xl font-black bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                        <h1 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
                             GUARDIAN VIEW
                         </h1>
-                        <p className="text-slate-400 text-sm">Jefferson Intelligence v4.0</p>
+                        <p className="text-slate-400 text-xs sm:text-sm">Jefferson Intelligence v4.0</p>
                     </div>
-                    <div className="text-right">
-                        <div className="text-3xl font-bold">{stats.mastered} / {stats.total}</div>
+                    <div className="text-left sm:text-right bg-slate-800/50 p-3 rounded-xl w-full sm:w-auto">
+                        <div className="text-2xl sm:text-3xl font-bold">{stats.mastered} / {stats.total}</div>
                         <div className="text-xs uppercase tracking-widest text-slate-500">Skills Mastered</div>
                     </div>
                 </div>
             </header>
 
-            <main className="max-w-6xl mx-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <main className="max-w-6xl mx-auto p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
 
                 {/* WEEKLY DIGEST */}
-                <div className="glass-panel rounded-2xl p-6">
+                <div className="glass-panel rounded-xl sm:rounded-2xl p-4 sm:p-6">
                     <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                         <span className="text-xl">📰</span> Weekly Digest
                     </h2>
@@ -61,13 +61,13 @@ export default function ParentDashboard() {
                             </p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/20">
-                                <div className="text-2xl font-bold text-emerald-400">{stats.mastered}</div>
+                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div className="bg-emerald-500/10 p-3 sm:p-4 rounded-xl border border-emerald-500/20 min-h-[60px]">
+                                <div className="text-xl sm:text-2xl font-bold text-emerald-400">{stats.mastered}</div>
                                 <div className="text-xs text-slate-400">New Skills</div>
                             </div>
-                            <div className="bg-blue-500/10 p-4 rounded-xl border border-blue-500/20">
-                                <div className="text-2xl font-bold text-blue-400">
+                            <div className="bg-blue-500/10 p-3 sm:p-4 rounded-xl border border-blue-500/20 min-h-[60px]">
+                                <div className="text-xl sm:text-2xl font-bold text-blue-400">
                                     {Math.round((stats.mastered / stats.total) * 100)}%
                                 </div>
                                 <div className="text-xs text-slate-400">Curriculum Complete</div>
@@ -77,7 +77,7 @@ export default function ParentDashboard() {
                 </div>
 
                 {/* EMOTIONAL HEATMAP */}
-                <div className="glass-panel rounded-2xl p-6">
+                <div className="glass-panel rounded-xl sm:rounded-2xl p-4 sm:p-6">
                     <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                         <span className="text-xl">🧠</span> Emotional Calibration
                     </h2>
