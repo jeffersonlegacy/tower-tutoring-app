@@ -65,11 +65,16 @@ const isValidPos = (r, c) => r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZ
  * A move object: { from, to, isJump, jumpDest, jumpPieceIdx }
  * IF forced jumps exist, ONLY returns jumps.
  */
-export const getValidMoves = (board, player) => {
+export const getValidMoves = (board, player, requiredFromIdx = null) => {
     let moves = [];
     let jumps = [];
 
-    for (let i = 0; i < 64; i++) {
+    // If requiredFromIdx is set, we ONLY check that specific piece (for multi-jump chains)
+    // Otherwise scan whole board
+    const start = requiredFromIdx !== null ? requiredFromIdx : 0;
+    const end = requiredFromIdx !== null ? requiredFromIdx + 1 : 64;
+
+    for (let i = start; i < end; i++) {
         const piece = board[i];
         if (piece === EMPTY || getPieceOwner(piece) !== player) continue;
 
@@ -78,7 +83,7 @@ export const getValidMoves = (board, player) => {
         const possibleDirs = MOVES[piece];
 
         for (const [dr, dc] of possibleDirs) {
-            // Check Simple Move
+            // Check Simple Move (Only allowed if NOT jumping somewhere else, checks later)
             const nr = r + dr, nc = c + dc;
             if (isValidPos(nr, nc)) {
                 const nIdx = nr * BOARD_SIZE + nc;
@@ -103,9 +108,14 @@ export const getValidMoves = (board, player) => {
         }
     }
 
-    // Force Jump Rule: If any jump is available, you MUST take it (unless we want to relax this for kids?)
-    // Relaxed rule for kids: Jumps are optional? No, standard checkers is better for logic.
-    // Let's implement STANDARD rules: Forced Jumps.
+    // Force Jump Rule: 
+    // 1. If we are in a multi-jump sequence (requiredFromIdx != null), we ONLY return jumps.
+    // 2. If standard turn, if ANY jump exists, MUST take it.
+    
+    if (requiredFromIdx !== null) {
+        return jumps; // In a multi-jump chain, simple moves are forbidden. Only further jumps allowed.
+    }
+
     return jumps.length > 0 ? jumps : moves;
 };
 

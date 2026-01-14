@@ -18,8 +18,8 @@ export default function GameOverlay({ children, title, onClose }) {
             className={`fixed inset-0 z-[100] flex items-end sm:items-center justify-center transition-all duration-300 ${isVisible ? 'bg-black/70 backdrop-blur-md' : 'bg-transparent'}`}
             onClick={(e) => e.target === e.currentTarget && handleClose()}
         >
-            {/* Ambient glow */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-br from-purple-500/10 to-cyan-500/10 rounded-full blur-[200px] pointer-events-none" />
+            {/* Ambient glow - Removed to prevent render artifacts "Cluster break" */}
+            {/* <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-br from-purple-500/10 to-cyan-500/10 rounded-full blur-[200px] pointer-events-none" /> */}
 
             <div
                 className={`

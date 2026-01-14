@@ -489,7 +489,10 @@ export const ACHIEVEMENTS = {
     level_up: { id: 'level_up', name: 'Progress', icon: '↑', desc: 'Reach level 2 in any skill' },
     master: { id: 'master', name: 'Expert', icon: '★', desc: 'Reach level 5 in any skill' },
     explorer: { id: 'explorer', name: 'Explorer', icon: '◈', desc: 'Try 5 different skills' },
-    standard_met: { id: 'standard_met', name: 'Standard Met', icon: '◎', desc: 'Meet a CA Common Core standard' }
+    standard_met: { id: 'standard_met', name: 'Standard Met', icon: '◎', desc: 'Meet a CA Common Core standard' },
+    eq_novice: { id: 'eq_novice', name: 'Equation Novice', icon: '⚖️', desc: 'Solve your first equation in Explorer' },
+    eq_master: { id: 'eq_master', name: 'Equation Master', icon: '👑', desc: 'Master a skill in Equation Explorer' },
+    algebra_alchemist: { id: 'algebra_alchemist', name: 'Algebra Alchemist', icon: '⚗️', desc: 'Master all Equation Explorer skills' }
 };
 
 // ═══════════════════════════════════════════════════════════════

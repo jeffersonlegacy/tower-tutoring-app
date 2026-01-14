@@ -20,6 +20,30 @@ export const MasteryProvider = ({ children }) => {
         localStorage.setItem('ji_student_profile', JSON.stringify(studentProfile));
     }, [studentProfile]);
 
+    // [RESTORED] Session Logs
+    const [sessionLogs, setSessionLogs] = useState(() => {
+        const saved = localStorage.getItem('ji_session_logs');
+        return saved ? JSON.parse(saved) : [];
+    });
+
+    // [RESTORED] Log Event
+    const logEvent = useCallback((type, data) => {
+        console.log(`[Mastery] ${type}`, data);
+        setSessionLogs(prev => {
+            const newLogs = [{ type, data, timestamp: Date.now() }, ...prev].slice(0, 100);
+            localStorage.setItem('ji_session_logs', JSON.stringify(newLogs));
+            return newLogs;
+        });
+    }, []);
+
+    // [RESTORED] Get Node Status
+    const getNodeStatus = useCallback((nodeId) => {
+        // Simple logic: If in progress, return status. Else default to 'unlocked' for MVP/Testing
+        // Or strictly 'locked' if dependencies not met.
+        // For Math Camp, let's assume 'unlocked' for now or check map.
+        return progress[nodeId]?.status || 'unlocked'; 
+    }, [progress]);
+
     const awardXP = useCallback((amount, reason) => {
         setStudentProfile(prev => {
             const newXP = prev.xp + amount;

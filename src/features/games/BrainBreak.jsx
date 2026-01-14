@@ -8,6 +8,7 @@ const Connect4 = lazy(() => import('./Connect4'));
 const SwipeFight = lazy(() => import('./SwipeFight'));
 const Battleship = lazy(() => import('./Battleship'));
 const EquationExplorer = lazy(() => import('./EquationExplorer'));
+const Checkers = lazy(() => import('./Checkers'));
 
 const GameLoader = () => (
     <div className="flex items-center justify-center h-full bg-slate-900">
@@ -142,6 +143,25 @@ export default function BrainBreak({ sessionId, onClose }) {
                                 </div>
                             </div>
                         </button>
+
+                        {/* GAME: Checkers */}
+                        <button
+                            onClick={() => setGame('checkers')}
+                            className="group relative h-20 sm:h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-emerald-500 transition-all bg-slate-900 shadow-xl"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/20 to-transparent"></div>
+
+                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
+                                <div className="p-2 sm:p-3 bg-black/50 rounded-lg border border-emerald-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(16,185,129,0.5)]">
+                                    <span className="text-2xl sm:text-3xl">🛸</span>
+                                </div>
+                                <div className="flex flex-col items-start">
+                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400 text-lg sm:text-xl uppercase tracking-tighter filter drop-shadow">NEON CHECKERS</span>
+                                    <span className="text-[10px] font-bold text-white/80 bg-emerald-600/50 px-2 py-0.5 rounded-full border border-emerald-400/30">STRATEGY</span>
+                                </div>
+                            </div>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -151,6 +171,7 @@ export default function BrainBreak({ sessionId, onClose }) {
                 <GameOverlay
                     title={
                         game === 'connect4' ? 'Neon Connect' :
+                            game === 'checkers' ? 'Neon Checkers' :
                             game === 'swipefight' ? 'Swipe Fight' :
                                 game === 'battleship' ? 'Naval Command' :
                                     game === 'offsetoperator' ? 'Equation Explorer' :
@@ -162,6 +183,7 @@ export default function BrainBreak({ sessionId, onClose }) {
                         {game === 'connect4' && <GameErrorBoundary onBack={closeGame}><Connect4 sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
                         {game === 'swipefight' && <GameErrorBoundary onBack={closeGame}><SwipeFight sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
                         {game === 'battleship' && <GameErrorBoundary onBack={closeGame}><Battleship sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
+                        {game === 'checkers' && <GameErrorBoundary onBack={closeGame}><Checkers onBack={closeGame} /></GameErrorBoundary>}
                         {game === 'offsetoperator' && <GameErrorBoundary onBack={closeGame}><EquationExplorer onBack={closeGame} /></GameErrorBoundary>}
                     </Suspense>
                 </GameOverlay>,

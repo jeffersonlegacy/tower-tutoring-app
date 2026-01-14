@@ -47,7 +47,7 @@ const CURRICULUM_MAPPING = {
 
 export default function EquationExplorer({ onBack }) {
     // Context hooks
-    const { completeNode } = useMastery();
+    const { completeNode, awardXP, unlockAchievement } = useMastery();
 
     // Game state
     const [screen, setScreen] = useState('menu'); // menu, skill_select, learning, playing, result
@@ -121,6 +121,10 @@ export default function EquationExplorer({ onBack }) {
             setFeedback('correct');
             const xpGain = hintsUsed === 0 ? 15 : hintsUsed === 1 ? 10 : 5;
             setSessionStats(s => ({ ...s, correct: s.correct + 1, xp: s.xp + xpGain }));
+            
+            // [NEW] Global XP & Achievement
+            awardXP(xpGain, 'Equation Explorer');
+            unlockAchievement('eq_novice'); // Attempt to unlock novice on every correct answer (logic handles duplicates)
 
             confetti({
                 particleCount: 50,
@@ -131,6 +135,13 @@ export default function EquationExplorer({ onBack }) {
             // Check for mastery unlock
             if (masteryResult.mastered && !selectedSkill.mastery.mastered) {
                 setJustMastered(true);
+                unlockAchievement('eq_master'); // Unlock master achievement
+
+                // Check if ALL skills are mastered roughly
+                const allSkills = getSkillList();
+                if (allSkills.every(s => s.mastery.mastered)) {
+                    unlockAchievement('algebra_alchemist');
+                }
 
                 // SYNC WITH CURRICULUM GRAPH
                 const globalNodeId = CURRICULUM_MAPPING[selectedSkill.id];

@@ -2,7 +2,8 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMastery } from '../../context/MasteryContext';
 import { ACHIEVEMENTS } from '../games/mathMind/adaptiveEngine'; 
-import AchievementToast from '../../components/AchievementToast'; // [NEW]
+import { getSkillList } from '../games/offsetOperator/educationEngine'; // [NEW] To read EE progress
+import AchievementToast from '../../components/AchievementToast';
 
 // Mapping of Game Name to Route and Asset
 const GAME_METADATA = {
@@ -68,6 +69,9 @@ export default function MathCamp() {
                 <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20"></div>
                 
                 <header className="max-w-4xl mx-auto relative z-10">
+                    <h1 className="text-4xl md:text-6xl font-black text-center mb-8 bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent filter drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]">
+                        MATHTELLIGENCE
+                    </h1>
                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                         {/* PROFILE CARD */}
                         <div className="flex items-center gap-4 bg-slate-900/80 p-4 rounded-2xl border border-white/10 backdrop-blur-md shadow-2xl w-full md:w-auto">
@@ -78,7 +82,7 @@ export default function MathCamp() {
                             </div>
                             <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                    <h2 className="text-xl font-bold text-white">Cadet</h2>
+                                    <h2 className="text-xl font-bold text-white">Mathtelligence</h2>
                                     <span className="bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Lvl {studentProfile.level}</span>
                                 </div>
                                 <div className="mt-2 w-48 h-2 bg-slate-800 rounded-full overflow-hidden">
@@ -181,9 +185,26 @@ export default function MathCamp() {
                                                 ? <div className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-500/30">Mastered</div>
                                                 : <div className="bg-slate-800 text-slate-500 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Training</div>
                                             }
-                                            {/* Mastery Stars (Mock) */}
+                                            {/* Mastery Stars (Dynamic) */}
                                             <div className="flex gap-0.5 mt-1 text-[10px] text-yellow-500/50">
-                                                <span>★</span><span>★</span><span>★</span><span>☆</span><span>☆</span>
+                                                {(() => {
+                                                    // Custom logic for Equation Explorer stats
+                                                    if (node.associatedGame === 'EquationExplorer') {
+                                                        const eeSkills = getSkillList();
+                                                        const masteredCount = eeSkills.filter(s => s.mastery.mastered).length;
+                                                        const totalSkills = eeSkills.length; // 8
+                                                        const starCount = Math.round((masteredCount / totalSkills) * 5);
+                                                        
+                                                        return Array(5).fill(0).map((_, i) => (
+                                                            <span key={i} className={i < starCount ? "text-yellow-400" : "text-slate-700"}>★</span>
+                                                        ));
+                                                    }
+                                                    
+                                                    // Fallback mock for others
+                                                    return (
+                                                        <><span>★</span><span>★</span><span>★</span><span>☆</span><span>☆</span></>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
                                     </div>

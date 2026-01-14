@@ -28,8 +28,8 @@ export default function Checkers({ onBack }) {
     // Calculate valid moves for current turn
     const currentMoves = useMemo(() => {
         if (status !== STATUS.PLAYING) return [];
-        return getValidMoves(board, turn);
-    }, [board, turn, status]);
+        return getValidMoves(board, turn, mustJumpPiece);
+    }, [board, turn, status, mustJumpPiece]);
 
     // Check Win Condition
     useEffect(() => {
@@ -50,19 +50,56 @@ export default function Checkers({ onBack }) {
     useEffect(() => {
         if (status === STATUS.PLAYING && turn === PLAYER.RED) {
             const timer = setTimeout(() => {
-                const aiMove = getAIMove(board, difficulty);
-                if (aiMove) {
-                    const nextBoard = makeMove(board, aiMove);
+                // If mustJumpPiece is set (from previous AI interval), we only look for that
+                const moves = getValidMoves(board, PLAYER.RED, mustJumpPiece);
+
+                // Simple AI Pick (Use minimax if no chain forced, else just grab the chain move)
+                // If forced chain, minimax might not be needed (only one valid path typically), 
+                // but checking depth is fine.
+                let selectedMove = null;
+
+                if (mustJumpPiece !== null) {
+                   // If forced chain, just take the first/best one (simple for now)
+                   // Or run minimax on reduced set?
+                   // ValidMoves returns ONLY the chain jumps. 
+                   // Let's just pick the best immediate jump to keep it fast.
+                   selectedMove = moves[0]; // TODO: Evaluate if multiple jump paths exist?
+                } else {
+                    selectedMove = getAIMove(board, difficulty);
+                }
+                
+                if (selectedMove) {
+                    const nextBoard = makeMove(board, selectedMove);
                     setBoard(nextBoard);
                     
-                    // Multi-jump Logic: If it was a jump, check if CAN jump again from dest?
-                    // For MVP simplicity: Single moves only.
+                    // DOUBLE JUMP CHECK FOR AI
+                    if (selectedMove.isJump) {
+                         const chainedJumps = getValidMoves(nextBoard, PLAYER.RED, selectedMove.to);
+                         if (chainedJumps.length > 0) {
+                             setMustJumpPiece(selectedMove.to);
+                             // Do NOT change turn. Effect will run again because 'board' changed (or we force a tick)
+                             // Wait, dependency array has 'board', so setBoard triggers re-run. 
+                             // We stay as PLAYER.RED.
+                             return; 
+                         }
+                    }
+
+                    // End Turn
+                    setMustJumpPiece(null);
                     setTurn(PLAYER.WHITE);
+                } else {
+                    // Start of game or no moves? If no moves, game over effect catches it.
                 }
             }, 800);
             return () => clearTimeout(timer);
         }
-    }, [turn, status, board, difficulty]);
+    }, [turn, status, board, difficulty, mustJumpPiece]);
+
+    // ═══════════════════════════════════════════════════════════════
+    // HANDLERS
+    // ═══════════════════════════════════════════════════════════════
+
+    const [mustJumpPiece, setMustJumpPiece] = useState(null); // [NEW] Track double-jump requirement
 
     // ═══════════════════════════════════════════════════════════════
     // HANDLERS
@@ -74,10 +111,15 @@ export default function Checkers({ onBack }) {
         const piece = board[idx];
         const isMyPiece = getPieceOwner(piece) === PLAYER.WHITE;
 
-        // Select Piece
+        // SELECTION LOGIC
         if (isMyPiece) {
-            // Can only select if it has valid moves
+            // If we are in a double-jump chain, ONLY the active piece is clickable
+            if (mustJumpPiece !== null && idx !== mustJumpPiece) return;
+
+            // Determine valid moves for this piece
+            // If mustJumpPiece is set, getValidMoves will return ONLY jumps for this piece
             const movesForPiece = currentMoves.filter(m => m.from === idx);
+            
             if (movesForPiece.length > 0) {
                 setSelectedIdx(idx);
                 setValidMoves(movesForPiece);
@@ -85,7 +127,7 @@ export default function Checkers({ onBack }) {
             return;
         }
 
-        // Move to empty square
+        // MOVE EXECUTION
         if (selectedIdx !== null) {
             const move = validMoves.find(m => m.to === idx);
             if (move) {
@@ -93,13 +135,30 @@ export default function Checkers({ onBack }) {
                 setBoard(nextBoard);
                 setSelectedIdx(null);
                 setValidMoves([]);
+
+                // CHECK FOR DOUBLE JUMP
+                if (move.isJump) {
+                    // Check if SAME piece at NEW location (move.to) has more JUMPS
+                    const chainedJumps = getValidMoves(nextBoard, turn, move.to);
+                    if (chainedJumps.length > 0) {
+                        // FORCE DOUBLE JUMP
+                        setMustJumpPiece(move.to);
+                        setSelectedIdx(move.to); // Auto-select for convenience
+                        setValidMoves(chainedJumps);
+                        // Turn NO change
+                        return;
+                    }
+                }
                 
-                // End turn (or check multi-jump in V2)
+                // Turn ENDS
+                setMustJumpPiece(null);
                 setTurn(PLAYER.RED);
             } else {
-                // Deselect if clicking invalid empty
-                setSelectedIdx(null);
-                setValidMoves([]);
+                // Deselect if clicking invalid empty (only if not forced)
+                if (mustJumpPiece === null) {
+                    setSelectedIdx(null);
+                    setValidMoves([]);
+                }
             }
         }
     };
@@ -110,6 +169,7 @@ export default function Checkers({ onBack }) {
         setWinner(null);
         setStatus(STATUS.PLAYING);
         setDifficulty(diff);
+        setMustJumpPiece(null);
         setSelectedIdx(null);
         setValidMoves([]);
     };
