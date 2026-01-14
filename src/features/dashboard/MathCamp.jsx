@@ -18,6 +18,12 @@ const GAME_METADATA = {
         color: "from-orange-500 to-red-600",
         icon: "⚔️"
     },
+    "Checkers": {
+        route: "/game/checkers",
+        description: "Classic strategy game to hone logical thinking.",
+        color: "from-emerald-500 to-teal-600",
+        icon: "♟️"
+    }, // [NEW]
     "Battleship": {
         route: "/game/battleship",
         description: "Hunt for ships using coordinate plane mastery.",

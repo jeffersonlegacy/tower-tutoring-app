@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Landing from './features/dashboard/Landing';
+import Checkers from './features/games/Checkers';
 
 // Lazy load heavy routes
 const SessionPage = lazy(() => import('./pages/SessionPage'));
@@ -31,6 +32,7 @@ export default function App() {
 
           {/* Game Routes */}
           <Route path="/game/equation-explorer" element={<EquationExplorer onBack={() => window.history.back()} />} />
+          <Route path="/checkers" element={<Checkers onBack={() => window.location.href = '/math-camp'} />} />
 
           {/* Session Routes wrapped in Layout */}
           <Route element={<SessionLayout />}>
