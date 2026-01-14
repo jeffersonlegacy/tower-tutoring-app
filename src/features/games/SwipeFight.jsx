@@ -647,39 +647,43 @@ export default function SwipeFight({ sessionId, onBack }) {
             {/* 3. GAMEPLAY HUD & CARD */}
             <div className={`flex flex-col h-full relative z-10 transition-opacity duration-500 ${status === 'playing' ? 'opacity-100' : 'opacity-20 pointer-events-none blur-sm'}`}>
                 {/* HUD */}
-                <div className="flex justify-between items-start p-4 bg-gradient-to-b from-slate-900/90 to-transparent">
+                <div className="flex justify-between items-start p-3 sm:p-4 bg-gradient-to-b from-slate-900/95 to-transparent backdrop-blur-sm z-50">
+                    {/* RESET / HOST CONTROLS */}
                     {isHost && (
                         <button
                             onClick={() => updateState({ status: 'waiting', hostScore: 0, clientScore: 0 })}
-                            className="absolute top-2 left-2 text-red-400 hover:text-white text-xs font-bold z-50"
+                            className="absolute top-1 left-1/2 -translate-x-1/2 text-red-500/50 hover:text-red-400 text-[10px] font-bold z-50 uppercase tracking-widest"
                         >
-                            🔄 RESET
+                            Reset
                         </button>
                     )}
-                    <div>
-                        <div className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">Score</div>
-                        <div className={`text-4xl font-mono font-black text-white ${scoreAnimating ? 'score-pop' : ''}`}>{score}</div>
-                        {floatingPoints && <div className={`text-lg font-black float-up absolute ${floatingPoints.includes('+') ? 'text-emerald-400' : 'text-red-400'}`}>{floatingPoints}</div>}
+                    
+                    {/* PLAYER SCORE */}
+                    <div className="flex flex-col">
+                        <div className="text-[9px] text-emerald-500 font-black uppercase tracking-widest">You</div>
+                        <div className={`text-2xl sm:text-4xl font-mono font-black text-white leading-none ${scoreAnimating ? 'score-pop' : ''}`}>{score}</div>
+                        {floatingPoints && <div className={`text-sm font-black float-up absolute top-8 ${floatingPoints.includes('+') ? 'text-emerald-400' : 'text-red-400'}`}>{floatingPoints}</div>}
                     </div>
 
-                    {/* Flow Multiplier */}
-                    {multiplier > 1 && (
-                        <div className="flex flex-col items-center animate-pulse">
-                            <div className="text-[10px] text-yellow-500 font-black uppercase tracking-widest">Flow</div>
-                            <div className="text-3xl font-black italic text-yellow-400 drop-shadow-lg">x{multiplier}</div>
-                        </div>
-                    )}
-
-                    <div className="text-center">
-                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Time</div>
-                        <div className={`text-3xl font-mono font-black ${timeLeft <= 10 ? 'text-red-500 animate-pulse urgency-pulse' : 'text-cyan-400'}`}>
+                    {/* TIMER & FLOW */}
+                    <div className="flex flex-col items-center flex-1 mx-2">
+                        {multiplier > 1 ? (
+                            <div className="flex gap-1 items-baseline animate-pulse mb-1">
+                                <span className="text-[10px] text-yellow-500 font-bold uppercase">Flow</span>
+                                <span className="text-xl font-black italic text-yellow-400">x{multiplier}</span>
+                            </div>
+                        ) : (
+                             <div className="h-6"></div> /* Spacer when no multiplier */
+                        )}
+                        <div className={`text-xl sm:text-3xl font-mono font-black leading-none ${timeLeft <= 10 ? 'text-red-500 animate-pulse urgency-pulse' : 'text-cyan-400'}`}>
                             {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
                         </div>
                     </div>
 
-                    <div className="text-right">
-                        <div className="text-[10px] text-pink-500 font-black uppercase tracking-widest">Enemy</div>
-                        <div className="text-4xl font-mono font-black text-slate-500">{opponentScore}</div>
+                    {/* ENEMY SCORE */}
+                    <div className="flex flex-col items-end">
+                        <div className="text-[9px] text-pink-500 font-black uppercase tracking-widest">Enemy</div>
+                        <div className="text-2xl sm:text-4xl font-mono font-black text-slate-600 leading-none">{opponentScore}</div>
                     </div>
                 </div>
 

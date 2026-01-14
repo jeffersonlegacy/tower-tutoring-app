@@ -360,7 +360,7 @@ export default function EquationExplorer({ onBack }) {
 
                     {/* Problem display */}
                     <div className={`flex-1 flex flex-col items-center justify-center ${feedback === 'wrong' ? 'wrong-shake' : feedback === 'correct' ? 'correct-pop' : ''}`}>
-                        <div className={`text-4xl sm:text-5xl font-black mb-8 p-6 rounded-2xl border-2 transition-all ${feedback === 'correct' ? 'bg-emerald-500/20 border-emerald-500' :
+                        <div className={`text-3xl sm:text-5xl font-black mb-6 sm:mb-8 p-6 rounded-2xl border-2 transition-all ${feedback === 'correct' ? 'bg-emerald-500/20 border-emerald-500' :
                             feedback === 'wrong' ? 'bg-rose-500/20 border-rose-500' :
                                 'bg-slate-800/50 border-slate-700'
                             }`}>

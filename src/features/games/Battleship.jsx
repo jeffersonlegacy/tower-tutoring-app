@@ -760,14 +760,20 @@ export default function Battleship({ sessionId, onBack }) {
                                             onDragStart={(e) => !placed && handleDragStart(ship, e)}
                                             onDragEnd={handleDragEnd}
                                             onClick={() => !placed && setPlacingShip(isPlacing ? null : ship)}
-                                            className={`p-2 text-xs font-bold rounded border transition-all flex items-center gap-2 ${placed ? 'bg-green-900/20 border-green-500/30 text-green-500 cursor-default' :
-                                                isPlacing ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500 scale-105 cursor-grab' :
-                                                    'bg-slate-800 border-slate-700 hover:border-white/30 cursor-grab'
+                                            className={`p-3 text-xs font-bold rounded-lg border-2 transition-all flex items-center justify-between gap-2 touch-manipulation ${placed ? 'bg-green-900/20 border-green-500/30 text-green-500 opacity-50' :
+                                                isPlacing ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400 scale-105 shadow-[0_0_15px_rgba(234,179,8,0.5)]' :
+                                                    'bg-slate-800 border-slate-700 hover:border-cyan-400/50 hover:bg-slate-700'
                                                 }`}
                                         >
-                                            <span>{ship.icon}</span>
-                                            <span>{ship.name} ({ship.size})</span>
-                                            {placed && <span className="ml-auto">✓</span>}
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-lg">{ship.icon}</span>
+                                                <div className="flex flex-col items-start leading-none">
+                                                    <span>{ship.name}</span>
+                                                    <span className="text-[9px] opacity-70 font-mono mt-0.5">{ship.size} blocks</span>
+                                                </div>
+                                            </div>
+                                            {placed && <span>✓</span>}
+                                            {!placed && isPlacing && <span className="animate-pulse">📍 Tap Grid</span>}
                                         </button>
                                     );
                                 })}

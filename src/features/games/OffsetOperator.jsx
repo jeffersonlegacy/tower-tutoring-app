@@ -711,17 +711,17 @@ export default function OffsetOperator({ onBack }) {
 
                 {/* Mobile D-Pad overlay (bottom corners) */}
                 {!hud.menu && !hud.gameOver && hud.phase === PHASE.WALKING && (
-                    <div className="absolute bottom-4 left-4 right-4 flex justify-between pointer-events-none md:hidden">
+                    <div className="absolute bottom-6 left-4 right-4 flex justify-between pointer-events-none md:hidden pb-safe">
                         {/* Left D-pad */}
-                        <div className="grid grid-cols-3 gap-1 pointer-events-auto">
+                        <div className="grid grid-cols-3 gap-2 pointer-events-auto bg-slate-900/50 p-2 rounded-2xl backdrop-blur-sm mx-auto">
                             <div></div>
-                            <button onClick={() => tryMove('up')} className="w-12 h-12 bg-slate-800/80 rounded-lg flex items-center justify-center text-white text-xl active:bg-cyan-600">↑</button>
+                            <button onClick={() => tryMove('up')} className="w-14 h-14 bg-slate-800/90 rounded-xl flex items-center justify-center text-white text-2xl shadow-lg border-b-4 border-slate-950 active:border-b-0 active:translate-y-1 transition-all">↑</button>
                             <div></div>
-                            <button onClick={() => tryMove('left')} className="w-12 h-12 bg-slate-800/80 rounded-lg flex items-center justify-center text-white text-xl active:bg-cyan-600">←</button>
+                            <button onClick={() => tryMove('left')} className="w-14 h-14 bg-slate-800/90 rounded-xl flex items-center justify-center text-white text-2xl shadow-lg border-b-4 border-slate-950 active:border-b-0 active:translate-y-1 transition-all">←</button>
                             <div></div>
-                            <button onClick={() => tryMove('right')} className="w-12 h-12 bg-slate-800/80 rounded-lg flex items-center justify-center text-white text-xl active:bg-cyan-600">→</button>
+                            <button onClick={() => tryMove('right')} className="w-14 h-14 bg-slate-800/90 rounded-xl flex items-center justify-center text-white text-2xl shadow-lg border-b-4 border-slate-950 active:border-b-0 active:translate-y-1 transition-all">→</button>
                             <div></div>
-                            <button onClick={() => tryMove('down')} className="w-12 h-12 bg-slate-800/80 rounded-lg flex items-center justify-center text-white text-xl active:bg-cyan-600">↓</button>
+                            <button onClick={() => tryMove('down')} className="w-14 h-14 bg-slate-800/90 rounded-xl flex items-center justify-center text-white text-2xl shadow-lg border-b-4 border-slate-950 active:border-b-0 active:translate-y-1 transition-all">↓</button>
                             <div></div>
                         </div>
                     </div>

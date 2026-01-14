@@ -168,7 +168,7 @@ const LoginScreen = ({ onLogin }) => {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="Enter your name"
-                    className="w-full px-4 py-3 glass rounded-xl text-white text-center font-medium focus:ring-2 focus:ring-emerald-500/50 focus:outline-none placeholder:text-slate-600"
+                    className="w-full px-4 py-4 glass rounded-xl text-white text-center font-medium text-base md:text-lg focus:ring-2 focus:ring-emerald-500/50 focus:outline-none placeholder:text-slate-600 appearance-none"
                     autoFocus
                 />
                 <button
