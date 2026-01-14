@@ -137,115 +137,177 @@ const dropPiece = (board, col, player) => {
     return { board: newBoard, index: row * COLS + col };
 };
 
+
 // ═══════════════════════════════════════════════════════════════
-// AI LOGIC (Minimax with Alpha-Beta Pruning)
+// AI LOGIC (Optimized Minimax with Alpha-Beta)
 // ═══════════════════════════════════════════════════════════════
 
-const scoreWindow = (window, player) => {
+/** Evaluate a window of 4 cells efficiently */
+const evaluateWindow = (c1, c2, c3, c4, player) => {
+    let score = 0;
     const opp = player === PLAYER.YELLOW ? PLAYER.RED : PLAYER.YELLOW;
-    const own = window.filter(c => c === player).length;
-    const empty = window.filter(c => c === null).length;
-    const enemy = window.filter(c => c === opp).length;
+    
+    let own = 0;
+    let empty = 0;
+    let enemy = 0;
+
+    if (c1 === player) own++; else if (c1 === null) empty++; else enemy++;
+    if (c2 === player) own++; else if (c2 === null) empty++; else enemy++;
+    if (c3 === player) own++; else if (c3 === null) empty++; else enemy++;
+    if (c4 === player) own++; else if (c4 === null) empty++; else enemy++;
 
     if (own === 4) return 100;
     if (own === 3 && empty === 1) return 5;
     if (own === 2 && empty === 2) return 2;
-    if (enemy === 3 && empty === 1) return -4;
+    // Heavily penalize letting opponent get 3 (blocking)
+    if (enemy === 3 && empty === 1) return -80; 
+    
     return 0;
 };
 
+/** Optimized board evaluator - no allocations */
 const evaluateBoard = (board, player) => {
     let score = 0;
 
-    // Center column preference
+    // Center column preference (multiply by 3)
+    let centerCount = 0;
     for (let r = 0; r < ROWS; r++) {
-        if (board[r * COLS + 3] === player) score += 3;
+        if (board[r * COLS + 3] === player) centerCount++;
     }
+    score += centerCount * 3;
 
-    // All windows
-    const addWindowScore = (indices) => {
-        score += scoreWindow(indices.map(i => board[i]), player);
-    };
-
+    // Horizontal
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c <= COLS - 4; c++) {
             const i = r * COLS + c;
-            addWindowScore([i, i + 1, i + 2, i + 3]);
+            score += evaluateWindow(board[i], board[i+1], board[i+2], board[i+3], player);
         }
     }
-    for (let r = 0; r <= ROWS - 4; r++) {
-        for (let c = 0; c < COLS; c++) {
+
+    // Vertical
+    for (let c = 0; c < COLS; c++) {
+        for (let r = 0; r <= ROWS - 4; r++) {
             const i = r * COLS + c;
-            addWindowScore([i, i + COLS, i + COLS * 2, i + COLS * 3]);
+            score += evaluateWindow(board[i], board[i+COLS], board[i+COLS*2], board[i+COLS*3], player);
         }
     }
+
+    // Diagonal 1 (\)
     for (let r = 0; r <= ROWS - 4; r++) {
         for (let c = 0; c <= COLS - 4; c++) {
             const i = r * COLS + c;
             const s = COLS + 1;
-            addWindowScore([i, i + s, i + s * 2, i + s * 3]);
+            score += evaluateWindow(board[i], board[i+s], board[i+s*2], board[i+s*3], player);
         }
     }
-    for (let r = 3; r < ROWS; r++) {
-        for (let c = 0; c <= COLS - 4; c++) {
+
+    // Diagonal 2 (/)
+    for (let r = 0; r <= ROWS - 4; r++) {
+        for (let c = 3; c < COLS; c++) {
             const i = r * COLS + c;
-            const s = -COLS + 1;
-            addWindowScore([i, i + s, i + s * 2, i + s * 3]);
+            const s = COLS - 1;
+            score += evaluateWindow(board[i], board[i+s], board[i+s*2], board[i+s*3], player);
         }
     }
 
     return score;
 };
 
+/** 
+ * Minimax with backtracking (mutating board) to avoid GC thrashing 
+ * Returns [column, score]
+ */
 const minimax = (board, depth, alpha, beta, maximizing) => {
-    const result = checkWinner(board);
-    if (result) {
-        if (result.winner === PLAYER.YELLOW) return [null, 10000 + depth];
-        if (result.winner === PLAYER.RED) return [null, -10000 - depth];
-        return [null, 0];
+    // Check terminal states
+    const winner = checkWinner(board);
+    if (winner) {
+        if (winner.winner === PLAYER.YELLOW) return [null, 100000 + depth];
+        if (winner.winner === PLAYER.RED) return [null, -100000 - depth];
+        return [null, 0]; // Draw
     }
     if (depth === 0) return [null, evaluateBoard(board, PLAYER.YELLOW)];
 
-    const cols = getValidColumns(board).sort((a, b) => Math.abs(a - 3) - Math.abs(b - 3));
-    if (cols.length === 0) return [null, 0];
+    // Get valid locations
+    const validCols = [];
+    for (let c = 0; c < COLS; c++) {
+        if (board[c] === null) validCols.push(c);
+    }
+    
+    // Shuffle columns for randomness in ties, then sort by center proximity
+    validCols.sort((a, b) => Math.abs(a - 3) - Math.abs(b - 3));
+
+    if (validCols.length === 0) return [null, 0];
 
     if (maximizing) {
-        let best = -Infinity, bestCol = cols[0];
-        for (const col of cols) {
-            const drop = dropPiece(board, col, PLAYER.YELLOW);
-            if (!drop) continue;
-            const [, score] = minimax(drop.board, depth - 1, alpha, beta, false);
-            if (score > best) { best = score; bestCol = col; }
-            alpha = Math.max(alpha, score);
+        let maxEval = -Infinity;
+        let bestCol = validCols[Math.floor(Math.random() * validCols.length)];
+
+        for (const col of validCols) {
+            // Make move (mutate)
+            const row = getDropRow(board, col);
+            board[row * COLS + col] = PLAYER.YELLOW;
+
+            const [, evalScore] = minimax(board, depth - 1, alpha, beta, false);
+
+            // Undo move (backtrack)
+            board[row * COLS + col] = null;
+
+            if (evalScore > maxEval) {
+                maxEval = evalScore;
+                bestCol = col;
+            }
+            alpha = Math.max(alpha, evalScore);
             if (beta <= alpha) break;
         }
-        return [bestCol, best];
+        return [bestCol, maxEval];
     } else {
-        let best = Infinity, bestCol = cols[0];
-        for (const col of cols) {
-            const drop = dropPiece(board, col, PLAYER.RED);
-            if (!drop) continue;
-            const [, score] = minimax(drop.board, depth - 1, alpha, beta, true);
-            if (score < best) { best = score; bestCol = col; }
-            beta = Math.min(beta, score);
+        let minEval = Infinity;
+        let bestCol = validCols[Math.floor(Math.random() * validCols.length)];
+
+        for (const col of validCols) {
+            // Make move (mutate)
+            const row = getDropRow(board, col);
+            board[row * COLS + col] = PLAYER.RED;
+
+            const [, evalScore] = minimax(board, depth - 1, alpha, beta, true);
+
+            // Undo move (backtrack)
+            board[row * COLS + col] = null;
+
+            if (evalScore < minEval) {
+                minEval = evalScore;
+                bestCol = col;
+            }
+            beta = Math.min(beta, evalScore);
             if (beta <= alpha) break;
         }
-        return [bestCol, best];
+        return [bestCol, minEval];
     }
 };
 
 const getAIMove = (board, difficulty) => {
-    const depth = DIFFICULTY[difficulty] || 2;
-    const cols = getValidColumns(board);
-    if (cols.length === 0) return null;
+    try {
+        const depth = DIFFICULTY[difficulty] || 2;
+        // Clone board once for the simulation to avoid mutating state directly
+        const simBoard = [...board]; 
+        
+        // Use optimized random fallback if empty
+        if (simBoard.every(c => c === null)) return 3; // Start center
 
-    // Beginner: random
-    if (difficulty === 'BEGINNER') {
-        return cols[Math.floor(Math.random() * cols.length)];
+        const [col] = minimax(simBoard, depth, -Infinity, Infinity, true);
+        
+        // Fallback safety
+        if (col === null) {
+            const valid = getValidColumns(board);
+            return valid[Math.floor(Math.random() * valid.length)];
+        }
+        return col;
+    } catch (err) {
+        console.error("AI Error:", err);
+        // Emergency fallback
+        const valid = getValidColumns(board);
+        return valid.length > 0 ? valid[0] : null;
     }
-
-    const [col] = minimax(board, depth, -Infinity, Infinity, true);
-    return col ?? cols[Math.floor(Math.random() * cols.length)];
 };
 
 // ═══════════════════════════════════════════════════════════════
