@@ -10,48 +10,49 @@ export const MasteryProvider = ({ children }) => {
         return saved ? JSON.parse(saved) : {};
     });
 
-    // Logs shape: [{ id, type: 'frustration'|'mastery'|'session_start', timestamp, metadata }]
-    const [sessionLogs, setSessionLogs] = useState(() => {
-        const saved = localStorage.getItem('ji_session_logs');
-        return saved ? JSON.parse(saved) : [];
+    // Profile shape: { xp: 0, level: 1, streak: 0, lastActive: 'ISO-DATE', currency: 0, missions: [] }
+    const [studentProfile, setStudentProfile] = useState(() => {
+        const saved = localStorage.getItem('ji_student_profile');
+        return saved ? JSON.parse(saved) : { xp: 0, level: 1, streak: 0, lastActive: null, currency: 0, missions: [] };
     });
 
     useEffect(() => {
-        localStorage.setItem('ji_mastery_progress', JSON.stringify(progress));
-    }, [progress]);
+        localStorage.setItem('ji_student_profile', JSON.stringify(studentProfile));
+    }, [studentProfile]);
 
-    useEffect(() => {
-        localStorage.setItem('ji_session_logs', JSON.stringify(sessionLogs));
-    }, [sessionLogs]);
+    const awardXP = useCallback((amount, reason) => {
+        setStudentProfile(prev => {
+            const newXP = prev.xp + amount;
+            // Simple level curve: Level * 500 XP
+            const xpForNextLevel = prev.level * 500;
+            let newLevel = prev.level;
+            
+            if (newXP >= xpForNextLevel) {
+                newLevel += 1;
+                logEvent('level_up', { level: newLevel });
+            }
 
-    const isNodeUnlocked = useCallback((nodeId) => {
-        const node = CURRICULUM_DATA.nodes[nodeId];
-        if (!node) return false;
-        if (nodeId === CURRICULUM_DATA.rootNodeId) return true;
-
-        const missingPrereq = node.prerequisites.some(prereqId => {
-            const prereqStatus = progress[prereqId]?.status;
-            return prereqStatus !== 'completed';
+            return {
+                ...prev,
+                xp: newXP,
+                level: newLevel,
+                currency: prev.currency + Math.floor(amount / 10) // 10% of XP as coins
+            };
         });
+        logEvent('xp_gain', { amount, reason });
+    }, [logEvent]);
 
-        return !missingPrereq;
-    }, [progress]);
+    const checkStreak = useCallback(() => {
+        const today = new Date().toISOString().split('T')[0];
+        setStudentProfile(prev => {
+            if (prev.lastActive === today) return prev; // Already active today
 
-    const getNodeStatus = useCallback((nodeId) => {
-        if (progress[nodeId]?.status === 'completed') return 'completed';
-        if (isNodeUnlocked(nodeId)) return 'unlocked';
-        return 'locked';
-    }, [progress, isNodeUnlocked]);
+            const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+            const isConsecutive = prev.lastActive === yesterday;
+            const newStreak = isConsecutive ? prev.streak + 1 : 1;
 
-    const logEvent = useCallback((type, metadata = {}) => {
-        const newLog = {
-            id: Date.now().toString(36) + Math.random().toString(36).substr(2),
-            timestamp: Date.now(),
-            type,
-            metadata
-        };
-        setSessionLogs(prev => [newLog, ...prev]);
-        console.log(`[MasteryLog] ${type}`, metadata);
+            return { ...prev, streak: newStreak, lastActive: today };
+        });
     }, []);
 
     const completeNode = useCallback((nodeId, score = 100) => {
@@ -59,25 +60,35 @@ export const MasteryProvider = ({ children }) => {
             ...prev,
             [nodeId]: { status: 'completed', lastScore: score, timestamp: Date.now() }
         }));
+        
+        // Award XP for node completion
+        awardXP(100, `Completed ${nodeId}`);
+        checkStreak(); // Activity counts for streak
+        
         logEvent('mastery', { nodeId, score });
-    }, [logEvent]);
+    }, [logEvent, awardXP, checkStreak]);
 
     const resetProgress = useCallback(() => {
         setProgress({});
         setSessionLogs([]);
+        setStudentProfile({ xp: 0, level: 1, streak: 0, lastActive: null, currency: 0, missions: [] });
         localStorage.removeItem('ji_mastery_progress');
         localStorage.removeItem('ji_session_logs');
+        localStorage.removeItem('ji_student_profile');
     }, []);
 
     const value = useMemo(() => ({
         progress,
         sessionLogs,
+        studentProfile, // [NEW]
+        awardXP,       // [NEW]
+        checkStreak,   // [NEW]
         getNodeStatus,
         completeNode,
         logEvent,
         resetProgress,
         curriculum: CURRICULUM_DATA
-    }), [progress, sessionLogs, getNodeStatus, completeNode, logEvent, resetProgress]);
+    }), [progress, sessionLogs, studentProfile, awardXP, checkStreak, getNodeStatus, completeNode, logEvent, resetProgress]);
 
     return (
         <MasteryContext.Provider value={value}>
