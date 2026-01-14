@@ -10,10 +10,10 @@ export const MasteryProvider = ({ children }) => {
         return saved ? JSON.parse(saved) : {};
     });
 
-    // Profile shape: { xp: 0, level: 1, streak: 0, lastActive: 'ISO-DATE', currency: 0, missions: [] }
+    // Profile shape: { xp: 0, level: 1, streak: 0, lastActive: 'ISO-DATE', currency: 0, missions: [], unlockedAchievements: [] }
     const [studentProfile, setStudentProfile] = useState(() => {
         const saved = localStorage.getItem('ji_student_profile');
-        return saved ? JSON.parse(saved) : { xp: 0, level: 1, streak: 0, lastActive: null, currency: 0, missions: [] };
+        return saved ? JSON.parse(saved) : { xp: 0, level: 1, streak: 0, lastActive: null, currency: 0, missions: [], unlockedAchievements: [] };
     });
 
     useEffect(() => {
@@ -50,8 +50,47 @@ export const MasteryProvider = ({ children }) => {
             const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
             const isConsecutive = prev.lastActive === yesterday;
             const newStreak = isConsecutive ? prev.streak + 1 : 1;
+            
+            // Check Streak Achievement
+            if (newStreak >= 5) unlockAchievement('streak_5');
+            if (newStreak >= 10) unlockAchievement('streak_10');
 
             return { ...prev, streak: newStreak, lastActive: today };
+        });
+    }, []);
+
+    const unlockAchievement = useCallback((achievementId) => {
+        setStudentProfile(prev => {
+            if (prev.unlockedAchievements.includes(achievementId)) return prev;
+            
+            logEvent('achievement_unlocked', { achievementId });
+            // In a real app, triggers a toast here
+            return { 
+                ...prev, 
+                unlockedAchievements: [...prev.unlockedAchievements, achievementId],
+                xp: prev.xp + 50 // Bonus XP for achievements
+            };
+        });
+    }, [logEvent]);
+
+    const checkAchievements = useCallback(() => {
+        setStudentProfile(prev => {
+            const unlocked = [...prev.unlockedAchievements];
+            let newXP = prev.xp;
+            
+            // Check Level Achievements
+            if (prev.level >= 2 && !unlocked.includes('level_up')) {
+                unlocked.push('level_up');
+                newXP += 50;
+            }
+            if (prev.level >= 5 && !unlocked.includes('master')) {
+                unlocked.push('master');
+                newXP += 100;
+            }
+            
+            if (unlocked.length === prev.unlockedAchievements.length) return prev;
+            
+            return { ...prev, unlockedAchievements: unlocked, xp: newXP };
         });
     }, []);
 
@@ -71,7 +110,7 @@ export const MasteryProvider = ({ children }) => {
     const resetProgress = useCallback(() => {
         setProgress({});
         setSessionLogs([]);
-        setStudentProfile({ xp: 0, level: 1, streak: 0, lastActive: null, currency: 0, missions: [] });
+        setStudentProfile({ xp: 0, level: 1, streak: 0, lastActive: null, currency: 0, missions: [], unlockedAchievements: [] });
         localStorage.removeItem('ji_mastery_progress');
         localStorage.removeItem('ji_session_logs');
         localStorage.removeItem('ji_student_profile');
@@ -83,6 +122,7 @@ export const MasteryProvider = ({ children }) => {
         studentProfile, // [NEW]
         awardXP,       // [NEW]
         checkStreak,   // [NEW]
+        unlockAchievement, // [NEW]
         getNodeStatus,
         completeNode,
         logEvent,

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMastery } from '../../context/MasteryContext';
+import { ACHIEVEMENTS } from '../games/mathMind/adaptiveEngine'; // [NEW]
 
 // Mapping of Game Name to Route and Asset
 const GAME_METADATA = {
@@ -124,6 +125,25 @@ export default function MathCamp() {
                             </div>
                         ))}
                     </div>
+                </div>
+            </div>
+
+            {/* TROPHY ROOM */}
+            <div className="max-w-4xl mx-auto px-4 mb-12">
+                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <span className="text-yellow-500">🏆</span> Trophy Room
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {Object.values(ACHIEVEMENTS).map(ach => {
+                        const isUnlocked = studentProfile.unlockedAchievements?.includes(ach.id);
+                        return (
+                            <div key={ach.id} className={`p-4 rounded-xl border flex flex-col items-center text-center transition-all ${isUnlocked ? 'bg-slate-900 border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}>
+                                <div className={`text-4xl mb-2 ${isUnlocked ? 'animate-bounce' : ''}`}>{ach.icon}</div>
+                                <div className="font-bold text-xs text-white uppercase tracking-wider mb-1">{ach.name}</div>
+                                <div className="text-[10px] text-slate-500 leading-tight">{ach.desc}</div>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
