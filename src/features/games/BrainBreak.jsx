@@ -70,17 +70,17 @@ export default function BrainBreak({ sessionId, onClose }) {
                         {/* GAME: Equation Explorer (Educational Math) */}
                         <button
                             onClick={() => setGame('offsetoperator')}
-                            className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-cyan-500 transition-all bg-slate-900 shadow-xl"
+                            className="group relative h-20 sm:h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-cyan-500 transition-all bg-slate-900 shadow-xl"
                         >
                             <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
                             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-transparent"></div>
 
                             <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-3 bg-black/50 rounded-lg border border-purple-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(139,92,246,0.5)]">
-                                    <span className="text-3xl">🏰</span>
+                                <div className="p-2 sm:p-3 bg-black/50 rounded-lg border border-purple-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(139,92,246,0.5)]">
+                                    <span className="text-2xl sm:text-3xl">🏰</span>
                                 </div>
                                 <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 text-xl uppercase tracking-tighter filter drop-shadow">EQUATION EXPLORER</span>
+                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 text-lg sm:text-xl uppercase tracking-tighter filter drop-shadow">EQUATION EXPLORER</span>
                                     <span className="text-[10px] font-bold text-white/80 bg-purple-600/50 px-2 py-0.5 rounded-full border border-purple-400/30">LEARN MATH</span>
                                 </div>
                             </div>
@@ -89,17 +89,17 @@ export default function BrainBreak({ sessionId, onClose }) {
                         {/* GAME: Battleship */}
                         <button
                             onClick={() => setGame('battleship')}
-                            className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-cyan-500 transition-all bg-slate-900 shadow-xl"
+                            className="group relative h-20 sm:h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-cyan-500 transition-all bg-slate-900 shadow-xl"
                         >
                             <div className="absolute inset-0 bg-gradient-to-br from-cyan-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
                             <div className="absolute inset-0 bg-gradient-to-r from-cyan-600/20 to-transparent"></div>
 
                             <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-3 bg-black/50 rounded-lg border border-cyan-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(34,211,238,0.5)]">
-                                    <span className="text-3xl">🚢</span>
+                                <div className="p-2 sm:p-3 bg-black/50 rounded-lg border border-cyan-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(34,211,238,0.5)]">
+                                    <span className="text-2xl sm:text-3xl">🚢</span>
                                 </div>
                                 <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 text-xl uppercase tracking-tighter filter drop-shadow">BATTLESHIP</span>
+                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 text-lg sm:text-xl uppercase tracking-tighter filter drop-shadow">BATTLESHIP</span>
                                     <span className="text-[10px] font-bold text-white/80 bg-cyan-600/50 px-2 py-0.5 rounded-full border border-cyan-400/30">NAVAL STRATEGY</span>
                                 </div>
                             </div>
@@ -108,17 +108,17 @@ export default function BrainBreak({ sessionId, onClose }) {
                         {/* GAME: Swipe Fight */}
                         <button
                             onClick={() => setGame('swipefight')}
-                            className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-teal-500 transition-all bg-slate-900 shadow-xl"
+                            className="group relative h-20 sm:h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-teal-500 transition-all bg-slate-900 shadow-xl"
                         >
                             <div className="absolute inset-0 bg-gradient-to-br from-teal-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
                             <div className="absolute inset-0 bg-gradient-to-r from-teal-600/20 to-transparent"></div>
 
                             <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-3 bg-black/50 rounded-lg border border-teal-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(45,212,191,0.5)]">
-                                    <span className="text-3xl">⚡</span>
+                                <div className="p-2 sm:p-3 bg-black/50 rounded-lg border border-teal-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(45,212,191,0.5)]">
+                                    <span className="text-2xl sm:text-3xl">⚡</span>
                                 </div>
                                 <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400 text-xl uppercase tracking-tighter filter drop-shadow">SWIPE FIGHT</span>
+                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400 text-lg sm:text-xl uppercase tracking-tighter filter drop-shadow">SWIPE FIGHT</span>
                                     <span className="text-[10px] font-bold text-white/80 bg-teal-600/50 px-2 py-0.5 rounded-full border border-teal-400/30">SPEED MATH</span>
                                 </div>
                             </div>
@@ -127,17 +127,17 @@ export default function BrainBreak({ sessionId, onClose }) {
                         {/* GAME: Neon Connect (Connect 4) */}
                         <button
                             onClick={() => setGame('connect4')}
-                            className="group relative h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-pink-500 transition-all bg-slate-900 shadow-xl"
+                            className="group relative h-20 sm:h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-pink-500 transition-all bg-slate-900 shadow-xl"
                         >
                             <div className="absolute inset-0 bg-gradient-to-br from-pink-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
                             <div className="absolute inset-0 bg-gradient-to-r from-pink-600/20 to-transparent"></div>
 
                             <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-3 bg-black/50 rounded-lg border border-pink-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(236,72,153,0.5)]">
-                                    <span className="text-3xl">🔴</span>
+                                <div className="p-2 sm:p-3 bg-black/50 rounded-lg border border-pink-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(236,72,153,0.5)]">
+                                    <span className="text-2xl sm:text-3xl">🔴</span>
                                 </div>
                                 <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-red-400 text-xl uppercase tracking-tighter filter drop-shadow">NEON CONNECT</span>
+                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-red-400 text-lg sm:text-xl uppercase tracking-tighter filter drop-shadow">NEON CONNECT</span>
                                     <span className="text-[10px] font-bold text-white/80 bg-pink-600/50 px-2 py-0.5 rounded-full border border-pink-400/30">4-IN-A-ROW</span>
                                 </div>
                             </div>

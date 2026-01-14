@@ -38,7 +38,7 @@ export default function GameEndOverlay({
     return (
         <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center animate-in fade-in duration-500 p-4 overflow-y-auto">
             {/* Visual Icon - smaller on mobile */}
-            <div className="text-[80px] sm:text-[120px] mb-2 sm:mb-4 animate-bounce">
+            <div className="text-6xl sm:text-[120px] mb-2 sm:mb-4 animate-bounce">
                 {icon || (isDraw ? '🤝' : (winner ? '👑' : '😢'))}
             </div>
 

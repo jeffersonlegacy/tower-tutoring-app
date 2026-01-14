@@ -588,8 +588,8 @@ export default function Connect4({ sessionId, onBack }) {
                         onMouseEnter={() => setHoveredCol(col)}
                         onMouseLeave={() => setHoveredCol(null)}
                         disabled={!canPlay || getDropRow(board, col) === -1}
-                        className={`w-10 h-8 rounded flex items-center justify-center text-white text-sm font-bold transition-all ${canPlay && getDropRow(board, col) !== -1
-                                ? 'bg-slate-700 hover:bg-slate-600'
+                        className={`w-10 h-12 rounded-b-lg flex items-center justify-center text-white text-sm font-bold transition-all touch-manipulation ${canPlay && getDropRow(board, col) !== -1
+                                ? 'bg-slate-700 hover:bg-slate-600 active:bg-slate-500'
                                 : 'bg-slate-800/30 text-slate-600 cursor-not-allowed'
                             } ${hoveredCol === col ? 'bg-slate-600 scale-110' : ''}`}
                     >
@@ -614,10 +614,10 @@ export default function Connect4({ sessionId, onBack }) {
                                 }`}
                         >
                             {cell && (
-                                <div className={`w-[85%] h-[85%] rounded-full transition-all ${cell === PLAYER.RED
-                                        ? 'bg-gradient-to-br from-pink-400 to-pink-600 shadow-[0_0_12px_#ec4899]'
-                                        : 'bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[0_0_12px_#facc15]'
-                                    } ${isWinning ? 'animate-pulse scale-110' : ''} ${isLastMove ? 'ring-2 ring-white/50' : ''}`} />
+                                <div className={`w-[85%] h-[85%] rounded-full transition-all animate-drop-bounce ${cell === PLAYER.RED
+                                        ? 'bg-gradient-to-br from-pink-400 to-pink-600 shadow-[inset_-2px_-2px_4px_rgba(0,0,0,0.3),_inset_2px_2px_4px_rgba(255,255,255,0.3)]'
+                                        : 'bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-[inset_-2px_-2px_4px_rgba(0,0,0,0.3),_inset_2px_2px_4px_rgba(255,255,255,0.3)]'
+                                    } ${isWinning ? 'animate-pulse scale-110 ring-4 ring-white/50' : ''} ${isLastMove ? 'ring-2 ring-white/50' : ''}`} />
                             )}
                             {showPreview && (
                                 <div className={`w-[85%] h-[85%] rounded-full opacity-30 ${myColor === PLAYER.RED
@@ -625,6 +625,8 @@ export default function Connect4({ sessionId, onBack }) {
                                         : 'bg-gradient-to-br from-yellow-300 to-yellow-500'
                                     }`} />
                             )}
+                            {/* Plastic Highlight Overlay */}
+                            <div className="absolute inset-0 rounded-full shadow-[inset_0_2px_4px_rgba(255,255,255,0.1),_inset_0_-2px_4px_rgba(0,0,0,0.3)] pointer-events-none" />
                         </div>
                     );
                 })}
