@@ -20,6 +20,7 @@ export default function Checkers({ onBack }) {
     const [validMoves, setValidMoves] = useState([]);
     const [winner, setWinner] = useState(null);
     const [difficulty, setDifficulty] = useState(2); // Depth
+    const [mustJumpPiece, setMustJumpPiece] = useState(null); // Track double-jump requirement
 
     // ═══════════════════════════════════════════════════════════════
     // GAME LOOP
@@ -94,12 +95,6 @@ export default function Checkers({ onBack }) {
             return () => clearTimeout(timer);
         }
     }, [turn, status, board, difficulty, mustJumpPiece]);
-
-    // ═══════════════════════════════════════════════════════════════
-    // HANDLERS
-    // ═══════════════════════════════════════════════════════════════
-
-    const [mustJumpPiece, setMustJumpPiece] = useState(null); // [NEW] Track double-jump requirement
 
     // ═══════════════════════════════════════════════════════════════
     // HANDLERS
