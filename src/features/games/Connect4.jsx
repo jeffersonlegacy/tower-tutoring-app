@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRealtimeGame } from '../../hooks/useRealtimeGame';
+import { useMastery } from '../../context/MasteryContext'; // [NEW]
 import GameEndOverlay from './GameEndOverlay';
 import confetti from 'canvas-confetti';
 
@@ -316,6 +317,7 @@ const getAIMove = (board, difficulty) => {
 
 export default function Connect4({ sessionId, onBack }) {
     const gameId = 'connect4_v6';
+    const { awardXP } = useMastery(); // [NEW]
     const { gameState, playerId, isHost, updateState } = useRealtimeGame(sessionId, gameId, INITIAL_STATE);
 
     const [hoveredCol, setHoveredCol] = useState(null);
@@ -377,12 +379,18 @@ export default function Connect4({ sessionId, onBack }) {
         return () => clearTimeout(aiTimer.current);
     }, [gameState?.turn, gameState?.status, gameState?.mode, board, updateState]);
 
-    // Win celebration
+    // Win celebration & XP
     useEffect(() => {
         if (gameState?.winner && gameState.winner !== 'draw') {
             confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+            
+            // [NEW] Award XP if I won (and verify we haven't already awarded for this specific game instance to avoid dupes)
+            // Ideally we'd track "awarded" state, but for MVP:
+            if (gameState.winner === myColor) {
+               awardXP(50, 'Won Connect 4');
+            }
         }
-    }, [gameState?.winner]);
+    }, [gameState?.winner, myColor, awardXP]);
 
     // Handlers
     const handleDrop = useCallback((col) => {

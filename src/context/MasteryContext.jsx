@@ -59,19 +59,33 @@ export const MasteryProvider = ({ children }) => {
         });
     }, []);
 
+    // Notifications queue for UX
+    const [notifications, setNotifications] = useState([]);
+
+    const addNotification = useCallback((type, data) => {
+        const id = Date.now();
+        setNotifications(prev => [...prev, { id, type, data }]);
+        
+        // Auto-dismiss after 3s (consumer can also dismiss)
+        setTimeout(() => {
+            setNotifications(prev => prev.filter(n => n.id !== id));
+        }, 5000);
+    }, []);
+
     const unlockAchievement = useCallback((achievementId) => {
         setStudentProfile(prev => {
             if (prev.unlockedAchievements.includes(achievementId)) return prev;
             
             logEvent('achievement_unlocked', { achievementId });
-            // In a real app, triggers a toast here
+            addNotification('achievement', { id: achievementId }); // Trigger Toast
+            
             return { 
                 ...prev, 
                 unlockedAchievements: [...prev.unlockedAchievements, achievementId],
                 xp: prev.xp + 50 // Bonus XP for achievements
             };
         });
-    }, [logEvent]);
+    }, [logEvent, addNotification]);
 
     const checkAchievements = useCallback(() => {
         setStudentProfile(prev => {
@@ -119,10 +133,11 @@ export const MasteryProvider = ({ children }) => {
     const value = useMemo(() => ({
         progress,
         sessionLogs,
-        studentProfile, // [NEW]
-        awardXP,       // [NEW]
-        checkStreak,   // [NEW]
-        unlockAchievement, // [NEW]
+        studentProfile,
+        notifications, // [NEW]
+        awardXP,
+        checkStreak,
+        unlockAchievement,
         getNodeStatus,
         completeNode,
         logEvent,

@@ -11,6 +11,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import confetti from 'canvas-confetti';
+import { useMastery } from '../../context/MasteryContext'; // [NEW]
 import {
     SKILLS, SKILL_ORDER, LEVELS, CATEGORIES,
     generateProblem, calculateNextDifficulty, isSkillUnlocked,
@@ -277,7 +278,7 @@ const DashboardScreen = ({ profile, analytics, onSelectSkill, onLogout }) => {
     );
 };
 
-const PracticeScreen = ({ profile, skillId, onBack, onTeach, onUpdateProfile }) => {
+const PracticeScreen = ({ profile, skillId, onBack, onTeach, onUpdateProfile, awardXP }) => {
     const [problem, setProblem] = useState(null);
     const [feedback, setFeedback] = useState(null); // null | 'correct' | 'wrong'
     const [showExplanation, setShowExplanation] = useState(false);
@@ -321,6 +322,9 @@ const PracticeScreen = ({ profile, skillId, onBack, onTeach, onUpdateProfile }) 
         if (isCorrect) {
             setFeedback('correct');
             confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
+            
+            // [NEW] Global XP Award
+            awardXP(problem.xpReward || 10, 'MathMind Problem');
 
             const adjustment = calculateNextDifficulty(
                 { ...stats, correct: (stats?.correct || 0) + 1, streak: (stats?.streak || 0) + 1, xp: (stats?.xp || 0) + (problem.xpReward || 10) },
@@ -557,6 +561,7 @@ const TeachingScreen = ({ skillId, onBack, onPractice }) => {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════
 export default function MathMind({ onBack }) {
+    const { awardXP } = useMastery(); // [NEW]
     const [screen, setScreen] = useState('login');
     const [username, setUsername] = useState(getActiveUser());
     const [profile, setProfile] = useState(null);
@@ -602,7 +607,7 @@ export default function MathMind({ onBack }) {
                     <DashboardScreen profile={profile} analytics={analytics} onSelectSkill={handleSelectSkill} onLogout={handleLogout} />
                 )}
                 {screen === 'practice' && profile && selectedSkill && (
-                    <PracticeScreen profile={profile} skillId={selectedSkill} onBack={handleBackToDashboard} onTeach={handleTeach} onUpdateProfile={setProfile} />
+                    <PracticeScreen profile={profile} skillId={selectedSkill} onBack={handleBackToDashboard} onTeach={handleTeach} onUpdateProfile={setProfile} awardXP={awardXP} />
                 )}
                 {screen === 'teaching' && selectedSkill && (
                     <TeachingScreen skillId={selectedSkill} onBack={handleBackToDashboard} onPractice={() => setScreen('practice')} />

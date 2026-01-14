@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMastery } from '../../context/MasteryContext';
-import { ACHIEVEMENTS } from '../games/mathMind/adaptiveEngine'; // [NEW]
+import { ACHIEVEMENTS } from '../games/mathMind/adaptiveEngine'; 
+import AchievementToast from '../../components/AchievementToast'; // [NEW]
 
 // Mapping of Game Name to Route and Asset
 const GAME_METADATA = {
@@ -55,6 +56,7 @@ export default function MathCamp() {
 
     return (
         <div className="min-h-screen bg-slate-950 text-white font-sans pb-20">
+            <AchievementToast /> {/* [NEW] Global Toast for this view */}
             {/* HERO SECTION: The Campfire */}
             <div className="relative bg-gradient-to-b from-purple-900/50 to-slate-950 pt-8 pb-12 px-4 overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20"></div>
