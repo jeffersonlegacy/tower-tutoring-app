@@ -69,7 +69,7 @@ export default function MathCamp() {
                 <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20"></div>
                 
                 <header className="max-w-4xl mx-auto relative z-10">
-                    <h1 className="text-4xl md:text-6xl font-black text-center mb-8 bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent filter drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]">
+                    <h1 className="text-2xl sm:text-4xl md:text-6xl font-black text-center mb-8 bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent filter drop-shadow-[0_0_10px_rgba(168,85,247,0.5)] px-4 break-words">
                         MATHTELLIGENCE
                     </h1>
                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">

@@ -85,9 +85,9 @@ export default function Landing() {
             </div>
           </div>
 
-          <h1 className="text-4xl md:text-8xl font-black tracking-tighter text-white mb-2 drop-shadow-2xl">
+          <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tighter text-white mb-4 drop-shadow-2xl px-2">
             TOWER
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 pb-2 filter drop-shadow-[0_0_15px_rgba(6,182,212,0.5)]">
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 pb-4 filter drop-shadow-[0_0_15px_rgba(6,182,212,0.5)] leading-tight">
               TUTORING
             </span>
           </h1>

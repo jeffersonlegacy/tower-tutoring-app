@@ -5,6 +5,7 @@ import { useWhiteboardSync } from '../../hooks/useWhiteboardSync';
 import { setWhiteboardEditor } from '../../utils/WhiteboardCapture';
 import WhiteboardOverlay from '../../components/WhiteboardOverlay';
 import { useHomeworkUpload } from '../../hooks/useHomeworkUpload';
+import { useWhiteboardActions } from '../../hooks/useWhiteboardActions';
 
 const Whiteboard = memo(({ sessionId }) => {
   const [editor, setEditor] = useState(null);
@@ -16,18 +17,29 @@ const Whiteboard = memo(({ sessionId }) => {
   // Hook for uploading to homework tray
   const { uploadFile } = useHomeworkUpload(sessionId);
 
+  // Hook for AI drawing actions
+  const { executeAction } = useWhiteboardActions();
+
   // Initialize sync when editor is ready
   useWhiteboardSync(editor, sessionId);
 
   // Listen for AI whiteboard actions (from GeminiChat)
   useEffect(() => {
     const handleAIAction = (e) => {
-      setAiAction(e.detail);
+      const action = e.detail;
+      
+      // Check if this is a persistent DRAW action
+      if (action && (action.type?.startsWith('DRAW') || action.type === 'CLEAR')) {
+        executeAction(editor, action);
+      } else {
+        // Fallback to ephemeral overlay
+        setAiAction(action);
+      }
     };
 
     window.addEventListener('ai-whiteboard-action', handleAIAction);
     return () => window.removeEventListener('ai-whiteboard-action', handleAIAction);
-  }, []);
+  }, [editor, executeAction]);
 
   const handleMount = useCallback((editorInstance) => {
     console.log('[Whiteboard] Editor mounted for session:', sessionId);
