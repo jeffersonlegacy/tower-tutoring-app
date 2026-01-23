@@ -1,3 +1,5 @@
+import React from 'react';
+
 export default function VideoChat({ sessionId, onTogglePiP, isFloating }) {
     // MIROTALK P2P INTEGRATION
     // Source: https://github.com/miroslavpejic85/mirotalk
