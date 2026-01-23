@@ -18,6 +18,14 @@ export default function VideoChat({ sessionId, onTogglePiP, isFloating }) {
 
     const videoUrl = `${mirotalkBase}/${roomName}?name=${userName}&video=true&audio=true&screen=0&notify=0`;
 
+    // Neutralize iframe on unmount to prevent memory leaks/zombie audio
+    React.useEffect(() => {
+        return () => {
+            const iframe = document.querySelector(`iframe[src*="${roomName}"]`);
+            if (iframe) iframe.src = 'about:blank';
+        };
+    }, [roomName]);
+
     return (
         <div className="h-full w-full bg-black flex flex-col overflow-hidden relative group font-sans">
             {/* Minimal overlay status - Fades out on hover/activity */}

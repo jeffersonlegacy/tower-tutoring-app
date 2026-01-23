@@ -43,10 +43,14 @@ export function useWhiteboardSync(editor, sessionId) {
             const updates = {};
             let hasChanges = false;
 
-            // Find Added / Updated
+            // Find Added / Updated (Filter out ephemeral records to save bandwidth/CPU)
+            const SYNC_EXCLUDES = ['instance', 'camera', 'pointer', 'instance_presence'];
+            
             for (const record of currentRecords) {
+                if (SYNC_EXCLUDES.includes(record.typeName)) continue;
+
                 const lastKnown = lastServerState.current[record.id];
-                // Simple equality check (JSON stringify is fast enough for individual records)
+                // Simple equality check
                 if (!lastKnown || JSON.stringify(lastKnown) !== JSON.stringify(record)) {
                     updates[`records.${record.id}`] = record;
                     hasChanges = true;
@@ -159,10 +163,10 @@ export function useWhiteboardSync(editor, sessionId) {
                 }
 
                 // REMOVE (Exist locally but not remotely)
-                // Only remove if it's a shape/asset that was actually deleted remotely
                 // We rely on the fact that 'data.records' is the source of truth
+                // We include 'binding' to ensure arrows/connections are cleaned up
                 const toRemove = localRecords
-                    .filter(l => !remoteMap.has(l.id) && (l.typeName === 'shape' || l.typeName === 'asset'))
+                    .filter(l => !remoteMap.has(l.id) && (l.typeName === 'shape' || l.typeName === 'asset' || l.typeName === 'binding'))
                     .map(l => l.id);
 
                 if (toUpsert.length > 0) {

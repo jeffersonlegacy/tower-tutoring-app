@@ -94,31 +94,46 @@ export default function Session() {
                 <MindHiveInterface onHome={() => window.location.href = '/'} />
             )}
 
-            {/* Mobile Tab Switcher (Visible only on small screens) */}
-            {/* Hiding this when on 'board' to give full screen real estate, accessible via a small floating toggle instead */}
-            <div className={`md:hidden flex items-center bg-slate-800 border-b border-slate-700 shrink-0 z-30 ${mainTab === 'board' ? 'hidden' : 'flex'}`}>
+            {/* Mobile Tab Switcher */}
+            <div className={`md:hidden flex items-center bg-[#0f172a] border-b border-white/5 shrink-0 z-30 ${mainTab === 'board' ? 'hidden' : 'flex'}`}>
                 <button
                     onClick={() => setMainTab('board')}
-                    className={`flex-1 p-3 text-sm font-bold uppercase tracking-widest transition-all ${mainTab === 'board' ? 'text-blue-400 bg-slate-900 border-b-2 border-blue-500' : 'text-slate-500'}`}
+                    className={`flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${mainTab === 'board' ? 'text-cyan-400 bg-slate-900 border-b-2 border-cyan-500' : 'text-slate-500'}`}
                 >
-                    Whiteboard
+                    Board
                 </button>
                 <button
-                    onClick={() => setMainTab('sidebar')}
-                    className={`flex-1 p-3 text-sm font-bold uppercase tracking-widest transition-all ${mainTab === 'sidebar' ? 'text-purple-400 bg-slate-900 border-b-2 border-purple-500' : 'text-slate-500'}`}
+                    onClick={() => {
+                        setMainTab('sidebar');
+                        setSidebarMode('ai');
+                    }}
+                    className={`flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${mainTab === 'sidebar' && sidebarMode === 'ai' ? 'text-indigo-400 bg-slate-900 border-b-2 border-indigo-500' : 'text-slate-500'}`}
+                >
+                    AI Tutor
+                </button>
+                <button
+                    onClick={() => {
+                        setMainTab('sidebar');
+                        // Stay on current sidebar mode if it's not AI, or default to homework
+                        if (sidebarMode === 'ai') setSidebarMode('homework');
+                    }}
+                    className={`flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${mainTab === 'sidebar' && sidebarMode !== 'ai' ? 'text-purple-400 bg-slate-900 border-b-2 border-purple-500' : 'text-slate-500'}`}
                 >
                     Backpack
                 </button>
             </div>
 
-            {/* Floating Mobile Toggle for full-screen board - More prominent */}
+            {/* Floating Mobile Toggle for full-screen board */}
             {mainTab === 'board' && (
                 <button
                     onClick={() => setMainTab('sidebar')}
-                    className="md:hidden absolute top-4 right-4 z-40 bg-slate-900/90 text-white px-3 py-2 rounded-full backdrop-blur-md border border-white/20 shadow-lg flex items-center gap-2 active:scale-95"
+                    className="md:hidden absolute top-4 right-4 z-40 bg-slate-900/90 text-white px-4 py-2 rounded-full backdrop-blur-md border border-white/20 shadow-2xl flex items-center gap-2 active:scale-95 animate-in slide-in-from-top-2"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-                    <span className="text-xs font-bold uppercase tracking-wide">Menu</span>
+                   <div className="flex gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse delay-75"></div>
+                   </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Menu</span>
                 </button>
             )}
 
