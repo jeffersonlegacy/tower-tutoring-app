@@ -407,9 +407,24 @@ export function parseAIResponse(rawText) {
     }
 
     if (jsonStr) {
+        // ADRVERSARIAL CHECK: Is the JSON complete? 
+        // If it looks like JSON but doesn't have a closing brace, it's likely still streaming.
+        // We return a "Partial" state to prevent the UI from showing raw JSON.
+        const trimmed = jsonStr.trim();
+        const isPotentialJson = trimmed.startsWith('{');
+        const isCompleteJson = trimmed.endsWith('}');
+
+        if (isPotentialJson && !isCompleteJson) {
+            return {
+                isStructured: true,
+                isPartial: true,
+                voiceResponse: '',
+                textDisplay: 'AI is formulating visual strategies...',
+                emotionalState: 'curious'
+            };
+        }
+
         try {
-            // Clean up any potential trailing commas or comments if we wanted to be fancy,
-            // but for now just standard parse
             const parsed = JSON.parse(jsonStr);
             return {
                 isStructured: true,

@@ -19,7 +19,7 @@ const REGION_MAP = {
     'bottom-right': { x: 65, y: 65, width: 30, height: 30 },
 };
 
-export default function WhiteboardOverlay({ action, onComplete }) {
+export default function WhiteboardOverlay({ action, onComplete, editor }) {
     const [visible, setVisible] = useState(false);
     const [fading, setFading] = useState(false);
 
@@ -95,11 +95,19 @@ export default function WhiteboardOverlay({ action, onComplete }) {
 
     if (action.coordinates && action.coordinates.length === 4) {
         const [x1, y1, x2, y2] = action.coordinates;
+        
+        // Use page bounds if editor is available to prevent drift
+        const bounds = editor?.getViewportPageBounds();
+        const baseW = bounds ? bounds.w : window.innerWidth;
+        const baseH = bounds ? bounds.h : window.innerHeight;
+        const offsetX = bounds ? bounds.x : 0;
+        const offsetY = bounds ? bounds.y : 0;
+
         const calcRegion = {
-            x: (x1 / window.innerWidth) * 100,
-            y: (y1 / window.innerHeight) * 100,
-            width: ((x2 - x1) / window.innerWidth) * 100,
-            height: ((y2 - y1) / window.innerHeight) * 100,
+            x: ((x1 - offsetX) / baseW) * 100,
+            y: ((y1 - offsetY) / baseH) * 100,
+            width: ((x2 - x1) / baseW) * 100,
+            height: ((y2 - y1) / baseH) * 100,
         };
         region = calcRegion;
     }

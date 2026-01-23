@@ -45,7 +45,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
             setWhiteboardImage(image);
             
             // Auto-send with scaffolding prompt
-            const isUpdate = (externalMessages || localMessages).length > 1; // welcoming message is index 0
+            const isUpdate = messagesRef.current.length > 1; // welcoming message is index 0
             let prompt = "";
 
             if (isAuto) {
@@ -96,6 +96,12 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
     const [whiteboardAction, setWhiteboardAction] = useState(null);
     const messagesEndRef = useRef(null);
     const lastAIResponseRef = useRef('');
+    
+    // Track messages in a ref to avoid stale closures in event listeners
+    const messagesRef = useRef(messages);
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

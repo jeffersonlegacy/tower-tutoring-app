@@ -109,15 +109,17 @@ export function useWhiteboardActions() {
         if (!start) return;
 
         // Convert percentage to page coordinates
-        const viewport = editor.getViewportScreenBounds();
+        const viewport = editor.getViewportPageBounds();
+        if (!viewport) return;
+
         const w = viewport.w;
         const h = viewport.h;
 
         let x = viewport.x + (w * (start.x / 100));
         let y = viewport.y + (h * (start.y / 100));
         
-        let width = 100;
-        let height = 100;
+        let width = (w * 0.1); // Default width 10%
+        let height = (h * 0.1); 
 
         if (end) {
              width = (w * ((end.x - start.x) / 100));
@@ -189,7 +191,9 @@ export function useWhiteboardActions() {
     const drawText = (editor, { text, position, color }) => {
         if (!text || !position) return;
 
-        const viewport = editor.getViewportScreenBounds();
+        const viewport = editor.getViewportPageBounds();
+        if (!viewport) return;
+
         let x = viewport.x + (viewport.w * (position.x / 100));
         let y = viewport.y + (viewport.h * (position.y / 100));
 
@@ -222,7 +226,9 @@ export function useWhiteboardActions() {
      * action: { position: { x, y } } or { region: 'top-right' }
      */
     const panCamera = (editor, { position, region }) => {
-        const viewport = editor.getViewportScreenBounds();
+        const viewport = editor.getViewportPageBounds();
+        if (!viewport) return;
+
         const w = viewport.w;
         const h = viewport.h;
         let x = viewport.x;

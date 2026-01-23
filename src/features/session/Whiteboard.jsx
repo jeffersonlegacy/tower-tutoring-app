@@ -123,6 +123,7 @@ const Whiteboard = memo(({ sessionId }) => {
       {/* AI Visual Overlay */}
       <WhiteboardOverlay
         action={aiAction}
+        editor={editor}
         onComplete={() => setAiAction(null)}
       />
 
