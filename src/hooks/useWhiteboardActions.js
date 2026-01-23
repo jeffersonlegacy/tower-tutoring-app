@@ -15,18 +15,12 @@ export function useWhiteboardActions() {
     const mapPosition = useCallback((editor, xPercent, yPercent) => {
         if (!editor) return { x: 0, y: 0 };
         
-        // Get common bounds or viewport
-        const viewport = editor.getViewportScreenBounds();
-        // Fallback to a reasonable default if viewport is weird (e.g. initial load)
-        const width = viewport.w || window.innerWidth;
-        const height = viewport.h || window.innerHeight;
+        // Use visible viewport bounds in page space
+        const viewport = editor.getViewportPageBounds();
+        if (!viewport) return { x: 0, y: 0 };
 
-        // Tldraw infinite canvas starts at 0,0 locally usually, but let's assume
-        // we are drawing relative to the current center or viewport.
-        // Actually, easiest for AI is "screen percentage" of current view.
-        
-        const x = viewport.x + (width * (xPercent / 100));
-        const y = viewport.y + (height * (yPercent / 100));
+        const x = viewport.x + (viewport.w * (xPercent / 100));
+        const y = viewport.y + (viewport.h * (yPercent / 100));
         
         return { x, y };
     }, []);

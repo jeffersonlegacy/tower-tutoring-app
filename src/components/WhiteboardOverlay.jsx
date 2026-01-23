@@ -24,6 +24,20 @@ export default function WhiteboardOverlay({ action, onComplete }) {
     const [fading, setFading] = useState(false);
 
     useEffect(() => {
+        // CSS for pulse animation - inject once
+        const id = 'whiteboard-overlay-styles';
+        if (!document.getElementById(id)) {
+            const styleSheet = document.createElement('style');
+            styleSheet.id = id;
+            styleSheet.textContent = `
+                @keyframes pulse {
+                    0%, 100% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.02); opacity: 0.8; }
+                }
+            `;
+            document.head.appendChild(styleSheet);
+        }
+
         if (action) {
             setVisible(true);
             setFading(false);
@@ -81,12 +95,13 @@ export default function WhiteboardOverlay({ action, onComplete }) {
 
     if (action.coordinates && action.coordinates.length === 4) {
         const [x1, y1, x2, y2] = action.coordinates;
-        region = {
+        const calcRegion = {
             x: (x1 / window.innerWidth) * 100,
             y: (y1 / window.innerHeight) * 100,
             width: ((x2 - x1) / window.innerWidth) * 100,
             height: ((y2 - y1) / window.innerHeight) * 100,
         };
+        region = calcRegion;
     }
 
     // Default to center if no region specified
@@ -216,13 +231,3 @@ export default function WhiteboardOverlay({ action, onComplete }) {
         />
     );
 }
-
-// CSS for pulse animation - inject into document
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-@keyframes pulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.02); opacity: 0.8; }
-}
-`;
-document.head.appendChild(styleSheet);

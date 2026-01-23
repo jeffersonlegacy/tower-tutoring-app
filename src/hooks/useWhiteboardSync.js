@@ -178,9 +178,10 @@ export function useWhiteboardSync(editor, sessionId) {
                 console.warn('[Sync] Apply error:', e);
             } finally {
                 // Short timeout to ensure store events settle before we allow pushing again
-                setTimeout(() => {
+                const timer = setTimeout(() => {
                     isApplyingRemote.current = false;
                 }, 50);
+                return () => clearTimeout(timer); // cleanup in case of fast updates
             }
         });
 

@@ -45,7 +45,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
             setWhiteboardImage(image);
             
             // Auto-send with scaffolding prompt
-            const isUpdate = messages.length > 0;
+            const isUpdate = (externalMessages || localMessages).length > 1; // welcoming message is index 0
             let prompt = "";
 
             if (isAuto) {
