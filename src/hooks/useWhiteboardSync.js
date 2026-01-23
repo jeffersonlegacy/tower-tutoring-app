@@ -6,7 +6,7 @@
  * - This prevents User A from overwriting User B's changes in other parts of the map.
  * - Uses deleteField() to remove records.
  */
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { db } from '../services/firebase';
 import { doc, onSnapshot, setDoc, updateDoc, getDoc, serverTimestamp, deleteField } from 'firebase/firestore';
 
@@ -19,6 +19,19 @@ export function useWhiteboardSync(editor, sessionId) {
     const lastServerState = useRef({}); 
     const syncTimeout = useRef(null);
     const isFirstLoad = useRef(true);
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+    // Online/Offline listeners
+    useEffect(() => {
+        const setOnline = () => setIsOnline(true);
+        const setOffline = () => setIsOnline(false);
+        window.addEventListener('online', setOnline);
+        window.addEventListener('offline', setOffline);
+        return () => {
+            window.removeEventListener('online', setOnline);
+            window.removeEventListener('offline', setOffline);
+        };
+    }, []);
 
     // 1. PUSH: Calculate diff and send granular updates
     const pushToFirebase = useCallback(async () => {
@@ -200,4 +213,6 @@ export function useWhiteboardSync(editor, sessionId) {
             window.removeEventListener('beforeunload', handleBlur);
         };
     }, [editor, sessionId, scheduleSync, pushToFirebase]);
+
+    return { isOnline };
 }

@@ -36,14 +36,29 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
     // Listen for Snap-to-Solve events from Whiteboard
     useEffect(() => {
         const handleSnapUpload = (e) => {
+            const data = e.detail;
+            const image = data.image || data; // Handle both direct string and object format
+            const isAuto = data.isAuto;
+
             // console.log('[GeminiChat] Received Snap upload:', e.detail);
             setIsOpen(true);
-            setWhiteboardImage(e.detail);
+            setWhiteboardImage(image);
+            
             // Auto-send with scaffolding prompt
-            sendMessage(
-                "I've uploaded a picture of my homework. Can you help me scaffold the solution? Please don't give me the answer, but help me identify the first step.",
-                [e.detail]
-            );
+            const isUpdate = messages.length > 0;
+            let prompt = "";
+
+            if (isAuto) {
+                // "Live Tutor" persona - Check in gently
+                prompt = "I'm looking at your work live. If I see a mistake or a good next step, I'll mention it clearly. Otherwise, I'll give a quick thumbs up. Keep going.";
+            } else {
+                // Manual Upload
+                prompt = isUpdate 
+                    ? "Here is my updated work. Please check it, give me feedback, and guide me to the next step."
+                    : "I've uploaded a picture of my homework. Can you help me scaffold the solution? Please don't give me the answer, but help me identify the first step.";
+            }
+            
+            sendMessage(prompt, [image]);
         };
 
         window.addEventListener('ai-vision-upload', handleSnapUpload);
@@ -149,8 +164,15 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
         let images = imagesOverride || (whiteboardImage ? [whiteboardImage] : []);
 
         // === CONTEXT INJECTION ===
-        // 1. Stroke Analytics
-        const strokeContext = strokeAnalytics.getContextString();
+        // 1. Device Context (Screen Size Awareness)
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const deviceType = width < 768 ? 'Mobile' : 'Desktop';
+        const deviceContext = `User Environment: ${deviceType} (Viewport: ${width}x${height})`;
+
+        // 2. Stroke Analytics
+        let strokeContext = strokeAnalytics.getContextString();
+        strokeContext = `${deviceContext}\n${strokeContext}`;
 
         // 2. Mastery Context (Curriculum Awareness)
         const currentUrlParams = window.location.pathname.split('/');
@@ -211,6 +233,9 @@ Associated Game: ${currentNode?.associatedGame || 'None'}
         setWhiteboardImage(null);
         setIsLoading(true);
         setCurrentModel(null);
+        
+        // VISUAL FEEDBACK: Tell whiteboard we are thinking
+        window.dispatchEvent(new CustomEvent('ai-thinking-start'));
 
         const placeholderId = Date.now();
         setMessages(prev => [...prev, { role: 'model', text: '', id: placeholderId, isStreaming: true }]);
@@ -270,6 +295,7 @@ Associated Game: ${currentNode?.associatedGame || 'None'}
         } finally {
             setIsLoading(false);
             setIsScanning(false);
+            window.dispatchEvent(new CustomEvent('ai-thinking-stop'));
             setMessages(prev => prev.map(msg =>
                 msg.id === placeholderId
                     ? { ...msg, isStreaming: false }

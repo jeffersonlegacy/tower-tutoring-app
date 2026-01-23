@@ -2,10 +2,11 @@ import { memo, useState, useCallback, useEffect } from 'react';
 import { Tldraw } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import { useWhiteboardSync } from '../../hooks/useWhiteboardSync';
-import { setWhiteboardEditor } from '../../utils/WhiteboardCapture';
+import { setWhiteboardEditor, captureWhiteboard } from '../../utils/WhiteboardCapture';
 import WhiteboardOverlay from '../../components/WhiteboardOverlay';
 import { useHomeworkUpload } from '../../hooks/useHomeworkUpload';
 import { useWhiteboardActions } from '../../hooks/useWhiteboardActions';
+import { useLiveObservation } from '../../hooks/useLiveObservation';
 
 const Whiteboard = memo(({ sessionId }) => {
   const [editor, setEditor] = useState(null);
@@ -13,6 +14,7 @@ const Whiteboard = memo(({ sessionId }) => {
   const [aiAction, setAiAction] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showUploadToast, setShowUploadToast] = useState(false);
+  const [isLiveMode, setIsLiveMode] = useState(false);
 
   // Hook for uploading to homework tray
   const { uploadFile } = useHomeworkUpload(sessionId);
@@ -21,7 +23,10 @@ const Whiteboard = memo(({ sessionId }) => {
   const { executeAction } = useWhiteboardActions();
 
   // Initialize sync when editor is ready
-  useWhiteboardSync(editor, sessionId);
+  const { isOnline } = useWhiteboardSync(editor, sessionId);
+
+  // Initialize Live Tutor Observation (Auto-Scan)
+  useLiveObservation(editor, isLiveMode);
 
   // Listen for AI whiteboard actions (from GeminiChat)
   useEffect(() => {
@@ -37,8 +42,25 @@ const Whiteboard = memo(({ sessionId }) => {
       }
     };
 
+    const handleThinkingStart = () => {
+        // Trigger a subtle 'thinking' state in the overlay
+        setAiAction({ type: 'THINKING' });
+    };
+
+    const handleThinkingStop = () => {
+        // Clear only if the current action is thinking
+        setAiAction(prev => prev?.type === 'THINKING' ? null : prev);
+    };
+
     window.addEventListener('ai-whiteboard-action', handleAIAction);
-    return () => window.removeEventListener('ai-whiteboard-action', handleAIAction);
+    window.addEventListener('ai-thinking-start', handleThinkingStart);
+    window.addEventListener('ai-thinking-stop', handleThinkingStop);
+
+    return () => {
+        window.removeEventListener('ai-whiteboard-action', handleAIAction);
+        window.removeEventListener('ai-thinking-start', handleThinkingStart);
+        window.removeEventListener('ai-thinking-stop', handleThinkingStop);
+    };
   }, [editor, executeAction]);
 
   const handleMount = useCallback((editorInstance) => {
@@ -71,6 +93,23 @@ const Whiteboard = memo(({ sessionId }) => {
     }
   };
 
+  const handleScanBoard = async () => {
+    setIsProcessing(true);
+    try {
+        const imageData = await captureWhiteboard();
+        if (imageData) {
+            // Dispatch event for GeminiChat to pick up
+            window.dispatchEvent(new CustomEvent('ai-vision-upload', { detail: imageData }));
+        } else {
+            alert("Canvas is empty! Draw something first.");
+        }
+    } catch (error) {
+        console.error('Scan failed:', error);
+    } finally {
+        setIsProcessing(false);
+    }
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -91,6 +130,13 @@ const Whiteboard = memo(({ sessionId }) => {
       {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-50">
           <div className="text-slate-400 text-sm animate-pulse">Loading whiteboard...</div>
+        </div>
+      )}
+
+      {/* Offline Warning Banner */}
+      {!isOnline && (
+        <div className="absolute top-0 left-0 right-0 bg-red-600 text-white text-[10px] font-bold py-1 text-center z-[100] animate-pulse uppercase tracking-widest">
+            ⚠️ OFFLINE MODE - Changes will sync when reconnected
         </div>
       )}
 
@@ -116,8 +162,10 @@ const Whiteboard = memo(({ sessionId }) => {
         </div>
       )}
 
-      {/* Snap-to-Solve Button (Bottom-right on mobile to avoid tldraw toolbar at bottom-left and nav toggle at top-right) */}
-      <div className="absolute bottom-20 right-4 sm:bottom-4 sm:left-4 sm:right-auto z-50">
+      {/* Action Buttons (Snap & Scan) */}
+      <div className="absolute bottom-20 right-4 sm:bottom-4 sm:left-4 sm:right-auto z-50 flex flex-col sm:flex-row gap-3">
+        
+        {/* SNAP HOMEWORK (Camera) */}
         <label className={`
             flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-full font-bold shadow-lg transition-all cursor-pointer border border-white/10
             ${isProcessing ? 'bg-slate-800 text-slate-500 scale-95' : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:scale-105 hover:shadow-emerald-500/30 active:scale-95'}
@@ -126,23 +174,59 @@ const Whiteboard = memo(({ sessionId }) => {
           {isProcessing ? (
             <>
               <div className="w-5 h-5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-sm uppercase tracking-wide">Scanning...</span>
+              <span className="text-sm uppercase tracking-wide">Processing...</span>
             </>
           ) : (
             <>
-              <span className="text-2xl">📸</span>
-              <span className="text-sm uppercase tracking-wide hidden sm:inline">Snap Homework</span>
-              <span className="text-sm uppercase tracking-wide sm:hidden">Snap</span>
+              <span className="text-xl">📸</span>
+              <span className="text-sm uppercase tracking-wide hidden sm:inline">Camera</span>
+              <span className="text-sm uppercase tracking-wide sm:hidden">Cam</span>
             </>
           )}
         </label>
+
+        {/* SCAN BOARD (Digital) */}
+        <button 
+            onClick={handleScanBoard}
+            disabled={isProcessing}
+            className={`
+            flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-full font-bold shadow-lg transition-all cursor-pointer border border-white/10
+            ${isProcessing ? 'bg-slate-800 text-slate-500 scale-95' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:scale-105 hover:shadow-blue-500/30 active:scale-95'}
+          `}>
+            {isProcessing ? (
+                <span className="text-sm uppercase tracking-wide">Scanning...</span>
+            ) : (
+                <>
+                <span className="text-xl">🧠</span>
+                <span className="text-sm uppercase tracking-wide hidden sm:inline">AI Scan</span>
+                <span className="text-sm uppercase tracking-wide sm:hidden">Scan</span>
+                </>
+            )}
+        </button>
+      </div>
+
+      {/* Live Tutor Toggle */}
+      <div className="absolute top-20 right-4 sm:top-24 z-50">
+        <button
+            onClick={() => setIsLiveMode(!isLiveMode)}
+            className={`px-4 py-2 rounded-full font-bold text-xs uppercase tracking-wider transition-all border border-white/10 shadow-lg flex items-center gap-2 ${
+                isLiveMode ? 'bg-red-600/90 text-white animate-pulse' : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700'
+            }`}
+        >
+            <span className={`w-2 h-2 rounded-full ${isLiveMode ? 'bg-white' : 'bg-slate-500'}`}></span>
+            {isLiveMode ? 'LIVE TUTOR ACTIVE' : 'LIVE TUTOR OFF'}
+        </button>
       </div>
 
       {/* Status Banner */}
       <div className="hidden md:flex absolute bottom-0 left-0 right-0 bg-slate-950/80 backdrop-blur-sm border-t border-white/5 px-3 py-1.5 justify-between items-center z-20 pointer-events-none">
         <div className="flex items-center gap-2">
           <span className="text-[9px] font-black text-purple-400 tracking-tighter">SYNC: FIREBASE REALTIME</span>
-          <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e] animate-pulse"></div>
+          <div className={`w-1.5 h-1.5 rounded-full shadow-[0_0_5px_currentColor] transition-colors ${
+              isOnline 
+              ? 'bg-green-500 shadow-green-500 animate-pulse' 
+              : 'bg-red-500 shadow-red-500'
+          }`}></div>
         </div>
         <div className="flex items-center gap-2 text-[8px] text-slate-500 font-bold uppercase tracking-widest">
           SESSION: {sessionId}

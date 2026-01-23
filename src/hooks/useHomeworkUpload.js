@@ -25,6 +25,17 @@ export function useHomeworkUpload(sessionId) {
                 uploadedAt: Date.now()
             });
 
+            // 3. INTELLIGENT AWARENESS (Notify AI Brain)
+            // Dispatch event for GeminiChat to pick up immediately
+            const aiEvent = new CustomEvent('ai-vision-upload', {
+                detail: {
+                    imageUrl: downloadURL,
+                    isAuto: false, // This is a manual user upload, so AI should acknowledge it
+                    context: "User uploaded a file/homework."
+                }
+            });
+            window.dispatchEvent(aiEvent);
+
             return true;
         } catch (error) {
             console.error("Upload failed", error);

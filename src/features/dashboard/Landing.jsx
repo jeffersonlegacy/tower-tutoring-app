@@ -56,28 +56,24 @@ export default function Landing() {
       </div>
 
       {/* --- HERO SECTION --- */}
-      <main className="flex-1 flex flex-col items-center justify-start md:justify-center relative z-10 p-6 pt-[max(2rem,env(safe-area-inset-top))] sm:pt-32 md:pt-0 pb-12 w-full max-w-7xl mx-auto">
+      <main className="flex-1 flex flex-col items-center justify-start md:justify-center relative z-10 p-6 pt-32 sm:pt-40 md:pt-0 pb-12 w-full max-w-7xl mx-auto">
 
         {/* Branding */}
         <div className="text-center mb-8 md:mb-12 animate-in fade-in slide-in-from-bottom-4 duration-1000">
 
-          {/* THE CIRCUIT TOWER EMBLEM */}
-          <div className="mb-8 md:mb-10 relative inline-block group cursor-pointer" onClick={() => navigate(`/session/demo_${Math.floor(Math.random() * 1000)}`)}>
+          {/* THE JEFFERSON EMBLEM */}
+          <div className="mb-6 md:mb-8 relative inline-block group cursor-pointer" onClick={() => navigate(`/session/demo_${Math.floor(Math.random() * 1000)}`)}>
             {/* Outer Pulse Ring */}
             <div className="absolute -inset-8 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full blur-2xl opacity-20 group-hover:opacity-40 transition duration-1000 animate-pulse-slow"></div>
 
-            {/* Rotating Circuit Ring */}
-            <div className="absolute -inset-1 rounded-full border-2 border-cyan-500/30 border-t-transparent border-l-transparent animate-spin-slow pointer-events-none"></div>
-            <div className="absolute -inset-1 rounded-full border-2 border-blue-500/20 border-b-transparent border-r-transparent animate-reverse-spin pointer-events-none"></div>
-
             {/* Main Emblem Container */}
-            <div className="w-48 h-48 md:w-80 md:h-80 relative z-10 rounded-full border-4 border-cyan-900/50 shadow-[0_0_50px_rgba(6,182,212,0.15)] overflow-hidden bg-black transition-transform duration-700 ease-out group-hover:scale-105 group-hover:shadow-[0_0_80px_rgba(6,182,212,0.3)]">
-
-              {/* Emblem Overlay */}
-              <img
-                src={towerEmblem} // Using Tower Emblem as the main logo
-                alt="Tower Tutoring Emblem"
-                className="relative z-10 w-full h-full object-contain p-0 opacity-100 transform transition-transform duration-700 group-hover:scale-110"
+            <div className="w-48 h-48 md:w-64 md:h-64 relative z-10 rounded-full border-4 border-cyan-900/50 shadow-[0_0_50px_rgba(6,182,212,0.15)] overflow-hidden bg-slate-900 flex items-center justify-center transition-transform duration-700 ease-out group-hover:scale-105 group-hover:shadow-[0_0_80px_rgba(6,182,212,0.3)]">
+              
+              {/* Jefferson Logo */}
+              <img 
+                src={jiLogo} 
+                alt="Jefferson Tutoring Logo" 
+                className="w-full h-full object-cover opacity-90 hover:opacity-100 transition-opacity duration-500"
               />
 
               {/* Glass Sheen Overlay (Subtle) */}
@@ -85,19 +81,19 @@ export default function Landing() {
             </div>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tighter text-white mb-4 drop-shadow-2xl px-2">
-            TOWER
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 pb-4 filter drop-shadow-[0_0_15px_rgba(6,182,212,0.5)] leading-tight">
+          <h1 className="text-4xl sm:text-6xl md:text-8xl font-black tracking-tighter text-white mb-6 drop-shadow-2xl px-4">
+            JEFFERSON
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 pb-4 filter drop-shadow-[0_0_15px_rgba(6,182,212,0.5)] leading-tight mt-2">
               TUTORING
             </span>
           </h1>
 
-          <p className="text-slate-400 text-sm md:text-base font-medium tracking-[0.2em] uppercase mb-6">
-            There’s Always Another Level
+          <p className="text-slate-400 text-sm md:text-lg font-medium tracking-[0.2em] uppercase mb-8">
+            Build a Mind That Solves Anything
           </p>
 
           {/* Acronym Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/80 border border-white/10 backdrop-blur-md shadow-lg hover:border-cyan-500/30 transition-colors cursor-default mb-8">
+          <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-slate-900/80 border border-white/10 backdrop-blur-md shadow-lg hover:border-cyan-500/30 transition-colors cursor-default mb-8">
             <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
             <p className="text-[10px] md:text-xs text-cyan-200/80 font-mono tracking-wider">
               <span className="font-bold text-cyan-400">T</span>utoring <span className="font-bold text-cyan-400">O</span>ptimized <span className="font-bold text-cyan-400">W</span>ith <span className="font-bold text-cyan-400">E</span>lite <span className="font-bold text-cyan-400">R</span>esources

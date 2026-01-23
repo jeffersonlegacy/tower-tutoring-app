@@ -24,6 +24,9 @@ export default function Session() {
     const { uploadFile } = useHomeworkUpload(sessionId);
     const [isDragging, setIsDragging] = useState(false);
     const [sessionEnded, setSessionEnded] = useState(false);
+    
+    // Video Float State (Phase 14.2)
+    const [isVideoFloating, setIsVideoFloating] = useState(false);
 
     // Sidebar Mode: 'homework' | 'mathcamp' | 'ai' | 'arcade' | 'tools'
     const [sidebarMode, setSidebarMode] = useState('homework');
@@ -135,18 +138,38 @@ export default function Session() {
                 </div>
             )}
 
+            {/* GLOBAL VIDEO OVERLAY (Phase 14.2) */}
+            {isVideoFloating && (
+                <div className="absolute top-4 right-4 z-[60] w-[280px] h-[200px] rounded-2xl overflow-hidden shadow-2xl border-2 border-slate-700/50 bg-black animate-in fade-in zoom-in-95 duration-300">
+                     <Suspense fallback={<ComponentLoader />}>
+                        <VideoChat 
+                            sessionId={sessionId} 
+                            onTogglePiP={() => setIsVideoFloating(false)} 
+                            isFloating={true}
+                        />
+                    </Suspense>
+                    {/* Handlers for dragging could go here later */}
+                </div>
+            )}
+
             {/* Main Content Area */}
             <div className="flex flex-1 flex-col md:flex-row overflow-hidden relative">
 
                 {/* Sidebar (Video + Tools) */}
                 <div className={`flex-none w-full md:w-[300px] lg:w-[350px] border-b md:border-b-0 md:border-r border-slate-700 bg-black flex flex-col relative z-20 shrink-0 h-full ${mainTab === 'sidebar' ? 'flex' : 'hidden md:flex'}`}>
 
-                    {/* Top: Video (Adaptive Height) */}
-                    <div className="h-[220px] md:h-[320px] shrink-0 border-b border-slate-700 bg-slate-900/50">
-                        <Suspense fallback={<ComponentLoader />}>
-                            <VideoChat sessionId={sessionId} />
-                        </Suspense>
-                    </div>
+                    {/* Top: Video (Adaptive Height) - DOCKED MODE */}
+                    {!isVideoFloating && (
+                        <div className="h-[220px] md:h-[320px] shrink-0 border-b border-slate-700 bg-slate-900/50">
+                            <Suspense fallback={<ComponentLoader />}>
+                                <VideoChat 
+                                    sessionId={sessionId} 
+                                    onTogglePiP={() => setIsVideoFloating(true)} 
+                                    isFloating={false}
+                                />
+                            </Suspense>
+                        </div>
+                    )}
 
                     {/* Sidebar Tabs (Local) */}
                     <div className="flex items-center bg-slate-900 border-b border-slate-700 shrink-0">

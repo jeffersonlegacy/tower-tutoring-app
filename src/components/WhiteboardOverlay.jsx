@@ -27,6 +27,9 @@ export default function WhiteboardOverlay({ action, onComplete }) {
         if (action) {
             setVisible(true);
             setFading(false);
+            
+            // For THINKING state, don't auto-fade. It clears manually.
+            if (action.type === 'THINKING') return;
 
             // Start fade after 3 seconds
             const fadeTimer = setTimeout(() => setFading(true), 3000);
@@ -47,8 +50,35 @@ export default function WhiteboardOverlay({ action, onComplete }) {
 
     if (!visible || !action) return null;
 
-    // Get region or use provided coordinates
-    let region = action.region ? REGION_MAP[action.region] : null;
+    // "THINKING" State - Subtle AI Presence
+    if (action.type === 'THINKING') {
+        return (
+            <div className="absolute inset-0 pointer-events-none z-[40] flex items-center justify-center">
+                <div className="relative">
+                    {/* Pulsing Core */}
+                    <div className="w-16 h-16 rounded-full bg-cyan-500/20 animate-ping absolute inset-0"></div>
+                    <div className="w-16 h-16 rounded-full bg-cyan-500/10 animate-pulse absolute inset-0 delay-75"></div>
+                    
+                    {/* Center Icon */}
+                    <div className="w-16 h-16 rounded-full bg-slate-900/50 backdrop-blur-md border border-cyan-500/30 flex items-center justify-center relative shadow-[0_0_30px_rgba(6,182,212,0.2)]">
+                        <span className="text-2xl animate-pulse">✨</span>
+                    </div>
+
+                    {/* Orbiting Particles */}
+                    <div className="absolute inset-0 animate-spin-slow">
+                        <div className="absolute -top-2 left-1/2 w-2 h-2 bg-cyan-400 rounded-full shadow-[0_0_10px_#22d3ee]"></div>
+                    </div>
+                </div>
+                
+                {/* Floating Text */}
+                <div className="absolute mt-24 text-cyan-400 font-bold text-xs tracking-[0.2em] uppercase animate-pulse text-shadow-glow">
+                    ANALYZING
+                </div>
+            </div>
+        );
+    }
+
+
     if (action.coordinates && action.coordinates.length === 4) {
         const [x1, y1, x2, y2] = action.coordinates;
         region = {
