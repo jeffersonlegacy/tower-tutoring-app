@@ -4,37 +4,70 @@ import { CURRICULUM_DATA } from '../data/CurriculumData';
 const MasteryContext = createContext(null);
 
 export const MasteryProvider = ({ children }) => {
-    // Progress shape: { [nodeId]: { status: 'locked' | 'unlocked' | 'completed', lastScore: 0 } }
-    const [progress, setProgress] = useState(() => {
-        const saved = localStorage.getItem('ji_mastery_progress');
-        return saved ? JSON.parse(saved) : {};
+    // Get sessionId from URL if present
+    const urlParams = new URLSearchParams(window.location.search);
+    // Note: In SessionPage we use useParams, but MasteryProvider is global.
+    // We'll use a more robust way to track the active session ID inside the provider.
+    const [activeSessionId, setActiveSessionId] = useState(() => {
+        const pathParts = window.location.pathname.split('/');
+        const id = pathParts[pathParts.indexOf('session') + 1];
+        return id ? id.toLowerCase() : 'global';
     });
+
+    // Update activeSessionId on navigation
+    useEffect(() => {
+        const handleLocationChange = () => {
+            const pathParts = window.location.pathname.split('/');
+            const id = pathParts[pathParts.indexOf('session') + 1];
+            if (id) setActiveSessionId(id.toLowerCase());
+        };
+        window.addEventListener('popstate', handleLocationChange);
+        // Also listen to custom events if using a router that doesn't trigger popstate on push
+        return () => window.removeEventListener('popstate', handleLocationChange);
+    }, []);
+
+    const profileKey = `ji_profile_${activeSessionId}`;
+    const progressKey = `ji_progress_${activeSessionId}`;
+    const logsKey = `ji_logs_${activeSessionId}`;
+
+    // Progress shape: { [nodeId]: { status: 'locked' | 'unlocked' | 'completed', lastScore: 0 } }
+    const [progress, setProgress] = useState({});
 
     // Profile shape: { xp: 0, level: 1, streak: 0, lastActive: 'ISO-DATE', currency: 0, missions: [], unlockedAchievements: [] }
-    const [studentProfile, setStudentProfile] = useState(() => {
-        const saved = localStorage.getItem('ji_student_profile');
-        return saved ? JSON.parse(saved) : { xp: 0, level: 1, streak: 0, lastActive: null, currency: 0, missions: [], unlockedAchievements: [] };
-    });
+    const [studentProfile, setStudentProfile] = useState({ xp: 0, level: 1, streak: 0, lastActive: null, currency: 0, missions: [], unlockedAchievements: [] });
+
+    const [sessionLogs, setSessionLogs] = useState([]);
+
+    // Load data when activeSessionId changes
+    useEffect(() => {
+        const savedProgress = localStorage.getItem(progressKey);
+        const savedProfile = localStorage.getItem(profileKey);
+        const savedLogs = localStorage.getItem(logsKey);
+
+        setProgress(savedProgress ? JSON.parse(savedProgress) : {});
+        setStudentProfile(savedProfile ? JSON.parse(savedProfile) : { xp: 0, level: 1, streak: 0, lastActive: null, currency: 0, missions: [], unlockedAchievements: [] });
+        setSessionLogs(savedLogs ? JSON.parse(savedLogs) : []);
+    }, [activeSessionId, progressKey, profileKey, logsKey]);
+
+    // Persist data when it changes
+    useEffect(() => {
+        if (activeSessionId === 'global') return;
+        localStorage.setItem(progressKey, JSON.stringify(progress));
+    }, [progress, progressKey, activeSessionId]);
 
     useEffect(() => {
-        localStorage.setItem('ji_student_profile', JSON.stringify(studentProfile));
-    }, [studentProfile]);
+        if (activeSessionId === 'global') return;
+        localStorage.setItem(profileKey, JSON.stringify(studentProfile));
+    }, [studentProfile, profileKey, activeSessionId]);
 
-    // [RESTORED] Session Logs
-    const [sessionLogs, setSessionLogs] = useState(() => {
-        const saved = localStorage.getItem('ji_session_logs');
-        return saved ? JSON.parse(saved) : [];
-    });
-
-    // [RESTORED] Log Event
     const logEvent = useCallback((type, data) => {
         console.log(`[Mastery] ${type}`, data);
         setSessionLogs(prev => {
             const newLogs = [{ type, data, timestamp: Date.now() }, ...prev].slice(0, 100);
-            localStorage.setItem('ji_session_logs', JSON.stringify(newLogs));
+            localStorage.setItem(logsKey, JSON.stringify(newLogs));
             return newLogs;
         });
-    }, []);
+    }, [logsKey]);
 
     // [RESTORED] Get Node Status
     const getNodeStatus = useCallback((nodeId) => {

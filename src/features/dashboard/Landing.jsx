@@ -17,7 +17,7 @@ export default function Landing() {
   }, []);
 
   const handleStart = () => {
-    let targetId = session.trim();
+    let targetId = session.trim().toLowerCase();
     if (!targetId) {
       targetId = `demo_tower_${Math.floor(Math.random() * 1000)}`;
     }
@@ -28,7 +28,7 @@ export default function Landing() {
   };
 
   const resumeSession = () => {
-    if (lastSessionId) navigate(`/session/${encodeURIComponent(lastSessionId)}`);
+    if (lastSessionId) navigate(`/session/${encodeURIComponent(lastSessionId.toLowerCase())}`);
   };
 
   return (
