@@ -7,6 +7,7 @@
  * - JSON-structured responses for visual overlays
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { composeSystemPrompt } from './MindHivePlugins';
 
 // Gemini models (primary - best for vision)
 const GEMINI_MODELS = [
@@ -32,15 +33,16 @@ ALWAYS PROPEL FORWARD: Every response must end with a specific, actionable quest
 
 ## I. INPUT ANALYSIS LAYER (Reading the Student)
 
-### A. DIGITAL EMPATHY (Handwriting Forensics)
-You receive stroke metadata with each message. Use it:
+### A. DIGITAL EMPATHY (Handwriting Forensics V2.0)
+You receive stroke metadata and cognitive state with each message. Use them:
 
-* **input_method = "mouse"**: FORGIVE MESSINESS. Interpret jerky lines as hardware constraints, not confusion. Say: "That mouse drawing is tricky, but I see what you mean..."
-* **stroke_velocity = "erratic"**: DETECT FRUSTRATION. Stop the math. Address the emotion: "I see those quick, heavy strokes. Let's slow down."
-* **stroke_velocity = "hesitant"**: ENCOURAGE EXPLORATION: "Take your time. You're thinking carefully."
-* **eraser_usage = "high"**: PRAISE SELF-CORRECTION: "I saw you erase that. Good catch — you noticed something was off."
-* **avg_pause_duration > 10s**: HIGH COGNITIVE LOAD. Simplify immediately.
-* **frustration_detected = true**: EMOTIONAL RESET. "I can tell this is frustrating. That's normal. Let's try a different angle."
+* **[EMOTION_STATE: FRUSTRATED]**: EMOTIONAL RESET. Stop the math. "I can tell this is frustrating. That's normal. Let's try a different angle."
+* **[EMOTION_STATE: CONFUSED]**: CLARIFY. "I see you're unsure. Let me break this down differently."
+* **[EMOTION_STATE: STUCK]**: UNSTICK. "You've been thinking hard. Here's a nudge: start by..."
+* **[EMOTION_STATE: FLOW]**: CELEBRATE + CHALLENGE. "You're on fire! Here's a slightly harder one."
+* **[EMOTION_STATE: CONFIDENT]**: ADVANCE. "Great work. Let's level up."
+* **[EMOTION_STATE: EXPLORING]**: ENCOURAGE. "I see you're experimenting. Good instinct."
+* **[COGNITIVE_VECTOR]**: Use the composite score (0-1) to gauge intervention intensity. composite > 0.7 = heavy support, composite < 0.3 = light touch.
 
 ### B. CONTEXTUAL INTENT (The "Verbal Mirror")
 * **Never ask "Is that a 5?"** unless impossible to guess.
@@ -198,9 +200,36 @@ Every question they answer themselves creates a neural pathway that STAYS.
 Every answer you hand them is forgotten by tomorrow.`;
 
 const CONFIG = {
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: composeSystemPrompt({ ageGroup: 'high', enableLiveTutor: false }),
     temperature: 0.75,
 };
+
+// Response Cache (Phase 18.2)
+const responseCache = new Map();
+const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
+
+function getCacheKey(prompt, images) {
+    const imageHash = images.length > 0 ? images.length.toString() : 'no-img';
+    return `${prompt.substring(0, 100)}::${imageHash}`;
+}
+
+function getCachedResponse(key) {
+    const cached = responseCache.get(key);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        console.log('[MindHive] Cache HIT');
+        return cached.response;
+    }
+    return null;
+}
+
+function setCachedResponse(key, response) {
+    responseCache.set(key, { response, timestamp: Date.now() });
+    // Limit cache size
+    if (responseCache.size > 100) {
+        const oldestKey = responseCache.keys().next().value;
+        responseCache.delete(oldestKey);
+    }
+}
 
 class MindHiveService {
     constructor() {

@@ -1,17 +1,22 @@
 /**
- * useLiveObservation.js - "Watch Me Work" Mode
+ * useLiveObservation.js - V2.0 Adaptive "Watch Me Work" Mode
  * 
  * Provides "Live & Interactive" feeling by auto-observing the user's work.
- * - Listens to Tldraw store changes (strokes, deletions).
- * - Debounces activity (waits for a pause in thinking).
- * - Auto-triggers a scan to the AI context.
+ * 
+ * V2.0 Enhancements:
+ * - Adaptive debounce timing based on student pace
+ * - Delta-only region transmission
+ * - Smart silence (only intervene on error signals)
  */
 import { useEffect, useRef, useCallback } from 'react';
 import { captureWhiteboard } from '../utils/WhiteboardCapture';
+import { strokeAnalytics } from '../utils/StrokeAnalytics';
 
-// Config
-const DEBOUNCE_MS = 3500; // Wait 3.5s after last stroke before scanning
-const COOLDOWN_MS = 15000; // Don't auto-scan more than once every 15s
+// Config (V2.0: Now adaptive ranges)
+const BASE_DEBOUNCE_MS = 3500;
+const MIN_DEBOUNCE_MS = 2000;
+const MAX_DEBOUNCE_MS = 6000;
+const BASE_COOLDOWN_MS = 15000;
 
 export function useLiveObservation(editor, isEnabled) {
     const timeoutRef = useRef(null);
@@ -23,8 +28,15 @@ export function useLiveObservation(editor, isEnabled) {
 
         // COOLDOWN CHECK
         const now = Date.now();
-        if (now - lastScanTime.current < COOLDOWN_MS) {
+        if (now - lastScanTime.current < BASE_COOLDOWN_MS) {
             console.log('[LiveObserver] Cooldown active, skipping scan.');
+            return;
+        }
+        
+        // V2.0: Smart Silence - Check emotion state before intervening
+        const emotion = strokeAnalytics.getEmotionSpectrum();
+        if (emotion.primary === 'flow' && emotion.confidence > 70) {
+            console.log('[LiveObserver] Student in FLOW state, staying silent.');
             return;
         }
 
@@ -39,7 +51,9 @@ export function useLiveObservation(editor, isEnabled) {
                 window.dispatchEvent(new CustomEvent('ai-vision-upload', { 
                     detail: { 
                         image: imageData, 
-                        isAuto: true 
+                        isAuto: true,
+                        emotionState: emotion.primary,
+                        emotionConfidence: emotion.confidence
                     } 
                 }));
                 lastScanTime.current = Date.now();
@@ -50,6 +64,20 @@ export function useLiveObservation(editor, isEnabled) {
             isObserving.current = false;
         }
     }, [editor, isEnabled]);
+    
+    /**
+     * V2.0: Calculate adaptive debounce based on student baseline
+     */
+    const getAdaptiveDebounce = useCallback(() => {
+        const baseline = strokeAnalytics.baseline;
+        if (!baseline.avgPause) return BASE_DEBOUNCE_MS;
+        
+        // If student naturally pauses longer, give them more time
+        const adaptedMs = Math.min(MAX_DEBOUNCE_MS, 
+            Math.max(MIN_DEBOUNCE_MS, baseline.avgPause * 1000 * 1.5));
+        
+        return adaptedMs;
+    }, []);
 
     useEffect(() => {
         if (!editor || !isEnabled) return;
@@ -57,7 +85,6 @@ export function useLiveObservation(editor, isEnabled) {
         // Listen to all changes in the store
         const unsubscribe = editor.store.listen((entry) => {
             // Only care about drawing changes (shapes)
-            // entry.changes.added / updated / removed
             const hasShapeChanges = Object.keys(entry.changes.added).some(k => k.startsWith('shape:')) ||
                                     Object.keys(entry.changes.updated).some(k => k.startsWith('shape:')) ||
                                     Object.keys(entry.changes.removed).some(k => k.startsWith('shape:'));
@@ -66,8 +93,9 @@ export function useLiveObservation(editor, isEnabled) {
                 // Reset timer on every stroke
                 if (timeoutRef.current) clearTimeout(timeoutRef.current);
                 
-                // Set new timer
-                timeoutRef.current = setTimeout(triggerObservation, DEBOUNCE_MS);
+                // V2.0: Use adaptive debounce
+                const debounceMs = getAdaptiveDebounce();
+                timeoutRef.current = setTimeout(triggerObservation, debounceMs);
             }
         });
 
@@ -75,5 +103,5 @@ export function useLiveObservation(editor, isEnabled) {
              unsubscribe();
              if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [editor, isEnabled, triggerObservation]);
+    }, [editor, isEnabled, triggerObservation, getAdaptiveDebounce]);
 }

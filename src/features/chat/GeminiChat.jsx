@@ -8,7 +8,7 @@ import { useMastery } from '../../context/MasteryContext';
 import ScanningOverlay from '../../components/ScanningOverlay';
 import jiLogo from '../../assets/ji_logo.jpg';
 import { getWhiteboardEditor } from '../../utils/WhiteboardCapture';
-import { getSpatialSummary } from '../../utils/WhiteboardSpatialAwareness';
+import { getEnhancedSpatialSummary } from '../../utils/WhiteboardSpatialAwareness';
 
 // Patterns that suggest the student completed a whiteboard task
 const COMPLETION_PATTERNS = [
@@ -195,9 +195,9 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
             .filter(n => getNodeStatus(n.id) === 'unlocked')
             .map(n => n.title);
 
-        // 3. Spatial Context (Whiteboard Layout)
+        // 3. Spatial Context (Whiteboard Layout - V2.0 Enhanced)
         const editor = getWhiteboardEditor();
-        const spatialContext = getSpatialSummary(editor) || "Board state unknown.";
+        const spatialContext = getEnhancedSpatialSummary(editor) || "Board state unknown.";
 
         const fullContext = `${strokeContext}\n${masteryContext}\n${spatialContext}`;
         // console.log('[v3.0] Full Context:', fullContext);

@@ -1,5 +1,5 @@
 /**
- * StrokeAnalytics.js - Capture stroke metadata for AI context injection
+ * StrokeAnalytics.js - V2.0 Neuro-Behavioral Analysis Engine
  * 
  * Analyzes user's drawing behavior to detect:
  * - Input method (mouse vs touch vs stylus)
@@ -7,6 +7,12 @@
  * - Cognitive load (pause durations)
  * - Self-correction (eraser usage)
  * - Frustration signals
+ * - Spatial density (crowding behavior)
+ * 
+ * V2.0 Enhancements:
+ * - Multi-signal fusion → Cognitive State Vector
+ * - Expanded emotion spectrum (frustrated/confused/stuck/flow/confident)
+ * - Per-session adaptive baselines
  */
 
 class StrokeAnalytics {
@@ -18,6 +24,16 @@ class StrokeAnalytics {
         this.pauses = [];           // Pause durations between strokes
         this.sessionStart = Date.now();
         this.inputMethod = 'unknown';
+        
+        // V2.0: Adaptive baselines (tracks session averages)
+        this.baseline = {
+            avgVelocity: null,
+            avgPause: null,
+            strokeCount: 0
+        };
+        
+        // V2.0: Spatial density tracking
+        this.recentPositions = [];
 
         // Attach listeners
         this.attachListeners();
@@ -156,23 +172,101 @@ class StrokeAnalytics {
     }
 
     /**
-     * Detect frustration signals
+     * Detect frustration signals (legacy - kept for compatibility)
      */
     detectFrustration() {
-        const velocity = this.getVelocityPattern();
+        return this.getEmotionSpectrum().primary === 'frustrated';
+    }
+
+    /**
+     * V2.0: Multi-Signal Cognitive State Vector
+     * Combines velocity, pauses, erasures, and spatial density into a normalized vector.
+     */
+    getCognitiveStateVector() {
+        const velocityPattern = this.getVelocityPattern();
+        const avgPause = parseFloat(this.getAvgPauseDuration());
         const eraserUsage = this.getEraserUsage();
+        const spatialDensity = this.getSpatialDensity();
+        
+        // Normalize to 0-1 scale
+        const velocityScore = { erratic: 1.0, hesitant: 0.7, moderate: 0.4, smooth: 0.2, none: 0 }[velocityPattern] || 0.5;
+        const pauseScore = Math.min(1, avgPause / 15); // 15s = max cognitive load
+        const eraserScore = { high: 1.0, moderate: 0.6, low: 0.3, none: 0 }[eraserUsage] || 0;
+        const densityScore = Math.min(1, spatialDensity / 10); // 10+ strokes in small area = crowded
+        
+        return {
+            velocity: velocityScore,
+            pause: pauseScore,
+            eraser: eraserScore,
+            density: densityScore,
+            composite: (velocityScore * 0.3 + pauseScore * 0.3 + eraserScore * 0.25 + densityScore * 0.15)
+        };
+    }
 
-        // High eraser + erratic = frustrated
-        if (velocity === 'erratic' && eraserUsage === 'high') return true;
+    /**
+     * V2.0: Spatial Density (crowding behavior)
+     * Measures how concentrated recent strokes are in one area.
+     */
+    getSpatialDensity() {
+        if (this.recentPositions.length < 3) return 0;
+        
+        const last10 = this.recentPositions.slice(-10);
+        const avgX = last10.reduce((s, p) => s + p.x, 0) / last10.length;
+        const avgY = last10.reduce((s, p) => s + p.y, 0) / last10.length;
+        
+        // Calculate average deviation from centroid
+        const avgDeviation = last10.reduce((s, p) => {
+            return s + Math.sqrt(Math.pow(p.x - avgX, 2) + Math.pow(p.y - avgY, 2));
+        }, 0) / last10.length;
+        
+        // Low deviation = high density (crowded)
+        return avgDeviation < 100 ? 10 : avgDeviation < 200 ? 5 : 2;
+    }
 
-        // Quick repeated strokes
-        const recentPauses = this.pauses.slice(-5);
-        if (recentPauses.length >= 3) {
-            const avgRecent = recentPauses.reduce((a, b) => a + b, 0) / recentPauses.length;
-            if (avgRecent < 1.0) return true; // Very rapid strokes
+    /**
+     * V2.0: Expanded Emotion Spectrum
+     * Returns primary emotion + confidence level.
+     */
+    getEmotionSpectrum() {
+        const csv = this.getCognitiveStateVector();
+        const timeOnScreen = this.getTimeOnScreen();
+        
+        // Decision logic based on composite score and individual signals
+        let primary = 'neutral';
+        let confidence = 0.5;
+        
+        // FRUSTRATED: High eraser + erratic velocity
+        if (csv.eraser > 0.7 && csv.velocity > 0.8) {
+            primary = 'frustrated';
+            confidence = Math.min(1, (csv.eraser + csv.velocity) / 2);
         }
-
-        return false;
+        // CONFUSED: High pauses + moderate erasures
+        else if (csv.pause > 0.6 && csv.eraser > 0.3) {
+            primary = 'confused';
+            confidence = csv.pause;
+        }
+        // STUCK: Very high pauses, low activity
+        else if (csv.pause > 0.8 && this.strokes.length < 5 && timeOnScreen > 60) {
+            primary = 'stuck';
+            confidence = 0.9;
+        }
+        // FLOW: Smooth velocity, low pauses, active
+        else if (csv.velocity < 0.3 && csv.pause < 0.3 && this.strokes.length > 10) {
+            primary = 'flow';
+            confidence = 1 - csv.composite;
+        }
+        // CONFIDENT: Moderate speed, minimal corrections
+        else if (csv.velocity < 0.5 && csv.eraser < 0.2 && this.strokes.length > 5) {
+            primary = 'confident';
+            confidence = 1 - csv.eraser;
+        }
+        // EXPLORING: High density (focused on one area)
+        else if (csv.density > 0.7) {
+            primary = 'exploring';
+            confidence = csv.density;
+        }
+        
+        return { primary, confidence: Math.round(confidence * 100) };
     }
 
     /**
@@ -198,11 +292,16 @@ class StrokeAnalytics {
     }
 
     /**
-     * Get formatted string for system prompt injection
+     * Get formatted string for system prompt injection (V2.0 Enhanced)
      */
     getContextString() {
         const meta = this.getMetadata();
-        return `[SYSTEM_DATA: Input=${meta.input_method}, Velocity=${meta.stroke_velocity}, Pauses=${meta.avg_pause_duration}, Erasures=${meta.eraser_usage}, TimeOnScreen=${meta.time_on_screen}, Frustrated=${meta.frustration_detected}]`;
+        const emotion = this.getEmotionSpectrum();
+        const csv = this.getCognitiveStateVector();
+        
+        return `[SYSTEM_DATA: Input=${meta.input_method}, Velocity=${meta.stroke_velocity}, Pauses=${meta.avg_pause_duration}, Erasures=${meta.eraser_usage}, TimeOnScreen=${meta.time_on_screen}]
+[EMOTION_STATE: ${emotion.primary.toUpperCase()} (${emotion.confidence}% confidence)]
+[COGNITIVE_VECTOR: velocity=${csv.velocity.toFixed(2)}, pause=${csv.pause.toFixed(2)}, eraser=${csv.eraser.toFixed(2)}, density=${csv.density.toFixed(2)}, composite=${csv.composite.toFixed(2)}]`;
     }
 
     /**
@@ -214,6 +313,34 @@ class StrokeAnalytics {
         this.pauses = [];
         this.sessionStart = Date.now();
         this.lastStrokeEnd = null;
+        this.recentPositions = [];
+        // Keep baseline for adaptive thresholds
+    }
+    
+    /**
+     * V2.0: Update adaptive baseline
+     */
+    updateBaseline() {
+        if (this.strokes.length === 0) return;
+        
+        const allVelocities = this.strokes.flatMap(s => s.velocities);
+        const avgVel = allVelocities.length > 0 
+            ? allVelocities.reduce((a, b) => a + b, 0) / allVelocities.length 
+            : 0;
+        
+        const avgPause = this.pauses.length > 0
+            ? this.pauses.reduce((a, b) => a + b, 0) / this.pauses.length
+            : 0;
+        
+        // Exponential moving average for smoother adaptation
+        const alpha = 0.3;
+        this.baseline.avgVelocity = this.baseline.avgVelocity === null 
+            ? avgVel 
+            : this.baseline.avgVelocity * (1 - alpha) + avgVel * alpha;
+        this.baseline.avgPause = this.baseline.avgPause === null
+            ? avgPause
+            : this.baseline.avgPause * (1 - alpha) + avgPause * alpha;
+        this.baseline.strokeCount += this.strokes.length;
     }
 }
 
