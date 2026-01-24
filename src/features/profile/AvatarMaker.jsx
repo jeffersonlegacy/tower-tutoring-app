@@ -2,30 +2,60 @@ import React, { useState } from 'react';
 import AvatarCanvas from './AvatarCanvas';
 import { useMastery } from '../../context/MasteryContext';
 
+// V5.0: Expanded Cosmetic Options (Phase 18.6)
 const OPTIONS = {
-    skin: ['#EDB98A', '#F1C27D', '#FFDBAC', '#E0AC69', '#8D5524'],
-    hair: ['#4A312C', '#2C1B18', '#7B5E57', '#DEBC99', '#B8977E', '#6A4E42'],
-    clothes: ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#6366F1'],
-    background: ['#1E293B', '#0F172A', '#111827', '#1E1B4B', '#020617'],
+    skin: ['#EDB98A', '#F1C27D', '#FFDBAC', '#E0AC69', '#8D5524', '#C68642', '#503335'],
+    hair: [
+        '#4A312C', '#2C1B18', '#7B5E57', '#DEBC99', '#B8977E', '#6A4E42',
+        '#E74C3C', '#9B59B6', '#3498DB', '#27AE60', '#F1C40F', '#E67E22' // Fantasy colors
+    ],
+    clothes: [
+        '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#6366F1',
+        '#14B8A6', '#F97316', '#84CC16', '#06B6D4', '#D946EF' // More variety
+    ],
+    background: ['#1E293B', '#0F172A', '#111827', '#1E1B4B', '#020617', '#0C4A6E', '#4C1D95', '#831843'],
     top: [
         { id: 'shortHair', label: 'Short Hair', xp: 0 },
         { id: 'longHair', label: 'Long Hair', xp: 50 },
-        { id: 'bald', label: 'Bald', xp: 0 }
+        { id: 'bald', label: 'Bald', xp: 0 },
+        { id: 'curly', label: 'Curly', xp: 100 },
+        { id: 'spiky', label: 'Spiky', xp: 150 },
+        { id: 'ponytail', label: 'Ponytail', xp: 200 },
+        { id: 'mohawk', label: 'Mohawk', xp: 500, rarity: 'rare' },
+        { id: 'afro', label: 'Afro', xp: 300 },
     ],
     eyes: [
         { id: 'default', label: 'Default', xp: 0 },
         { id: 'happy', label: 'Happy', xp: 100 },
-        { id: 'wink', label: 'Wink', xp: 200 }
+        { id: 'wink', label: 'Wink', xp: 200 },
+        { id: 'star', label: 'Star Eyes', xp: 400, rarity: 'rare' },
+        { id: 'heart', label: 'Heart Eyes', xp: 600, rarity: 'epic' },
+        { id: 'cool', label: 'Cool', xp: 150 },
     ],
     mouth: [
         { id: 'smile', label: 'Smile', xp: 0 },
-        { id: 'default', label: 'Serious', xp: 0 }
+        { id: 'default', label: 'Serious', xp: 0 },
+        { id: 'grin', label: 'Big Grin', xp: 50 },
+        { id: 'openSmile', label: 'Open Smile', xp: 75 },
     ],
     accessories: [
         { id: 'none', label: 'None', xp: 0 },
         { id: 'glasses', label: 'Glasses', xp: 300 },
-        { id: 'crown', label: 'Crown', xp: 1000 }
+        { id: 'sunglasses', label: 'Sunglasses', xp: 400, rarity: 'rare' },
+        { id: 'monocle', label: 'Monocle', xp: 700, rarity: 'epic' },
+        { id: 'crown', label: 'Crown', xp: 1000, rarity: 'legendary' },
+        { id: 'halo', label: 'Halo', xp: 1500, rarity: 'legendary' },
+        { id: 'headphones', label: 'Headphones', xp: 250 },
+        { id: 'hat', label: 'Beanie', xp: 350 },
     ]
+};
+
+// Rarity color mappings
+const RARITY_COLORS = {
+    common: 'border-slate-500',
+    rare: 'border-blue-500 shadow-blue-500/30',
+    epic: 'border-purple-500 shadow-purple-500/30',
+    legendary: 'border-amber-400 shadow-amber-400/40'
 };
 
 export default function AvatarMaker({ onSave, initialConfig }) {

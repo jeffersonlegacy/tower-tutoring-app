@@ -8,6 +8,43 @@ import { useHomeworkUpload } from '../../hooks/useHomeworkUpload';
 import { useWhiteboardActions } from '../../hooks/useWhiteboardActions';
 import { useLiveObservation } from '../../hooks/useLiveObservation';
 
+// V5.0: Smart Image Compression (Phase 18.5)
+const MAX_IMAGE_SIZE = 1024 * 1024; // 1MB
+const COMPRESSION_QUALITY = 0.7;
+
+async function compressImage(file) {
+    if (file.size <= MAX_IMAGE_SIZE) return file;
+    
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const maxDim = 1600;
+                let { width, height } = img;
+                
+                if (width > maxDim || height > maxDim) {
+                    const ratio = Math.min(maxDim / width, maxDim / height);
+                    width *= ratio;
+                    height *= ratio;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                canvas.toBlob((blob) => {
+                    resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+                }, 'image/jpeg', COMPRESSION_QUALITY);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
 const Whiteboard = memo(({ sessionId }) => {
   const [editor, setEditor] = useState(null);
   const [isReady, setIsReady] = useState(false);
@@ -15,6 +52,7 @@ const Whiteboard = memo(({ sessionId }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showUploadToast, setShowUploadToast] = useState(false);
   const [isLiveMode, setIsLiveMode] = useState(false);
+  const [uploadQueue, setUploadQueue] = useState([]); // V5.0: Multi-page queue
 
   // Hook for uploading to homework tray
   const { uploadFile } = useHomeworkUpload(sessionId);
