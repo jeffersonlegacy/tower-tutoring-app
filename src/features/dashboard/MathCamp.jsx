@@ -4,6 +4,7 @@ import { useMastery } from '../../context/MasteryContext';
 import { ACHIEVEMENTS } from '../games/mathMind/adaptiveEngine'; 
 import { getSkillList } from '../games/offsetOperator/educationEngine'; // [NEW] To read EE progress
 import AchievementToast from '../../components/AchievementToast';
+import AvatarCanvas from '../profile/AvatarCanvas';
 
 // Mapping of Game Name to Route and Asset
 const GAME_METADATA = {
@@ -75,14 +76,16 @@ export default function MathCamp() {
                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                         {/* PROFILE CARD */}
                         <div className="flex items-center gap-4 bg-slate-900/80 p-4 rounded-2xl border border-white/10 backdrop-blur-md shadow-2xl w-full md:w-auto">
-                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 p-0.5 shadow-[0_0_20px_rgba(6,182,212,0.5)]">
-                                <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-3xl">
-                                    🧑‍🚀
-                                </div>
+                            <div className="w-16 h-16 rounded-full bg-slate-900 border-2 border-white/10 shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center justify-center overflow-hidden">
+                                {studentProfile.avatarConfig ? (
+                                    <AvatarCanvas config={studentProfile.avatarConfig} size={64} />
+                                ) : (
+                                    <span className="text-3xl">🧑‍🚀</span>
+                                )}
                             </div>
                             <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                    <h2 className="text-xl font-bold text-white">Mathtelligence</h2>
+                                    <h2 className="text-xl font-bold text-white uppercase tracking-tight">{window.location.pathname.split('/').pop() || 'Student'}</h2>
                                     <span className="bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Lvl {studentProfile.level}</span>
                                 </div>
                                 <div className="mt-2 w-48 h-2 bg-slate-800 rounded-full overflow-hidden">

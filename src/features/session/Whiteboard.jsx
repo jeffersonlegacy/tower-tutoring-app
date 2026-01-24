@@ -83,6 +83,21 @@ const Whiteboard = memo(({ sessionId }) => {
         // Show toast notification
         setShowUploadToast(true);
         setTimeout(() => setShowUploadToast(false), 4000);
+        
+        // ZERO-FRICTION INGESTION (Phase 17.3)
+        // Convert file to base64 and send directly to AI for instant analysis
+        const reader = new FileReader();
+        reader.onload = (readerEvent) => {
+          const base64 = readerEvent.target.result;
+          window.dispatchEvent(new CustomEvent('ai-vision-upload', {
+            detail: {
+              image: base64,
+              isAuto: false,
+              context: "User just snapped a photo of their homework. Analyze and guide them."
+            }
+          }));
+        };
+        reader.readAsDataURL(file);
       }
     } catch (err) {
       console.error('Snap upload failed:', err);

@@ -7,6 +7,8 @@ import { strokeAnalytics } from '../../utils/StrokeAnalytics';
 import { useMastery } from '../../context/MasteryContext';
 import ScanningOverlay from '../../components/ScanningOverlay';
 import jiLogo from '../../assets/ji_logo.jpg';
+import { getWhiteboardEditor } from '../../utils/WhiteboardCapture';
+import { getSpatialSummary } from '../../utils/WhiteboardSpatialAwareness';
 
 // Patterns that suggest the student completed a whiteboard task
 const COMPLETION_PATTERNS = [
@@ -193,15 +195,11 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
             .filter(n => getNodeStatus(n.id) === 'unlocked')
             .map(n => n.title);
 
-        const masteryContext = `
-[SYSTEM_DATA: STUDENT_MASTERY]
-Mastered Skills: ${masteredNodes.join(', ') || 'None'}
-Unlocked/Available: ${unlockedNodes.join(', ') || 'Intro'}
-Current Focus: ${currentNode ? `${currentNode.title} (Status: ${getNodeStatus(currentNode.id)})` : 'General Chat'}
-Associated Game: ${currentNode?.associatedGame || 'None'}
-`;
+        // 3. Spatial Context (Whiteboard Layout)
+        const editor = getWhiteboardEditor();
+        const spatialContext = getSpatialSummary(editor) || "Board state unknown.";
 
-        const fullContext = `${strokeContext}\n${masteryContext}`;
+        const fullContext = `${strokeContext}\n${masteryContext}\n${spatialContext}`;
         // console.log('[v3.0] Full Context:', fullContext);
 
         // AUTO-CAPTURE LOGIC

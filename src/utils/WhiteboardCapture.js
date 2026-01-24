@@ -17,6 +17,10 @@ export function setWhiteboardEditor(editor) {
     console.log('[WhiteboardCapture] Editor reference set');
 }
 
+export function getWhiteboardEditor() {
+    return globalEditor;
+}
+
 /**
  * Capture the whiteboard as a base64 PNG data URL
  * Uses multiple strategies for reliability

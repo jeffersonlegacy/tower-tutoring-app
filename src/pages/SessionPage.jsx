@@ -11,6 +11,7 @@ const BrainBreak = lazy(() => import("../features/games/BrainBreak"));
 const GeminiChat = lazy(() => import("../features/chat/GeminiChat"));
 const MathTools = lazy(() => import("../features/tools/MathTools"));
 const MathMind = lazy(() => import("../features/games/MathMind"));
+const ProfileDashboard = lazy(() => import("../features/profile/ProfileDashboard"));
 
 const ComponentLoader = () => (
     <div className="flex items-center justify-center h-full bg-slate-900/50">
@@ -28,7 +29,7 @@ export default function Session() {
     // Video Float State (Phase 14.2)
     const [isVideoFloating, setIsVideoFloating] = useState(false);
 
-    // Sidebar Mode: 'homework' | 'mathcamp' | 'ai' | 'arcade' | 'tools'
+    // Sidebar Mode: 'homework' | 'mathcamp' | 'ai' | 'arcade' | 'tools' | 'profile'
     const [sidebarMode, setSidebarMode] = useState('homework');
 
     // Main Tab Mode (Mobile Only): 'board' | 'sidebar'
@@ -153,19 +154,23 @@ export default function Session() {
                 </div>
             )}
 
-            {/* GLOBAL VIDEO OVERLAY (Phase 14.2) */}
-            {isVideoFloating && (
-                <div className="absolute top-4 right-4 z-[60] w-[280px] h-[200px] rounded-2xl overflow-hidden shadow-2xl border-2 border-slate-700/50 bg-black animate-in fade-in zoom-in-95 duration-300">
-                     <Suspense fallback={<ComponentLoader />}>
-                        <VideoChat 
-                            sessionId={sessionId} 
-                            onTogglePiP={() => setIsVideoFloating(false)} 
-                            isFloating={true}
-                        />
-                    </Suspense>
-                    {/* Handlers for dragging could go here later */}
-                </div>
-            )}
+            {/* GLOBAL STAPLE VIDEO (Phase 17.1) */}
+            {/* We render this ONCE and toggle its visibility/positioning via CSS to prevent iframe reloads */}
+            <div 
+                className={`fixed z-[60] transition-all duration-500 ease-in-out bg-black border-2 border-slate-700/50 shadow-2xl overflow-hidden rounded-2xl
+                    ${isVideoFloating 
+                        ? 'top-4 right-4 w-[280px] h-[200px] opacity-100' 
+                        : 'hidden md:block md:static md:w-full md:h-[320px] md:opacity-100 md:rounded-none md:border-0 md:border-b md:border-slate-700'
+                    }`}
+            >
+                <Suspense fallback={<ComponentLoader />}>
+                    <VideoChat 
+                        sessionId={sessionId} 
+                        onTogglePiP={() => setIsVideoFloating(!isVideoFloating)} 
+                        isFloating={isVideoFloating}
+                    />
+                </Suspense>
+            </div>
 
             {/* Main Content Area */}
             <div className="flex flex-1 flex-col md:flex-row overflow-hidden relative">
@@ -173,18 +178,9 @@ export default function Session() {
                 {/* Sidebar (Video + Tools) */}
                 <div className={`flex-none w-full md:w-[300px] lg:w-[350px] border-b md:border-b-0 md:border-r border-slate-700 bg-black flex flex-col relative z-20 shrink-0 h-full ${mainTab === 'sidebar' ? 'flex' : 'hidden md:flex'}`}>
 
-                    {/* Top: Video (Adaptive Height) - DOCKED MODE */}
-                    {!isVideoFloating && (
-                        <div className="h-[220px] md:h-[320px] shrink-0 border-b border-slate-700 bg-slate-900/50">
-                            <Suspense fallback={<ComponentLoader />}>
-                                <VideoChat 
-                                    sessionId={sessionId} 
-                                    onTogglePiP={() => setIsVideoFloating(true)} 
-                                    isFloating={false}
-                                />
-                            </Suspense>
-                        </div>
-                    )}
+                    {/* TOP VIDEO AREA (MOVED TO GLOBAL STITCHING) */}
+                    {/* Note: In V4.0, the video is rendered globally above to ensure persistence. 
+                        We keep this space as a placeholder if needed or let the global div occupy this slot. */}
 
                     {/* Sidebar Tabs (Local) */}
                     <div className="flex items-center bg-slate-900 border-b border-slate-700 shrink-0">
@@ -218,6 +214,12 @@ export default function Session() {
                         >
                             Tools
                         </button>
+                        <button
+                            onClick={() => setSidebarMode('profile')}
+                            className={`flex-1 p-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${sidebarMode === 'profile' ? 'text-white bg-slate-800 border-b-2 border-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
+                        >
+                            Profile
+                        </button>
                     </div>
 
                     {/* End Session Button */}
@@ -247,6 +249,9 @@ export default function Session() {
                             )}
                             {sidebarMode === 'tools' && (
                                 <MathTools />
+                            )}
+                            {sidebarMode === 'profile' && (
+                                <ProfileDashboard />
                             )}
                         </Suspense>
                     </div>

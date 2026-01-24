@@ -33,8 +33,17 @@ export const MasteryProvider = ({ children }) => {
     // Progress shape: { [nodeId]: { status: 'locked' | 'unlocked' | 'completed', lastScore: 0 } }
     const [progress, setProgress] = useState({});
 
-    // Profile shape: { xp: 0, level: 1, streak: 0, lastActive: 'ISO-DATE', currency: 0, missions: [], unlockedAchievements: [] }
-    const [studentProfile, setStudentProfile] = useState({ xp: 0, level: 1, streak: 0, lastActive: null, currency: 0, missions: [], unlockedAchievements: [] });
+    // Profile shape: { xp: 0, level: 1, streak: 0, lastActive: 'ISO-DATE', currency: 0, missions: [], unlockedAchievements: [], avatarConfig: null }
+    const [studentProfile, setStudentProfile] = useState({ 
+        xp: 0, 
+        level: 1, 
+        streak: 0, 
+        lastActive: null, 
+        currency: 0, 
+        missions: [], 
+        unlockedAchievements: [],
+        avatarConfig: null 
+    });
 
     const [sessionLogs, setSessionLogs] = useState([]);
 
@@ -197,6 +206,7 @@ export const MasteryProvider = ({ children }) => {
         unlockAchievement,
         getNodeStatus,
         completeNode,
+        setAvatarConfig,
         logEvent,
         resetProgress,
         curriculum: CURRICULUM_DATA
