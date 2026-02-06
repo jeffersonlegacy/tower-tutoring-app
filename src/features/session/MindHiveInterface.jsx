@@ -1,4 +1,4 @@
-import React, { useState, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { getMindHive } from '../../services/MindHiveService';
 import { useMastery } from '../../context/MasteryContext';
 
