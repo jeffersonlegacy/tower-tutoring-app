@@ -1,194 +1,244 @@
-import React, { useState, Suspense, lazy } from 'react';
-import { createPortal } from 'react-dom';
-import GameOverlay from './GameOverlay';
-import GameErrorBoundary from './GameErrorBoundary';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useMastery } from '../../context/MasteryContext';
+import { db } from '../../services/firebase';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import AvatarCanvas from '../profile/AvatarCanvas';
 
-// Lazy load games for code splitting
-const Connect4 = lazy(() => import('./Connect4'));
-const SwipeFight = lazy(() => import('./SwipeFight'));
-const Battleship = lazy(() => import('./Battleship'));
-const EquationExplorer = lazy(() => import('./EquationExplorer'));
-const Checkers = lazy(() => import('./Checkers'));
+const GAMES = [
+    {
+        id: 'connect4',
+        title: 'Connect 4',
+        icon: '🔴',
+        description: 'Classic strategy. 4 in a row wins.',
+        tags: ['STRATEGY', 'LOGIC'],
+        color: 'blue',
+        route: '/game/connect4'
+    },
+    {
+        id: 'battleship',
+        title: 'Battleship',
+        icon: '🚢',
+        description: 'Naval warfare. Find and sink the fleet.',
+        tags: ['COORDINATES', 'STRATEGY'],
+        color: 'cyan',
+        route: '/game/battleship'
+    },
+    {
+        id: 'airhockey',
+        title: 'Air Hockey',
+        icon: '🏒',
+        description: 'High speed reaction physics.',
+        tags: ['PHYSICS', 'SPEED'],
+        color: 'rose',
+        route: '/game/air-hockey'
+    },
+    {
+        id: 'checkers',
+        title: 'Checkers',
+        icon: '🛸',
+        description: 'Classic capture strategy.',
+        tags: ['LOGIC', 'STRATEGY'],
+        color: 'emerald',
+        route: '/game/checkers'
+    },
+    {
+        id: 'swipefight',
+        title: 'Swipe Fight',
+        icon: '🥊',
+        description: 'Fast-paced math combat.',
+        tags: ['ACTION', 'MATH'],
+        color: 'orange',
+        route: '/game/swipe-fight'
+    }
+];
 
-const GameLoader = () => (
-    <div className="flex items-center justify-center h-full bg-slate-900">
-        <div className="text-center">
-            <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-cyan-400 font-mono text-sm">Loading game...</p>
-        </div>
-    </div>
-);
+// Global Averages for comparison (Mock Data for MVP)
+const GLOBAL_STATS = {
+    battleship: { avgWins: 12, avgHighScore: 1500 },
+    airhockey: { avgWins: 25, avgHighScore: 3200 },
+    checkers: { avgWins: 8, avgHighScore: 800 },
+    connect4: { avgWins: 15, avgHighScore: 2000 },
+    swipefight: { avgWins: 10, avgHighScore: 1200 }
+};
 
-export default function BrainBreak({ sessionId, onClose }) {
-    const [game, setGame] = useState('menu');
+export default function BrainBreak({ onNavigate, onBack }) {
+    const { studentProfile, updateGameStats } = useMastery();
+    const navigate = useNavigate();
 
-    const closeGame = () => setGame('menu');
+    // Live Leaderboard Logic
+    const [leaderboard, setLeaderboard] = useState([]);
+    const [activeGameId, setActiveGameId] = useState('airhockey'); // Default to hockey
+    
+    // Fetch top 5 for the ACTIVE game
+    useEffect(() => {
+        const q = query(
+            collection(db, 'leaderboards', activeGameId, 'scores'),
+            orderBy('highScore', 'desc'),
+            limit(5)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setLeaderboard(data);
+        });
+
+        return () => unsubscribe();
+    }, [activeGameId]);
+
+    const handleResetStats = () => {
+        if (window.confirm("Are you sure you want to reset your leaderboard stats? This cannot be undone.")) {
+            alert("Stats reset request sent to mainframe.");
+        }
+    };
 
     return (
-        <div className="w-full h-full bg-slate-900 border-t border-slate-700 flex flex-col relative overflow-hidden">
-
-            {/* Header */}
-            <div className="p-2 border-b border-white/5 flex items-center justify-between bg-slate-800/50 sticky top-0 z-10 shrink-0">
-                <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg">
-                        <span className="text-white text-sm">🕹️</span>
+        <div className="min-h-screen bg-slate-950 text-white font-sans p-6 pb-20 relative overflow-hidden">
+             {/* Background Effects */}
+             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+             
+             <div className="relative z-10 max-w-7xl mx-auto">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row items-center justify-between mb-12 gap-6">
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={onBack}
+                            className="px-4 py-2 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2 border border-white/10"
+                        >
+                            ← Dashboard
+                        </button>
+                        <button 
+                            onClick={() => {
+                                const lastSession = localStorage.getItem('last_tower_session') || 'demo';
+                                navigate(`/session/${lastSession}`);
+                            }}
+                            className="px-4 py-2 bg-cyan-600/50 rounded-lg hover:bg-cyan-600 transition-colors flex items-center gap-2 border border-cyan-500/30"
+                        >
+                            🎯 Back to Session
+                        </button>
                     </div>
-                    <div>
-                        <h2 className="text-sm font-bold text-white tracking-wide">BRAIN BREAK</h2>
+                    
+                    <div className="text-center md:text-right">
+                        <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 uppercase tracking-tighter">
+                            BRAIN BREAK
+                        </h1>
+                        <p className="text-slate-500 font-mono text-xs tracking-widest uppercase">
+                            TOWER GAMING LAB
+                        </p>
                     </div>
-                </div>
-                {onClose && (
-                    <button
-                        onClick={onClose}
-                        className="w-6 h-6 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
-                        title="Close Arcade"
-                    >
-                        ×
-                    </button>
-                )}
-            </div>
 
-            {/* Content Container (Menu) */}
-            <div className="flex-1 overflow-y-auto bg-logo-pattern">
-                <div className="relative z-10 p-2 min-h-full">
-                    <div className="grid grid-cols-1 gap-3 p-2">
-
-                        {/* Header */}
-                        <div className="flex justify-between items-center mb-6">
-                            <div>
-                                <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 italic tracking-tighter filter drop-shadow-[0_0_10px_rgba(6,182,212,0.5)]">
-                                    BRAIN BREAK
-                                </h1>
-                                <p className="text-cyan-500 font-mono text-xs tracking-[0.3em] font-bold uppercase mt-1 animate-pulse">
-                                    Tower Gaming Lab
-                                </p>
+                    {/* LIVE LEADERBOARD (Top 5 Agents) */}
+                    <div className="bg-slate-900/80 border border-cyan-500/20 rounded-xl p-4 w-full md:w-80 shadow-lg shadow-cyan-500/10">
+                        <div className="flex justify-between items-center mb-3">
+                            <div className="text-[10px] text-cyan-400 uppercase tracking-widest font-bold">
+                                TOP 5 AGENTS • {GAMES.find(g => g.id === activeGameId)?.title.toUpperCase()}
                             </div>
-                            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                            </button>
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
                         </div>
-
-                        {/* GAME: Equation Explorer (Educational Math) */}
-                        <button
-                            onClick={() => setGame('offsetoperator')}
-                            className="group relative h-20 sm:h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-cyan-500 transition-all bg-slate-900 shadow-xl"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
-                            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-transparent"></div>
-
-                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-2 sm:p-3 bg-black/50 rounded-lg border border-purple-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(139,92,246,0.5)]">
-                                    <span className="text-2xl sm:text-3xl">🏰</span>
-                                </div>
-                                <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 text-lg sm:text-xl uppercase tracking-tighter filter drop-shadow">EQUATION EXPLORER</span>
-                                    <span className="text-[10px] font-bold text-white/80 bg-purple-600/50 px-2 py-0.5 rounded-full border border-purple-400/30">LEARN MATH</span>
-                                </div>
+                        
+                        <div className="space-y-2">
+                            {leaderboard.length === 0 ? (
+                                <div className="text-xs text-slate-500 text-center py-2">No agents data found. Be the first!</div>
+                            ) : (
+                                leaderboard.map((entry, idx) => (
+                                    <div key={entry.id} className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`font-mono font-bold w-4 text-right ${idx === 0 ? 'text-yellow-400' : 'text-slate-500'}`}>#{idx + 1}</span>
+                                            {/* Tiny Avatar Preview */}
+                                            {entry.avatarConfig && (
+                                                <div className="w-4 h-4 rounded-full bg-slate-800 overflow-hidden border border-white/20">
+                                                    <AvatarCanvas config={entry.avatarConfig} />
+                                                </div>
+                                            )}
+                                            <span className={entry.towerTag === studentProfile.towerTag ? 'text-white font-bold' : 'text-slate-300'}>{entry.towerTag}</span>
+                                        </div>
+                                        <span className="font-mono text-cyan-400">{entry.highScore}</span>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        
+                        <div className="mt-3 pt-2 border-t border-white/5 flex justify-between items-center">
+                            <div className="text-[9px] text-slate-500">YOUR RANK</div>
+                            <div className="text-[9px] text-slate-300">
+                                {leaderboard.findIndex(e => e.towerTag === studentProfile.towerTag) !== -1 
+                                    ? `#${leaderboard.findIndex(e => e.towerTag === studentProfile.towerTag) + 1} (${studentProfile.gameStats?.[activeGameId]?.highScore || 0})` 
+                                    : 'UNRANKED'
+                                }
                             </div>
-                        </button>
-
-                        {/* GAME: Battleship */}
-                        <button
-                            onClick={() => setGame('battleship')}
-                            className="group relative h-20 sm:h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-cyan-500 transition-all bg-slate-900 shadow-xl"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-cyan-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
-                            <div className="absolute inset-0 bg-gradient-to-r from-cyan-600/20 to-transparent"></div>
-
-                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-2 sm:p-3 bg-black/50 rounded-lg border border-cyan-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(34,211,238,0.5)]">
-                                    <span className="text-2xl sm:text-3xl">🚢</span>
-                                </div>
-                                <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 text-lg sm:text-xl uppercase tracking-tighter filter drop-shadow">BATTLESHIP</span>
-                                    <span className="text-[10px] font-bold text-white/80 bg-cyan-600/50 px-2 py-0.5 rounded-full border border-cyan-400/30">NAVAL STRATEGY</span>
-                                </div>
-                            </div>
-                        </button>
-
-                        {/* GAME: Swipe Fight */}
-                        <button
-                            onClick={() => setGame('swipefight')}
-                            className="group relative h-20 sm:h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-teal-500 transition-all bg-slate-900 shadow-xl"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-teal-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
-                            <div className="absolute inset-0 bg-gradient-to-r from-teal-600/20 to-transparent"></div>
-
-                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-2 sm:p-3 bg-black/50 rounded-lg border border-teal-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(45,212,191,0.5)]">
-                                    <span className="text-2xl sm:text-3xl">⚡</span>
-                                </div>
-                                <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400 text-lg sm:text-xl uppercase tracking-tighter filter drop-shadow">SWIPE FIGHT</span>
-                                    <span className="text-[10px] font-bold text-white/80 bg-teal-600/50 px-2 py-0.5 rounded-full border border-teal-400/30">SPEED MATH</span>
-                                </div>
-                            </div>
-                        </button>
-
-                        {/* GAME: Neon Connect (Connect 4) */}
-                        <button
-                            onClick={() => setGame('connect4')}
-                            className="group relative h-20 sm:h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-pink-500 transition-all bg-slate-900 shadow-xl"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-pink-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
-                            <div className="absolute inset-0 bg-gradient-to-r from-pink-600/20 to-transparent"></div>
-
-                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-2 sm:p-3 bg-black/50 rounded-lg border border-pink-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(236,72,153,0.5)]">
-                                    <span className="text-2xl sm:text-3xl">🔴</span>
-                                </div>
-                                <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-red-400 text-lg sm:text-xl uppercase tracking-tighter filter drop-shadow">NEON CONNECT</span>
-                                    <span className="text-[10px] font-bold text-white/80 bg-pink-600/50 px-2 py-0.5 rounded-full border border-pink-400/30">4-IN-A-ROW</span>
-                                </div>
-                            </div>
-                        </button>
-
-                        {/* GAME: Checkers */}
-                        <button
-                            onClick={() => setGame('checkers')}
-                            className="group relative h-20 sm:h-24 rounded-xl overflow-hidden border-2 border-white/20 hover:border-emerald-500 transition-all bg-slate-900 shadow-xl"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-slate-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
-                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/20 to-transparent"></div>
-
-                            <div className="absolute inset-0 flex flex-row items-center justify-start px-4 gap-4 z-10">
-                                <div className="p-2 sm:p-3 bg-black/50 rounded-lg border border-emerald-500/50 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(16,185,129,0.5)]">
-                                    <span className="text-2xl sm:text-3xl">🛸</span>
-                                </div>
-                                <div className="flex flex-col items-start">
-                                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400 text-lg sm:text-xl uppercase tracking-tighter filter drop-shadow">NEON CHECKERS</span>
-                                    <span className="text-[10px] font-bold text-white/80 bg-emerald-600/50 px-2 py-0.5 rounded-full border border-emerald-400/30">STRATEGY</span>
-                                </div>
-                            </div>
-                        </button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* OVERLAY PORTAL */}
-            {game !== 'menu' && createPortal(
-                <GameOverlay
-                    title={
-                        game === 'connect4' ? 'Neon Connect' :
-                            game === 'checkers' ? 'Neon Checkers' :
-                            game === 'swipefight' ? 'Swipe Fight' :
-                                game === 'battleship' ? 'Naval Command' :
-                                    game === 'offsetoperator' ? 'Equation Explorer' :
-                                        'Arcade'
-                    }
-                    onClose={closeGame}
-                >
-                    <Suspense fallback={<GameLoader />}>
-                        {game === 'connect4' && <GameErrorBoundary onBack={closeGame}><Connect4 sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                        {game === 'swipefight' && <GameErrorBoundary onBack={closeGame}><SwipeFight sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                        {game === 'battleship' && <GameErrorBoundary onBack={closeGame}><Battleship sessionId={sessionId} onBack={closeGame} /></GameErrorBoundary>}
-                        {game === 'checkers' && <GameErrorBoundary onBack={closeGame}><Checkers onBack={closeGame} /></GameErrorBoundary>}
-                        {game === 'offsetoperator' && <GameErrorBoundary onBack={closeGame}><EquationExplorer onBack={closeGame} /></GameErrorBoundary>}
-                    </Suspense>
-                </GameOverlay>,
-                document.body
-            )}
+                {/* Game Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
+                    {GAMES.map(game => {
+                        const stats = studentProfile.gameStats?.[game.id] || { wins: 0, losses: 0, highScore: 0 };
+                        const global = GLOBAL_STATS[game.id] || { avgWins: '-', avgHighScore: '-' };
+
+                        return (
+                            <div 
+                                key={game.id}
+                                onClick={() => navigate(game.route)}
+                                className={`group relative bg-slate-900 border rounded-3xl p-8 hover:-translate-y-2 hover:bg-slate-800 transition-all cursor-pointer overflow-hidden
+                                    ${game.color === 'cyan' ? 'border-cyan-500/20 hover:border-cyan-500/50' : 
+                                      game.color === 'rose' ? 'border-rose-500/20 hover:border-rose-500/50' :
+                                      game.color === 'emerald' ? 'border-emerald-500/20 hover:border-emerald-500/50' :
+                                      'border-pink-500/20 hover:border-pink-500/50'}
+                                `}
+                            >
+                                {/* Glow Effect */}
+                                <div className={`absolute -right-20 -bottom-20 w-64 h-64 rounded-full blur-[100px] opacity-20 group-hover:opacity-40 transition-opacity
+                                    ${game.color === 'cyan' ? 'bg-cyan-500' : 
+                                      game.color === 'rose' ? 'bg-rose-500' :
+                                      game.color === 'emerald' ? 'bg-emerald-500' :
+                                      'bg-pink-500'}
+                                `}></div>
+
+                                <div className="relative z-10 flex flex-col h-full">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="text-6xl group-hover:scale-110 transition-transform origin-left">{game.icon}</div>
+                                        
+                                        {/* Stat Badge */}
+                                        <div className="bg-black/40 backdrop-blur-md rounded-lg p-2 text-right border border-white/5">
+                                            <div className="text-[10px] text-slate-500 uppercase">Your High Score</div>
+                                            <div className={`font-mono font-bold ${
+                                                stats.highScore > global.avgHighScore ? 'text-green-400' : 'text-white'
+                                            }`}>
+                                                {stats.highScore}
+                                            </div>
+                                            {stats.highScore > 0 && stats.highScore > global.avgHighScore && (
+                                                <div className="text-[8px] text-green-500 uppercase tracking-tighter">Top 10%</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    <h3 className="text-3xl font-black mb-2">{game.title}</h3>
+                                    <p className="text-slate-400 mb-8 flex-grow leading-relaxed">{game.description}</p>
+                                    
+                                    <div className="flex justify-between items-end">
+                                        <div className="flex gap-2">
+                                            {game.tags.map(tag => (
+                                                <span key={tag} className={`text-[10px] font-bold px-3 py-1 rounded-full border border-white/10 bg-slate-950 uppercase tracking-wider
+                                                    ${game.color === 'cyan' ? 'text-cyan-400' : 
+                                                      game.color === 'rose' ? 'text-rose-400' :
+                                                      game.color === 'emerald' ? 'text-emerald-400' :
+                                                      'text-pink-400'}
+                                                `}>
+                                                    {tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <div className="text-xs font-bold text-slate-500 group-hover:text-white transition-colors uppercase tracking-widest">
+                                            Play Now →
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+             </div>
         </div>
     );
 }

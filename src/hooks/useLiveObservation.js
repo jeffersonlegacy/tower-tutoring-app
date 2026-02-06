@@ -12,40 +12,49 @@ import { useEffect, useRef, useCallback } from 'react';
 import { captureWhiteboard } from '../utils/WhiteboardCapture';
 import { strokeAnalytics } from '../utils/StrokeAnalytics';
 
-// Config (V2.0: Now adaptive ranges)
-const BASE_DEBOUNCE_MS = 3500;
-const MIN_DEBOUNCE_MS = 2000;
-const MAX_DEBOUNCE_MS = 6000;
-const BASE_COOLDOWN_MS = 15000;
+// Config (V2.1: More responsive timing)
+const BASE_DEBOUNCE_MS = 2500;
+const MIN_DEBOUNCE_MS = 1500;
+const MAX_DEBOUNCE_MS = 4000;
+const BASE_COOLDOWN_MS = 8000; // Reduced from 15s for better responsiveness
 
 export function useLiveObservation(editor, isEnabled) {
     const timeoutRef = useRef(null);
     const lastScanTime = useRef(0);
     const isObserving = useRef(false);
+    const strokeCount = useRef(0); // Track strokes since last scan
 
     const triggerObservation = useCallback(async () => {
         if (!isEnabled || !editor) return;
 
-        // COOLDOWN CHECK
+        // COOLDOWN CHECK (but allow override if many strokes)
         const now = Date.now();
-        if (now - lastScanTime.current < BASE_COOLDOWN_MS) {
+        const timeSinceLast = now - lastScanTime.current;
+        const forceOverride = strokeCount.current > 10; // Force if lots of activity
+        
+        if (timeSinceLast < BASE_COOLDOWN_MS && !forceOverride) {
             console.log('[LiveObserver] Cooldown active, skipping scan.');
             return;
         }
         
-        // V2.0: Smart Silence - Check emotion state before intervening
-        const emotion = strokeAnalytics.getEmotionSpectrum();
-        if (emotion.primary === 'flow' && emotion.confidence > 70) {
-            console.log('[LiveObserver] Student in FLOW state, staying silent.');
+        // V2.1: Smart Silence - Only skip if VERY confident flow
+        const emotion = strokeAnalytics.getEmotionSpectrum?.() || { primary: 'neutral', confidence: 0 };
+        if (emotion.primary === 'flow' && emotion.confidence > 85 && !forceOverride) {
+            console.log('[LiveObserver] Student in deep FLOW, staying silent.');
             return;
         }
 
         console.log('[LiveObserver] 👀 Auto-observing user work...');
         isObserving.current = true;
+        strokeCount.current = 0; // Reset stroke counter
 
         try {
-            // reuse the capture utility
-            const imageData = await captureWhiteboard();
+            // Capture with timeout fallback
+            const imageData = await Promise.race([
+                captureWhiteboard(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Capture timeout')), 3000))
+            ]);
+            
             if (imageData) {
                 // Dispatch special "auto-observation" event
                 window.dispatchEvent(new CustomEvent('ai-vision-upload', { 
@@ -53,13 +62,17 @@ export function useLiveObservation(editor, isEnabled) {
                         image: imageData, 
                         isAuto: true,
                         emotionState: emotion.primary,
-                        emotionConfidence: emotion.confidence
+                        emotionConfidence: emotion.confidence,
+                        prompt: "The student is working on the whiteboard. Observe what they've drawn and provide helpful, encouraging feedback. If you see a math problem, help guide them toward the solution."
                     } 
                 }));
                 lastScanTime.current = Date.now();
+                console.log('[LiveObserver] ✅ Auto-scan sent to AI');
+            } else {
+                console.warn('[LiveObserver] Capture returned empty');
             }
         } catch (err) {
-            console.warn('[LiveObserver] Observation failed:', err);
+            console.warn('[LiveObserver] Observation failed:', err.message);
         } finally {
             isObserving.current = false;
         }
@@ -90,12 +103,41 @@ export function useLiveObservation(editor, isEnabled) {
                                     Object.keys(entry.changes.removed).some(k => k.startsWith('shape:'));
 
             if (hasShapeChanges) {
-                // Reset timer on every stroke
-                if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                // Track strokes for activity-based override
+                strokeCount.current++;
+                
+                // Reset existing timers
+                if (timeoutRef.current) clearInterval(timeoutRef.current);
                 
                 // V2.0: Use adaptive debounce
                 const debounceMs = getAdaptiveDebounce();
-                timeoutRef.current = setTimeout(triggerObservation, debounceMs);
+                const startTime = Date.now();
+                const endTime = startTime + debounceMs;
+                
+                // Dispatch START event
+                window.dispatchEvent(new CustomEvent('live-tutor-timer-start', {
+                    detail: { durationMs: debounceMs }
+                }));
+
+                // Start TICK interval
+                let lastSeconds = Math.ceil(debounceMs / 1000);
+                
+                timeoutRef.current = setInterval(() => {
+                    const remaining = Math.ceil((endTime - Date.now()) / 1000);
+                    
+                    if (remaining <= 0) {
+                        clearInterval(timeoutRef.current);
+                        triggerObservation();
+                        // Dispatch END event
+                        window.dispatchEvent(new CustomEvent('live-tutor-timer-end'));
+                    } else if (remaining !== lastSeconds) {
+                        // Optimization: Only dispatch if integer second changed
+                        lastSeconds = remaining;
+                        window.dispatchEvent(new CustomEvent('live-tutor-timer-tick', {
+                            detail: { seconds: remaining }
+                        }));
+                    }
+                }, 100); // Check frequently for smooth updates/cancellation
             }
         });
 

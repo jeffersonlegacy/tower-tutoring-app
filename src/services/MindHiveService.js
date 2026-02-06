@@ -1,5 +1,5 @@
 /**
- * MindHiveService.js - Jefferson Intelligence v3.0
+ * MindHiveService.js - ToweR Intelligence v3.0
  * 
  * Neuro-Adaptive Learning Architect with:
  * - Multi-provider fallback (Gemini → Groq)
@@ -9,24 +9,23 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { composeSystemPrompt } from './MindHivePlugins';
 
-// Gemini models (primary - best for vision)
-const GEMINI_MODELS = [
-    'gemini-2.0-flash-exp',
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-8b',
-];
+// OpenRouter Models (Unified Hub)
+const OPENROUTER_MODELS = {
+    math: 'deepseek/deepseek-r1', // High reasoning specialist
+    vision: 'google/gemini-2.0-flash-exp:free', // Vision specialist
+    general: 'google/gemini-2.0-flash-exp',
+    fallback: 'moonshotai/kimi-k2' // Vision fallback
+};
 
-// Groq models (fallback - extremely fast)
-const GROQ_MODELS = [
-    'llama-3.3-70b-versatile',
-    'llama-3.1-8b-instant',
-    'mixtral-8x7b-32768',
-];
+const ENDPOINTS = {
+    openrouter: 'https://openrouter.ai/api/v1/chat/completions',
+    groq: 'https://api.groq.com/openai/v1/chat/completions',
+};
 
-const SYSTEM_PROMPT = `# JEFFERSON INTELLIGENCE v3.0 (Neuro-Adaptive Architect)
+const SYSTEM_PROMPT = `# TOWER INTELLIGENCE v3.0 (Neuro-Adaptive Architect)
 
 ## IDENTITY & PRIME DIRECTIVE
-You are **Jefferson Intelligence**, a Neuro-Adaptive Learning Architect. You analyze the **cognitive state** of each student to optimize their learning velocity.
+You are **ToweR Intelligence**, a Neuro-Adaptive Learning Architect. You analyze the **cognitive state** of each student to optimize their learning velocity.
 Your Goal: Build a mind that can solve ANY problem, not just the one currently on the board.
 MAINTAIN CONTINUITY: You are in a continuous session. If the user replies or uploads a new image, assume it is the NEXT STEP of the current problem, not a new one.
 ALWAYS PROPEL FORWARD: Every response must end with a specific, actionable question or a "Try this" instruction.
@@ -236,7 +235,7 @@ class MindHiveService {
         this.geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
         this.genAI = this.geminiKey ? new GoogleGenerativeAI(this.geminiKey) : null;
         this.groqKey = import.meta.env.VITE_GROQ_API_KEY;
-        this.groqEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
+        this.openrouterKey = import.meta.env.VITE_OPENROUTER_API_KEY;
     }
 
     /**
@@ -244,41 +243,45 @@ class MindHiveService {
      * Injects stroke metadata into context
      */
     async streamResponse(prompt, history = [], onChunk, onModelChange, images = [], strokeContext = '') {
-        console.log('🐝 Activating Mind Hive v3.0...');
+        console.log('🐝 Activating Mind Hive v5.0 (Global Hub)...');
 
-        // Inject stroke context into prompt
-        const enrichedPrompt = strokeContext
-            ? `${strokeContext}\n\nUser Message: ${prompt}`
-            : prompt;
+        const enrichedPrompt = strokeContext ? `${strokeContext}\n\nUser Message: ${prompt}` : prompt;
+        const isComplexMath = /solve|equation|calculate|proof|integral|matrix/i.test(prompt);
+        const hasImages = images && images.length > 0;
+
+        const providers = [
+            // Preference 1: Native Gemini (if available) for vision/speed
+            { name: 'Gemini', models: ['gemini-2.0-flash-exp', 'gemini-1.5-flash-latest'], key: this.geminiKey, type: 'gemini', priority: hasImages ? 1 : 10 },
+            
+            // Preference 2: OpenRouter (DeepSeek R1) for Math/Reasoning
+            { name: 'OpenRouter', models: [OPENROUTER_MODELS.math], key: this.openrouterKey, type: 'openai', endpoint: ENDPOINTS.openrouter, priority: isComplexMath ? 1 : 20 },
+            
+            // Preference 3: OpenRouter Fallbacks
+            { name: 'OpenRouter', models: [OPENROUTER_MODELS.general, OPENROUTER_MODELS.fallback], key: this.openrouterKey, type: 'openai', endpoint: ENDPOINTS.openrouter, priority: 30 },
+
+            // Preference 4: Groq (Text speed fallback)
+            { name: 'Groq', models: ['llama-3.3-70b-versatile'], key: this.groqKey, type: 'openai', endpoint: ENDPOINTS.groq, priority: 40 }
+        ].sort((a, b) => (a.priority || 5) - (b.priority || 5));
 
         const errors = [];
+        for (const provider of providers) {
+            if (!provider.key) continue;
 
-        // TIER 1: Try Gemini (best for vision/images)
-        if (this.genAI) {
-            for (const modelName of GEMINI_MODELS) {
+            for (const modelName of provider.models) {
                 try {
-                    console.log(`🔄 [Gemini] Attempting: ${modelName}`);
-                    await this.streamGemini(modelName, enrichedPrompt, history, onChunk, onModelChange, images);
-                    console.log(`✅ [Gemini] Success: ${modelName}`);
+                    console.log(`🔄 [${provider.name}] Attempting: ${modelName}`);
+                    
+                    if (provider.type === 'gemini') {
+                        await this.streamGemini(modelName, enrichedPrompt, history, onChunk, onModelChange, images);
+                    } else {
+                        await this.streamOpenAI(provider.name, provider.endpoint, provider.key, modelName, enrichedPrompt, history, onChunk, onModelChange);
+                    }
+
+                    console.log(`✅ [${provider.name}] Success: ${modelName}`);
                     return;
                 } catch (error) {
-                    console.warn(`⚠️ [Gemini] ${modelName} failed: ${error.message}`);
-                    errors.push(`Gemini/${modelName}: ${error.message}`);
-                }
-            }
-        }
-
-        // TIER 2: Try Groq (extremely fast, text-only)
-        if (this.groqKey) {
-            for (const modelName of GROQ_MODELS) {
-                try {
-                    console.log(`🔄 [Groq] Attempting: ${modelName}`);
-                    await this.streamGroq(modelName, enrichedPrompt, history, onChunk, onModelChange);
-                    console.log(`✅ [Groq] Success: ${modelName}`);
-                    return;
-                } catch (error) {
-                    console.warn(`⚠️ [Groq] ${modelName} failed: ${error.message}`);
-                    errors.push(`Groq/${modelName}: ${error.message}`);
+                    console.warn(`⚠️ [${provider.name}] ${modelName} failed: ${error.message}`);
+                    errors.push(`${provider.name}/${modelName}: ${error.message}`);
                 }
             }
         }
@@ -288,6 +291,8 @@ class MindHiveService {
     }
 
     async streamGemini(modelName, prompt, history, onChunk, onModelChange, images = []) {
+        if (!this.genAI) throw new Error('Gemini SDK not available');
+        
         const model = this.genAI.getGenerativeModel({
             model: modelName,
             systemInstruction: CONFIG.systemPrompt,
@@ -340,9 +345,9 @@ class MindHiveService {
         if (!hasContent) throw new Error('Empty response');
     }
 
-    async streamGroq(modelName, prompt, history, onChunk, onModelChange) {
+    async streamOpenAI(providerName, endpoint, apiKey, modelName, prompt, history, onChunk, onModelChange) {
         if (onModelChange) {
-            onModelChange(`GROQ ${modelName.split('-')[0].toUpperCase()}`);
+            onModelChange(`${providerName.toUpperCase()} ${modelName}`);
         }
 
         const messages = [{ role: 'system', content: CONFIG.systemPrompt }];
@@ -356,11 +361,13 @@ class MindHiveService {
         }
         messages.push({ role: 'user', content: prompt });
 
-        const response = await fetch(this.groqEndpoint, {
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.groqKey}`
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': 'https://jefferson.edu', // Required by OpenRouter
+                'X-Title': 'ToweR Intelligence'
             },
             body: JSON.stringify({
                 model: modelName,
@@ -378,29 +385,43 @@ class MindHiveService {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let hasContent = false;
+        let buffer = '';
 
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
 
             const chunk = decoder.decode(value, { stream: true });
-            for (const line of chunk.split('\n')) {
+            buffer += chunk;
+            
+            const lines = buffer.split('\n');
+            // Keep the last line in buffer if it's incomplete
+            buffer = lines.pop(); 
+
+            for (const line of lines) {
                 const trimmed = line.trim();
                 if (!trimmed || trimmed === 'data: [DONE]') continue;
+                
                 if (trimmed.startsWith('data: ')) {
                     try {
-                        const json = JSON.parse(trimmed.slice(6));
-                        const content = json.choices?.[0]?.delta?.content;
+                        const jsonStr = trimmed.substring(6); // Remove 'data: '
+                        const json = JSON.parse(jsonStr);
+                        
+                        // Handle OpenRouter/OpenAI delta format
+                        const content = json.choices?.[0]?.delta?.content || json.choices?.[0]?.text;
+                        
                         if (content) {
                             hasContent = true;
                             onChunk(content);
                         }
-                    } catch { /* ignore */ }
+                    } catch (e) { 
+                        // console.warn('JSON parse error in stream:', e); 
+                    }
                 }
             }
         }
 
-        if (!hasContent) throw new Error('Empty response');
+        if (!hasContent) throw new Error('Empty response from AI provider');
     }
 
     blobToBase64(blob) {
@@ -413,7 +434,14 @@ class MindHiveService {
     }
 }
 
-export const mindHive = new MindHiveService();
+// export const mindHive = new MindHiveService();
+let instance = null;
+export function getMindHive() {
+    if (!instance) {
+        instance = new MindHiveService();
+    }
+    return instance;
+}
 
 /**
  * Parse AI response - handles both JSON and plain text

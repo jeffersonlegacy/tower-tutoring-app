@@ -1,15 +1,24 @@
-import React, { useState } from 'react';
-import GeminiChat from '../chat/GeminiChat';
-import { mindHive } from '../../services/MindHiveService';
+import React, { useState, Suspense, lazy } from 'react';
+import { getMindHive } from '../../services/MindHiveService';
+import { useMastery } from '../../context/MasteryContext';
+
+const GeminiChat = lazy(() => import('../chat/GeminiChat'));
 
 export default function MindHiveInterface({ onHome }) {
+    const { sessionLogs } = useMastery();
     const [messages, setMessages] = useState([
         { role: 'model', text: 'Welcome to the Session Review. I have access to your session context. Shall we generate a report?' },
     ]);
     const [isReporting, setIsReporting] = useState(false);
     const [report, setReport] = useState(null);
     const [isGenerating, setIsGenerating] = useState(false);
-    const [userNotes, setUserNotes] = useState("");
+    const [userNotes, setUserNotes] = useState(() => {
+        return localStorage.getItem('ji_tutor_notes_temp') || "";
+    });
+
+    useEffect(() => {
+        localStorage.setItem('ji_tutor_notes_temp', userNotes);
+    }, [userNotes]);
 
     const handleGenerateReport = async () => {
         setIsGenerating(true);
@@ -20,7 +29,7 @@ export default function MindHiveInterface({ onHome }) {
                 context += `\n\nTUTOR NOTES: ${userNotes}`;
             }
 
-            await mindHive.streamResponse(
+            await getMindHive().streamResponse(
                 "Generate a professional Tutoring Session Report for a parent based on the following context/notes. \n\nStructure:\n1. Topics Covered\n2. Student Strengths/Wins\n3. Areas for Improvement\n4. Recommended Homework\n\nTone: Professional, encouraging, precise. Use Markdown.",
                 [{ role: 'user', text: context }],
                 (chunk) => {
@@ -100,12 +109,14 @@ export default function MindHiveInterface({ onHome }) {
                                 </div>
                             </div>
                             <div className="flex-1 relative">
-                                <GeminiChat
-                                    mode="fullscreen"
-                                    onHome={onHome}
-                                    externalMessages={messages}
-                                    setExternalMessages={setMessages}
-                                />
+                                <Suspense fallback={<div className="flex items-center justify-center h-full text-slate-500 text-xs">Loading Chat...</div>}>
+                                    <GeminiChat
+                                        mode="fullscreen"
+                                        onHome={onHome}
+                                        externalMessages={messages}
+                                        setExternalMessages={setMessages}
+                                    />
+                                </Suspense>
                             </div>
                         </div>
                     </section>
@@ -155,17 +166,35 @@ export default function MindHiveInterface({ onHome }) {
                         <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-6">
                             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Live Knowledge Feed</h4>
                             <div className="space-y-3">
-                                {[
-                                    { t: 'Stroke Analytics Compiled', time: '2m ago', icon: '✍️' },
-                                    { t: 'Emotional Drift: Neutral → Confident', time: '10m ago', icon: '📈' },
-                                    { t: 'Whiteboard Page 2 Synthesized', time: '15m ago', icon: '🧠' }
-                                ].map((item, i) => (
-                                    <div key={i} className="flex items-center gap-3 px-3 py-2 bg-slate-950/30 rounded-xl border border-white/[0.02]">
-                                        <span className="text-lg opacity-70">{item.icon}</span>
-                                        <span className="flex-1 text-xs text-slate-300 font-medium">{item.t}</span>
-                                        <span className="text-[10px] text-slate-600 font-bold">{item.time}</span>
+                                {sessionLogs.length > 0 ? (
+                                    sessionLogs.slice(0, 5).map((log, i) => (
+                                        <div key={i} className="flex items-center gap-3 px-3 py-2 bg-slate-950/30 rounded-xl border border-white/[0.02]">
+                                            <span className="text-lg opacity-70">
+                                                {log.type === 'pv_gain' ? '⭐' : 
+                                                 log.type === 'mastery' ? '🏆' :
+                                                 log.type === 'frustration_detected' ? '😤' :
+                                                 log.type === 'session_start' ? '🚀' : '📝'}
+                                            </span>
+                                            <div className="flex-1">
+                                                <p className="text-xs text-slate-300 font-medium">
+                                                    {log.type === 'pv_gain' ? `Gained ${log.data.amount} PV` :
+                                                     log.type === 'mastery' ? `Mastered ${log.data.nodeId}` :
+                                                     log.type === 'frustration_detected' ? `Emotion: ${log.data.emotion}` :
+                                                     log.type === 'session_start' ? `Session Started: ${log.data.mode}` :
+                                                     'Activity Recorded'}
+                                                </p>
+                                                {log.data.reason && <p className="text-[9px] text-slate-500">{log.data.reason}</p>}
+                                            </div>
+                                            <span className="text-[10px] text-slate-600 font-bold whitespace-nowrap">
+                                                {Math.floor((Date.now() - log.timestamp) / 60000)}m ago
+                                            </span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-4 text-slate-600 text-xs italic">
+                                        No recent activity recorded.
                                     </div>
-                                ))}
+                                )}
                             </div>
                         </div>
                     </section>
@@ -179,7 +208,7 @@ export default function MindHiveInterface({ onHome }) {
                         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                             <div>
                                 <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Session Review</h3>
-                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Jefferson Intelligence Engine • AI Synthesized</p>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">ToweR Intelligence Engine • AI Synthesized</p>
                             </div>
                             <button 
                                 onClick={() => setReport(null)} 

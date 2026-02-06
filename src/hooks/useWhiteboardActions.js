@@ -58,10 +58,55 @@ export function useWhiteboardActions() {
             case 'WIPE_REGION':
                 wipeRegion(editor, action);
                 break;
+            case 'STAPLE_IMAGE':
+                stapleImage(editor, action);
+                break;
             default:
                 console.warn('[WhiteboardActions] Unknown action type:', action.type);
         }
     }, [mapPosition]);
+
+    const stapleImage = (editor, { url, name, position }) => {
+        if (!url) return;
+        
+        const viewport = editor.getViewportPageBounds();
+        if (!viewport) return;
+
+        // Default to center if no position provided
+        const x = position ? (viewport.x + (viewport.w * (position.x / 100))) : (viewport.x + viewport.w / 4);
+        const y = position ? (viewport.y + (viewport.h * (position.y / 100))) : (viewport.y + viewport.h / 4);
+        
+        const width = 400; // Default staple width
+        const height = 300; // Placeholder aspect ratio
+
+        const smartPos = getSmartPosition(editor, x, y, width, height);
+
+        const assetId = editor.createAsset({
+            type: 'image',
+            name: name || 'stapled-image',
+            props: {
+                src: url,
+                w: width,
+                h: height,
+                mimeType: 'image/jpeg'
+            }
+        });
+
+        editor.createShape({
+            id: createShapeId(),
+            type: 'image',
+            x: smartPos.x,
+            y: smartPos.y,
+            props: {
+                assetId,
+                w: width,
+                h: height,
+            }
+        });
+
+        // Center camera on the new item
+        editor.zoomToShapes([editor.getCurrentPageShapeIds().slice(-1)[0]], { animation: { duration: 500 } });
+    };
 
     /**
      * SMART LOCATOR: Finds a position that doesn't overlap existing shapes.

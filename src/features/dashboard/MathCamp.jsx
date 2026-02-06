@@ -1,246 +1,193 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMastery } from '../../context/MasteryContext';
-import { ACHIEVEMENTS } from '../games/mathMind/adaptiveEngine'; 
-import { getSkillList } from '../games/offsetOperator/educationEngine'; // [NEW] To read EE progress
 import AchievementToast from '../../components/AchievementToast';
 import AvatarCanvas from '../profile/AvatarCanvas';
+import AssessmentCenter from './AssessmentCenter';
+import HyperbolicChamber from './HyperbolicChamber';
+import TowerTagModal from '../profile/TowerTagModal';
 
-// Mapping of Game Name to Route and Asset
-const GAME_METADATA = {
-    "EquationExplorer": {
-        route: "/game/equation-explorer",
-        description: "Master balancing equations in this puzzle adventure.",
-        color: "from-purple-500 to-indigo-600",
-        icon: "⚖️"
-    },
-    "SwipeFight": {
-        route: "/game/swipe-fight",
-        description: "Test your reflex math speed against the clock.",
-        color: "from-orange-500 to-red-600",
-        icon: "⚔️"
-    },
-    "Checkers": {
-        route: "/game/checkers",
-        description: "Classic strategy game to hone logical thinking.",
-        color: "from-emerald-500 to-teal-600",
-        icon: "♟️"
-    }, // [NEW]
-    "Battleship": {
-        route: "/game/battleship",
-        description: "Hunt for ships using coordinate plane mastery.",
-        color: "from-blue-500 to-cyan-600",
-        icon: "🚢"
-    },
-    // Generic fallback for others
-    "MathMind": {
-        route: "/game/math-mind",
-        description: "Pure arithmetic challenge.",
-        color: "from-emerald-500 to-teal-600",
-        icon: "🧠"
-    }
-};
-
-export default function MathCamp() {
-    const { curriculum, getNodeStatus, studentProfile, checkStreak } = useMastery();
+export default function MathCamp({ onNavigate }) {
+    const { studentProfile, assessmentState } = useMastery();
     const navigate = useNavigate();
+    const [view, setView] = useState('dashboard'); // dashboard, hyperbolic, arcade
 
-    // Check streak on mount
-    React.useEffect(() => {
-        checkStreak();
-    }, [checkStreak]);
-
-    // Progress Calculation
-    const xpForNextLevel = studentProfile.level * 500;
-    const progressPercent = Math.min(100, (studentProfile.xp / xpForNextLevel) * 100);
-
-    // Filter nodes that have associated games
-    const gameNodes = Object.values(curriculum.nodes).filter(node => node.associatedGame);
-
-    const handlePlay = (gameName) => {
-        const meta = GAME_METADATA[gameName] || GAME_METADATA["MathMind"];
-        navigate(meta.route);
+    const handleNavigate = (route) => {
+        if (onNavigate) {
+            onNavigate(route);
+        } else {
+            navigate(route);
+        }
     };
+
+    // 1. ASSESSMENT PHASE
+    if (!assessmentState || assessmentState.status !== 'completed') {
+        return (
+            <div className="min-h-screen bg-slate-950 text-white font-sans flex flex-col items-center justify-center p-4">
+                <AchievementToast />
+                <div className="max-w-4xl w-full">
+                    <AssessmentCenter />
+                </div>
+            </div>
+        );
+    }
+
+    // 2. HYPERBOLIC CHAMBER
+    if (view === 'hyperbolic') {
+        return <HyperbolicChamber onBack={() => setView('dashboard')} />;
+    }
+
+    // 3. BRAIN BREAK (ARCADE)
+    if (view === 'arcade') {
+        // Use lazy import inside component or just dynamic import to avoid circular dependency issues if any
+        const BrainBreak = React.lazy(() => import('../games/BrainBreak'));
+        return (
+            <React.Suspense fallback={<div className="p-8 text-center text-cyan-400">Loading Arcade...</div>}>
+                <BrainBreak onBack={() => setView('dashboard')} onNavigate={handleNavigate} />
+            </React.Suspense>
+        );
+    }
+
+    // 3. MAIN DASHBOARD (The Three Paths)
+    const recommendedPath = assessmentState.path || 'visual';
 
     return (
         <div className="min-h-screen bg-slate-950 text-white font-sans pb-20">
-            <AchievementToast /> {/* [NEW] Global Toast for this view */}
-            {/* HERO SECTION: The Campfire */}
-            <div className="relative bg-gradient-to-b from-purple-900/50 to-slate-950 pt-8 pb-12 px-4 overflow-hidden">
+            <AchievementToast />
+            <TowerTagModal />
+            
+            {/* HERO HERO */}
+            <div className="relative bg-gradient-to-b from-indigo-900/50 to-slate-950 pt-8 pb-12 px-4">
                 <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20"></div>
                 
                 <header className="max-w-4xl mx-auto relative z-10">
-                    <h1 className="text-2xl sm:text-4xl md:text-6xl font-black text-center mb-8 bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent filter drop-shadow-[0_0_10px_rgba(168,85,247,0.5)] px-4 break-words">
+                    <h1 className="text-3xl md:text-5xl font-black text-center mb-8 bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent px-4">
                         MATHTELLIGENCE
                     </h1>
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                        {/* PROFILE CARD */}
-                        <div className="flex items-center gap-4 bg-slate-900/80 p-4 rounded-2xl border border-white/10 backdrop-blur-md shadow-2xl w-full md:w-auto">
-                            <div className="w-16 h-16 rounded-full bg-slate-900 border-2 border-white/10 shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center justify-center overflow-hidden">
+
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-900/80 p-6 rounded-3xl border border-white/10 backdrop-blur-md shadow-2xl">
+                        {/* Profile Info */}
+                        <div className="flex items-center gap-4">
+                            <div className="w-20 h-20 rounded-full bg-slate-900 border-2 border-cyan-500/30 flex items-center justify-center overflow-hidden">
                                 {studentProfile.avatarConfig ? (
-                                    <AvatarCanvas config={studentProfile.avatarConfig} size={64} />
+                                    <AvatarCanvas config={studentProfile.avatarConfig} size={80} />
                                 ) : (
-                                    <span className="text-3xl">🧑‍🚀</span>
+                                    <span className="text-4xl">🧑‍🚀</span>
                                 )}
                             </div>
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                    <h2 className="text-xl font-bold text-white uppercase tracking-tight">{window.location.pathname.split('/').pop() || 'Student'}</h2>
-                                    <span className="bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Lvl {studentProfile.level}</span>
+                            <div>
+                                <h2 className="text-2xl font-bold uppercase tracking-tight">Student</h2>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <span className="bg-purple-600/20 text-purple-300 text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                        Lvl {studentProfile.level}
+                                    </span>
+                                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                                        {assessmentState.score} Assessment Score
+                                    </span>
                                 </div>
-                                <div className="mt-2 w-48 h-2 bg-slate-800 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-gradient-to-r from-cyan-400 to-purple-500 transition-all duration-1000"
-                                        style={{ width: `${progressPercent}%` }}
-                                    ></div>
-                                </div>
-                                <div className="text-[10px] text-slate-400 mt-1 flex justify-between">
-                                    <span>{studentProfile.xp} XP</span>
-                                    <span>{xpForNextLevel} XP</span>
+                                <div className="text-xs text-slate-500 mt-2">
+                                    {studentProfile.pv} PV Total
                                 </div>
                             </div>
                         </div>
 
-                        {/* STREAK FLAME */}
-                        <div className="flex items-center gap-3 bg-orange-500/10 border border-orange-500/30 px-6 py-3 rounded-2xl">
-                            <span className="text-4xl animate-pulse filter drop-shadow-[0_0_10px_rgba(249,115,22,0.8)]">🔥</span>
-                            <div className="flex flex-col">
-                                <span className="text-2xl font-black text-orange-500 leading-none">{studentProfile.streak}</span>
-                                <span className="text-[10px] text-orange-300 font-bold uppercase tracking-widest">Day Streak</span>
+                        {/* Current Path Badge */}
+                        <div className="text-right">
+                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Recommended Path</div>
+                            <div className={`text-2xl font-black uppercase tracking-wide
+                                ${recommendedPath === 'visual' ? 'text-pink-400' : 
+                                  recommendedPath === 'analytical' ? 'text-cyan-400' : 'text-yellow-400'}
+                            `}>
+                                {recommendedPath} LEARNER
                             </div>
-                        </div>
-
-                        {/* CURRENCY */}
-                        <div className="hidden md:flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/30 px-4 py-2 rounded-xl">
-                            <span className="text-xl">🪙</span>
-                            <span className="font-bold text-yellow-400">{studentProfile.currency}</span>
                         </div>
                     </div>
                 </header>
             </div>
 
-            {/* DAILY MISSIONS (Mock for now) */}
-            <div className="max-w-4xl mx-auto px-4 -mt-6 relative z-20 mb-12">
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <span className="text-emerald-500">⚡</span> Daily Training
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {[
-                            { title: "Solve 10 Equations", reward: 50, done: false },
-                            { title: "Play 1 Battleship", reward: 100, done: true },
-                            { title: "Earn 200 XP", reward: 30, done: false }
-                        ].map((mission, i) => (
-                            <div key={i} className={`flex items-center justify-between p-3 rounded-xl border ${mission.done ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-800 border-slate-700'}`}>
-                                <div className="flex flex-col">
-                                    <span className={`text-sm font-bold ${mission.done ? 'text-emerald-400 line-through opacity-70' : 'text-white'}`}>{mission.title}</span>
-                                    <span className="text-[10px] text-yellow-500 font-mono">+{mission.reward} XP</span>
-                                </div>
-                                {mission.done ? <span className="text-emerald-500">✓</span> : <div className="w-4 h-4 rounded-full border-2 border-slate-600"></div>}
-                            </div>
-                        ))}
+            {/* THE THREE PATHS */}
+            <div className="max-w-6xl mx-auto px-4 mt-8">
+                <h3 className="text-xl font-bold text-center text-slate-400 uppercase tracking-widest mb-8">Choose Your Journey</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* PATH 1: VISUAL (Equation Explorer) */}
+                    <div 
+                        onClick={() => handleNavigate('/game/equation-explorer')}
+                        className={`group relative bg-slate-900 rounded-3xl p-8 border hover:-translate-y-2 transition-all cursor-pointer overflow-hidden
+                            ${recommendedPath === 'visual' ? 'border-pink-500 ring-2 ring-pink-500/20 shadow-[0_0_50px_rgba(236,72,153,0.2)]' : 'border-white/10 opacity-60 hover:opacity-100'}
+                        `}
+                    >
+                        <div className="absolute -right-10 -bottom-10 text-9xl opacity-10 group-hover:opacity-20 transition-opacity">👁️</div>
+                        <div className="text-4xl mb-4 text-pink-400">📐</div>
+                        <h3 className="text-2xl font-bold text-white mb-2">Visual Path</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                            See the math. Use geometry, graphs, and balance scales to understand equations without just memorizing rules.
+                        </p>
+                        <span className="text-xs font-bold text-pink-400 uppercase tracking-wider group-hover:underline">Enter Path →</span>
+                    </div>
+
+                    {/* PATH 2: ANALYTICAL (Checkers/Logic) */}
+                    <div 
+                        onClick={() => handleNavigate('/game/checkers')}
+                        className={`group relative bg-slate-900 rounded-3xl p-8 border hover:-translate-y-2 transition-all cursor-pointer overflow-hidden
+                            ${recommendedPath === 'analytical' ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-[0_0_50px_rgba(6,182,212,0.2)]' : 'border-white/10 opacity-60 hover:opacity-100'}
+                        `}
+                    >
+                        <div className="absolute -right-10 -bottom-10 text-9xl opacity-10 group-hover:opacity-20 transition-opacity">🧠</div>
+                        <div className="text-4xl mb-4 text-cyan-400">♟️</div>
+                        <h3 className="text-2xl font-bold text-white mb-2">Analytical Path</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                            Deep work. Master logic, strategy, and complex problem solving. Think several moves ahead.
+                        </p>
+                        <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider group-hover:underline">Enter Path →</span>
+                    </div>
+
+                    {/* PATH 3: SPEED (Speed Math) */}
+                    <div 
+                        onClick={() => handleNavigate('/speed-math')}
+                        className={`group relative bg-slate-900 rounded-3xl p-8 border hover:-translate-y-2 transition-all cursor-pointer overflow-hidden
+                            ${recommendedPath === 'speed' ? 'border-yellow-500 ring-2 ring-yellow-500/20 shadow-[0_0_50px_rgba(234,179,8,0.2)]' : 'border-white/10 opacity-60 hover:opacity-100'}
+                        `}
+                    >
+                        <div className="absolute -right-10 -bottom-10 text-9xl opacity-10 group-hover:opacity-20 transition-opacity">⚡</div>
+                        <div className="text-4xl mb-4 text-yellow-400">🏎️</div>
+                        <h3 className="text-2xl font-bold text-white mb-2">Speed Path</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                            High velocity. Learn mental math tricks from around the world to calculate faster than a machine.
+                        </p>
+                        <span className="text-xs font-bold text-yellow-400 uppercase tracking-wider group-hover:underline">Enter Path →</span>
                     </div>
                 </div>
-            </div>
 
-            {/* TROPHY ROOM */}
-            <div className="max-w-4xl mx-auto px-4 mb-12">
-                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <span className="text-yellow-500">🏆</span> Trophy Room
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {Object.values(ACHIEVEMENTS).map(ach => {
-                        const isUnlocked = studentProfile.unlockedAchievements?.includes(ach.id);
-                        return (
-                            <div key={ach.id} className={`p-4 rounded-xl border flex flex-col items-center text-center transition-all ${isUnlocked ? 'bg-slate-900 border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}>
-                                <div className={`text-4xl mb-2 ${isUnlocked ? 'animate-bounce' : ''}`}>{ach.icon}</div>
-                                <div className="font-bold text-xs text-white uppercase tracking-wider mb-1">{ach.name}</div>
-                                <div className="text-[10px] text-slate-500 leading-tight">{ach.desc}</div>
-                            </div>
-                        );
-                    })}
+                {/* HYPERBOLIC CHAMBER BUTTON */}
+                {/* HYPERBOLIC CHAMBER BUTTON */}
+                {/* HYPERBOLIC CHAMBER & ARCADE BUTTONS */}
+                <div className="mt-12 text-center mb-16 flex flex-col md:flex-row items-center justify-center gap-6">
+                    <button 
+                        onClick={() => setView('hyperbolic')}
+                        className="group relative inline-flex items-center justify-center px-8 py-4 bg-slate-900 border border-indigo-500/50 rounded-2xl overflow-hidden hover:border-indigo-400 transition-colors"
+                    >
+                        <div className="absolute inset-0 bg-indigo-500/10 group-hover:bg-indigo-500/20 transition-colors"></div>
+                        <span className="relative z-10 flex items-center gap-3 font-black text-indigo-300 uppercase tracking-widest text-sm group-hover:text-white transition-colors">
+                            <span className="text-2xl">🌌</span> Hyperbolic Chamber
+                        </span>
+                    </button>
+                    
+                    <button 
+                        onClick={() => setView('arcade')}
+                        className="group relative inline-flex items-center justify-center px-8 py-4 bg-slate-900 border border-cyan-500/50 rounded-2xl overflow-hidden hover:border-cyan-400 transition-colors"
+                    >
+                        <div className="absolute inset-0 bg-cyan-500/10 group-hover:bg-cyan-500/20 transition-colors"></div>
+                        <span className="relative z-10 flex items-center gap-3 font-black text-cyan-400 uppercase tracking-widest text-sm group-hover:text-white transition-colors">
+                            <span className="text-2xl">🕹️</span> Brain Break Arcade
+                        </span>
+                    </button>
                 </div>
-            </div>
 
-            {/* GAMES GRID */}
-            <div className="max-w-6xl mx-auto px-4">
-                <h3 className="text-2xl font-black text-center mb-8 bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">TRAINING MODULES</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {gameNodes.map(node => {
-                        const status = getNodeStatus(node.id);
-                        const isLocked = status === 'locked';
-                        const isCompleted = status === 'completed';
-                        const meta = GAME_METADATA[node.associatedGame] || GAME_METADATA["MathMind"];
-
-                        return (
-                            <div key={node.id} className={`relative group ${isLocked ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
-                                <div className={`absolute -inset-0.5 bg-gradient-to-r ${meta.color} rounded-2xl blur opacity-20 group-hover:opacity-100 transition duration-500`}></div>
-                                <div className="relative bg-slate-900 rounded-2xl p-6 h-full border border-white/10 flex flex-col hover:-translate-y-1 transition-transform duration-300">
-                                    
-                                    {/* Icon Header */}
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${meta.color} bg-opacity-10 flex items-center justify-center text-3xl shadow-inner`}>
-                                            {meta.icon}
-                                        </div>
-                                        <div className="flex flex-col items-end">
-                                            {isCompleted 
-                                                ? <div className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-500/30">Mastered</div>
-                                                : <div className="bg-slate-800 text-slate-500 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Training</div>
-                                            }
-                                            {/* Mastery Stars (Dynamic) */}
-                                            <div className="flex gap-0.5 mt-1 text-[10px] text-yellow-500/50">
-                                                {(() => {
-                                                    // Custom logic for Equation Explorer stats
-                                                    if (node.associatedGame === 'EquationExplorer') {
-                                                        const eeSkills = getSkillList();
-                                                        const masteredCount = eeSkills.filter(s => s.mastery.mastered).length;
-                                                        const totalSkills = eeSkills.length; // 8
-                                                        const starCount = Math.round((masteredCount / totalSkills) * 5);
-                                                        
-                                                        return Array(5).fill(0).map((_, i) => (
-                                                            <span key={i} className={i < starCount ? "text-yellow-400" : "text-slate-700"}>★</span>
-                                                        ));
-                                                    }
-                                                    
-                                                    // Fallback mock for others
-                                                    return (
-                                                        <><span>★</span><span>★</span><span>★</span><span>☆</span><span>☆</span></>
-                                                    );
-                                                })()}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <h3 className="text-2xl font-bold mb-1">{node.associatedGame}</h3>
-                                    <p className="text-slate-400 text-sm mb-6 flex-grow leading-relaxed">{meta.description}</p>
-
-                                    <div className="bg-slate-950/50 rounded-lg p-3 mb-6 flex items-center gap-3 border border-white/5">
-                                        <span className="text-lg">📚</span>
-                                        <div className="flex flex-col">
-                                            <span className="text-[9px] uppercase tracking-widest font-bold text-slate-500">Curriculum Link</span>
-                                            <span className="text-xs font-medium text-cyan-400">{node.title}</span>
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        onClick={() => handlePlay(node.associatedGame)}
-                                        className={`w-full py-3.5 rounded-xl font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2
-                                            ${isLocked ? 'bg-slate-800 text-slate-500 cursor-not-allowed' :
-                                                `bg-gradient-to-r ${meta.color} text-white shadow-lg group-hover:shadow-purple-500/20 hover:brightness-110 active:scale-[0.98]`}
-                                        `}
-                                    >
-                                        {isLocked ? (
-                                            <><span>🔒</span> Locked</>
-                                        ) : (
-                                            <><span>▶</span> Play Now</>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
+                <div className="text-center text-[10px] text-slate-600 font-mono mb-8">
+                    CAUTION: CONTAINS NON-EUCLIDEAN CONCEPTS & HIGH VELOCITY SIMULATIONS
                 </div>
+
             </div>
         </div>
     );

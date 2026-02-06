@@ -47,7 +47,7 @@ const CURRICULUM_MAPPING = {
 
 export default function EquationExplorer({ onBack }) {
     // Context hooks
-    const { completeNode, awardXP, unlockAchievement } = useMastery();
+    const { completeNode, awardPV, unlockAchievement } = useMastery();
 
     // Game state
     const [screen, setScreen] = useState('menu'); // menu, skill_select, learning, playing, result
@@ -58,7 +58,7 @@ export default function EquationExplorer({ onBack }) {
     const [currentHint, setCurrentHint] = useState(null);
     const [showWorkedExample, setShowWorkedExample] = useState(false);
     const [exampleStep, setExampleStep] = useState(0);
-    const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0, xp: 0 });
+    const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0, pv: 0 }); // [MOD] xp -> pv
     const [skillsData, setSkillsData] = useState([]);
     const [justMastered, setJustMastered] = useState(false);
     const [wrongAnswerExplanation, setWrongAnswerExplanation] = useState(null);
@@ -74,7 +74,7 @@ export default function EquationExplorer({ onBack }) {
     // Start practicing a skill
     const startPractice = useCallback((skill) => {
         setSelectedSkill(skill);
-        setSessionStats({ correct: 0, wrong: 0, xp: 0 });
+        setSessionStats({ correct: 0, wrong: 0, pv: 0 }); // [MOD] xp -> pv
         setQuestionsThisSession(0);
 
         // Check if this is first time - show worked example
@@ -119,11 +119,11 @@ export default function EquationExplorer({ onBack }) {
 
         if (isCorrect) {
             setFeedback('correct');
-            const xpGain = hintsUsed === 0 ? 15 : hintsUsed === 1 ? 10 : 5;
-            setSessionStats(s => ({ ...s, correct: s.correct + 1, xp: s.xp + xpGain }));
+            const pvGain = hintsUsed === 0 ? 15 : hintsUsed === 1 ? 10 : 5; // [MOD] xp -> pv
+            setSessionStats(s => ({ ...s, correct: s.correct + 1, pv: s.pv + pvGain })); // [MOD] xp -> pv
             
-            // [NEW] Global XP & Achievement
-            awardXP(xpGain, 'Equation Explorer');
+            // [NEW] Global PV & Achievement
+            awardPV(pvGain, 'Equation Explorer'); // [MOD] awardXP -> awardPV
             unlockAchievement('eq_novice'); // Attempt to unlock novice on every correct answer (logic handles duplicates)
 
             confetti({
@@ -206,13 +206,13 @@ export default function EquationExplorer({ onBack }) {
                     onClick={() => screen === 'menu' ? onBack() : setScreen('menu')}
                     className="text-xs text-slate-400 hover:text-white"
                 >
-                    ← {screen === 'menu' ? 'ARCADE' : 'MENU'}
+                    ← {screen === 'menu' ? 'MATH CAMP' : 'MENU'}
                 </button>
                 <h1 className="text-lg sm:text-xl font-black bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
                     EQUATION EXPLORER
                 </h1>
                 <div className="text-xs text-slate-500">
-                    {sessionStats.xp > 0 && <span className="text-yellow-400">⭐ {sessionStats.xp} XP</span>}
+                    {sessionStats.pv > 0 && <span className="text-yellow-400">⭐ {sessionStats.pv} PV</span>}
                 </div>
             </div>
 
@@ -467,8 +467,8 @@ export default function EquationExplorer({ onBack }) {
                                 <div className="text-xs text-slate-500">Wrong</div>
                             </div>
                             <div>
-                                <div className="text-3xl font-black text-yellow-400">{sessionStats.xp}</div>
-                                <div className="text-xs text-slate-500">XP</div>
+                                <div className="text-3xl font-black text-yellow-400">{sessionStats.pv}</div>
+                                <div className="text-xs text-slate-500">PV</div>
                             </div>
                         </div>
 

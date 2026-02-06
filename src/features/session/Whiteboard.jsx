@@ -4,9 +4,11 @@ import '@tldraw/tldraw/tldraw.css';
 import { useWhiteboardSync } from '../../hooks/useWhiteboardSync';
 import { setWhiteboardEditor, captureWhiteboard } from '../../utils/WhiteboardCapture';
 import WhiteboardOverlay from '../../components/WhiteboardOverlay';
+import { SimplifiedToolbar, simplifiedComponents } from '../../components/SimplifiedToolbar';
 import { useHomeworkUpload } from '../../hooks/useHomeworkUpload';
 import { useWhiteboardActions } from '../../hooks/useWhiteboardActions';
 import { useLiveObservation } from '../../hooks/useLiveObservation';
+import { useDraggable } from '../../hooks/useDraggable';
 
 // V5.0: Smart Image Compression (Phase 18.5)
 const MAX_IMAGE_SIZE = 1024 * 1024; // 1MB
@@ -94,10 +96,17 @@ const Whiteboard = memo(({ sessionId }) => {
     window.addEventListener('ai-thinking-start', handleThinkingStart);
     window.addEventListener('ai-thinking-stop', handleThinkingStop);
 
+    const handleStaple = (e) => {
+        const { url, name } = e.detail;
+        executeAction(editor, { type: 'STAPLE_IMAGE', url, name });
+    };
+    window.addEventListener('whiteboard-staple-image', handleStaple);
+
     return () => {
         window.removeEventListener('ai-whiteboard-action', handleAIAction);
         window.removeEventListener('ai-thinking-start', handleThinkingStart);
         window.removeEventListener('ai-thinking-stop', handleThinkingStop);
+        window.removeEventListener('whiteboard-staple-image', handleStaple);
     };
   }, [editor, executeAction]);
 
@@ -171,6 +180,19 @@ const Whiteboard = memo(({ sessionId }) => {
     };
   }, []);
 
+    const { 
+        position: actionsPos, 
+        dragHandlers: actionsHandlers, 
+        style: actionsStyle 
+    } = useDraggable({ x: 20, y: window.innerHeight - 100 });
+
+    const { 
+        position: livePos, 
+        dragHandlers: liveHandlers, 
+        style: liveStyle 
+    } = useDraggable({ x: window.innerWidth - 180, y: 100 });
+
+
   return (
     <div className="w-full h-full bg-slate-900 relative overflow-hidden flex flex-col">
       {/* AI Visual Overlay */}
@@ -194,13 +216,15 @@ const Whiteboard = memo(({ sessionId }) => {
         </div>
       )}
 
-      {/* Tldraw Editor */}
+      {/* Tldraw Editor with Simplified UI */}
       <div className={`w-full h-full tldraw__editor transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}>
         <Tldraw
           onMount={handleMount}
-          hideUi={false}
+          components={simplifiedComponents}
           autoFocus
-        />
+        >
+          <SimplifiedToolbar />
+        </Tldraw>
       </div>
 
       {/* Upload Success Toast */}
@@ -216,12 +240,15 @@ const Whiteboard = memo(({ sessionId }) => {
         </div>
       )}
 
-      {/* Action Buttons (Snap & Scan) */}
-      <div className="absolute bottom-20 right-4 sm:bottom-4 sm:left-4 sm:right-auto z-50 flex flex-col sm:flex-row gap-3">
-        
+      {/* Action Buttons (Snap & Scan) - DRAGGABLE */}
+      <div 
+        {...actionsHandlers}
+        style={actionsStyle}
+        className="flex flex-col sm:flex-row gap-3 p-2 rounded-2xl hover:bg-black/20 transition-colors"
+      >
         {/* SNAP HOMEWORK (Camera) */}
         <label className={`
-            flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-full font-bold shadow-lg transition-all cursor-pointer border border-white/10
+            flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-full font-bold shadow-lg transition-all cursor-pointer border border-white/10 select-none
             ${isProcessing ? 'bg-slate-800 text-slate-500 scale-95' : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:scale-105 hover:shadow-emerald-500/30 active:scale-95'}
           `}>
           <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleSnap} disabled={isProcessing} />
@@ -244,7 +271,7 @@ const Whiteboard = memo(({ sessionId }) => {
             onClick={handleScanBoard}
             disabled={isProcessing}
             className={`
-            flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-full font-bold shadow-lg transition-all cursor-pointer border border-white/10
+            flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-full font-bold shadow-lg transition-all cursor-pointer border border-white/10 select-none
             ${isProcessing ? 'bg-slate-800 text-slate-500 scale-95' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:scale-105 hover:shadow-blue-500/30 active:scale-95'}
           `}>
             {isProcessing ? (
@@ -259,11 +286,14 @@ const Whiteboard = memo(({ sessionId }) => {
         </button>
       </div>
 
-      {/* Live Tutor Toggle */}
-      <div className="absolute top-20 right-4 sm:top-24 z-50">
+      {/* Live Tutor Toggle - DRAGGABLE */}
+      <div 
+        {...liveHandlers}
+        style={liveStyle}
+      >
         <button
             onClick={() => setIsLiveMode(!isLiveMode)}
-            className={`px-4 py-2 rounded-full font-bold text-xs uppercase tracking-wider transition-all border border-white/10 shadow-lg flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-full font-bold text-xs uppercase tracking-wider transition-all border border-white/10 shadow-lg flex items-center gap-2 select-none ${
                 isLiveMode ? 'bg-red-600/90 text-white animate-pulse' : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700'
             }`}
         >

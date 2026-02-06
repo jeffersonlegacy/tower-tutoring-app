@@ -23,6 +23,25 @@ export default function WhiteboardOverlay({ action, onComplete, editor }) {
     const [visible, setVisible] = useState(false);
     const [fading, setFading] = useState(false);
 
+    // V2.1: Live Tutor Countdown Timer
+    const [timerSecs, setTimerSecs] = useState(null);
+
+    useEffect(() => {
+        const handleStart = () => setTimerSecs(null); // Reset
+        const handleTick = (e) => setTimerSecs(e.detail.seconds);
+        const handleEnd = () => setTimerSecs(0); // Trigger analyzing state
+        
+        window.addEventListener('live-tutor-timer-start', handleStart);
+        window.addEventListener('live-tutor-timer-tick', handleTick);
+        window.addEventListener('live-tutor-timer-end', handleEnd);
+        
+        return () => {
+            window.removeEventListener('live-tutor-timer-start', handleStart);
+            window.removeEventListener('live-tutor-timer-tick', handleTick);
+            window.removeEventListener('live-tutor-timer-end', handleEnd);
+        };
+    }, []);
+
     useEffect(() => {
         // CSS for pulse animation - inject once
         const id = 'whiteboard-overlay-styles';
@@ -62,6 +81,18 @@ export default function WhiteboardOverlay({ action, onComplete, editor }) {
         }
     }, [action, onComplete]);
 
+    // RENDER TIMER BADGE
+    if (timerSecs !== null && timerSecs > 0) {
+        return (
+            <div className="absolute top-24 left-1/2 -translate-x-1/2 pointer-events-none z-[100] animate-bounce-in">
+                 <div className="bg-slate-900/80 backdrop-blur-md border border-cyan-500/50 text-cyan-400 px-4 py-2 rounded-full font-mono text-sm shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
+                    Analyzing in {timerSecs}s...
+                 </div>
+            </div>
+        );
+    }
+
     if (!visible || !action) return null;
 
     // "THINKING" State - Subtle AI Presence
@@ -92,6 +123,9 @@ export default function WhiteboardOverlay({ action, onComplete, editor }) {
         );
     }
 
+
+    // Declaring region variable at the start to avoid reference errors
+    let region = action.region ? REGION_MAP[action.region] : null;
 
     if (action.coordinates && action.coordinates.length === 4) {
         const [x1, y1, x2, y2] = action.coordinates;

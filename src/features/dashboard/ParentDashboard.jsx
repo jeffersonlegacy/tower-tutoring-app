@@ -32,7 +32,7 @@ export default function ParentDashboard() {
                         <h1 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
                             GUARDIAN VIEW
                         </h1>
-                        <p className="text-slate-400 text-xs sm:text-sm">Jefferson Intelligence v4.0</p>
+                        <p className="text-slate-400 text-xs sm:text-sm">ToweR Intelligence v4.0</p>
                     </div>
                     <div className="text-left sm:text-right bg-slate-800/50 p-3 rounded-xl w-full sm:w-auto">
                         <div className="text-2xl sm:text-3xl font-bold">{stats.mastered} / {stats.total}</div>

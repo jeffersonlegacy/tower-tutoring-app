@@ -87,19 +87,26 @@ async function captureViaEditor() {
         const canvas = document.createElement('canvas');
 
         img.onload = () => {
-            canvas.width = img.width || 800;
-            canvas.height = img.height || 600;
+            const MAX_DIM = 1600;
+            let width = img.width || 800;
+            let height = img.height || 600;
+
+            if (width > MAX_DIM || height > MAX_DIM) {
+                const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+                width *= ratio;
+                height *= ratio;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = 'white';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
+            ctx.drawImage(img, 0, 0, width, height);
+            
             URL.revokeObjectURL(url);
-            resolve(canvas.toDataURL('image/png', 0.9));
-        };
-
-        img.onerror = () => {
-            URL.revokeObjectURL(url);
-            resolve(null);
+            // Lower quality slightly for faster transmission
+            resolve(canvas.toDataURL('image/jpeg', 0.8));
         };
 
         img.src = url;

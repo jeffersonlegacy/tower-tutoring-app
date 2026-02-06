@@ -3,7 +3,7 @@ import { db, storage } from '../../services/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { useHomeworkUpload } from '../../hooks/useHomeworkUpload';
-import { mindHive } from '../../services/MindHiveService';
+import { getMindHive } from '../../services/MindHiveService';
 
 export default function HomeworkTray({ sessionId }) {
     const [files, setFiles] = useState([]);
@@ -62,7 +62,7 @@ export default function HomeworkTray({ sessionId }) {
             // using mindHive service
 
             let fullText = "";
-            await mindHive.streamResponse(
+            await getMindHive().streamResponse(
                 "Analyze this homework image. Identify the subject, the key problem, and provide a step-by-step solution guide. Do not give the direct answer immediately, but explain the method.",
                 [], // No history needed
                 (chunk) => {
@@ -136,6 +136,19 @@ export default function HomeworkTray({ sessionId }) {
                                     🧠
                                 </button>
                             )}
+                            {file.type.includes('image') && (
+                                <button
+                                    onClick={() => {
+                                        window.dispatchEvent(new CustomEvent('whiteboard-staple-image', { 
+                                            detail: { url: file.url, name: file.name } 
+                                        }));
+                                    }}
+                                    className="p-1 hover:text-emerald-400 text-slate-400"
+                                    title="Staple to Board"
+                                >
+                                    📌
+                                </button>
+                            )}
                             <a
                                 href={file.url}
                                 target="_blank"
@@ -181,7 +194,7 @@ export default function HomeworkTray({ sessionId }) {
                             )}
                         </div>
                         <div className="p-3 border-t border-white/10 bg-slate-950/30 text-center">
-                            <span className="text-[9px] text-slate-600 uppercase tracking-widest">Powered by Jefferson Intelligence Vision</span>
+                            <span className="text-[9px] text-slate-600 uppercase tracking-widest">Powered by ToweR Intelligence Vision</span>
                         </div>
                     </div>
                 </div>

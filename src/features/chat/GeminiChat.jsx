@@ -1,14 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { mindHive, parseAIResponse } from '../../services/MindHiveService';
-import { captureWhiteboard } from '../../utils/WhiteboardCapture';
-import { strokeAnalytics } from '../../utils/StrokeAnalytics';
+// import ReactMarkdown from 'react-markdown';
+// import remarkGfm from 'remark-gfm';
+import { getMindHive, parseAIResponse } from '../../services/MindHiveService';
+// import { captureWhiteboard } from '../../utils/WhiteboardCapture';
+// import { strokeAnalytics } from '../../utils/StrokeAnalytics';
 import { useMastery } from '../../context/MasteryContext';
-import ScanningOverlay from '../../components/ScanningOverlay';
-import jiLogo from '../../assets/ji_logo.jpg';
-import { getWhiteboardEditor } from '../../utils/WhiteboardCapture';
-import { getEnhancedSpatialSummary } from '../../utils/WhiteboardSpatialAwareness';
+// import ScanningOverlay from '../../components/ScanningOverlay';
+// import jiLogo from '../../assets/ji_logo.jpg';
+// import { getEnhancedSpatialSummary } from '../../utils/WhiteboardSpatialAwareness';
 
 // Patterns that suggest the student completed a whiteboard task
 const COMPLETION_PATTERNS = [
@@ -23,14 +22,45 @@ const INSTRUCTION_PATTERNS = [
     /label/i, /show me/i, /put/i, /add/i, /create/i, /make/i
 ];
 
-export default function GeminiChat({ mode = 'widget', onHome, externalMessages, setExternalMessages }) {
+export default function GeminiChat({ mode = 'widget', onHome, externalMessages, setExternalMessages, sessionMode = 'standard' }) {
     const { curriculum, getNodeStatus, logEvent } = useMastery();
 
-    const [localMessages, setLocalMessages] = useState([
-        { role: 'model', text: 'Welcome to Jefferson Intelligence v3.0. I can see your whiteboard and understand how you\'re working. Just tell me what you need help with!' },
-    ]);
+    // === ALL STATE DECLARATIONS FIRST (before any useEffects) ===
+    const [localMessages, setLocalMessages] = useState(() => {
+        let welcomeText = "Welcome to ToweR Intelligence v3.0. I can see your whiteboard and understand how you're working. Just tell me what you need help with!";
+        
+        if (sessionMode === 'visualize') {
+            welcomeText = "👁️ **VISUAL MODE INITIATED.** I'm ready to demonstrate concepts. Ask me to 'show you' how something works!";
+        } else if (sessionMode === 'train') {
+            welcomeText = "⚡ **NEURO-TRAIN MODE.** Speed is key. I'll give you rapid-fire problems. Ready?";
+        } else if (sessionMode === 'guide') {
+            welcomeText = "🧠 **GUIDED MODE.** We'll go step-by-step. Upload your problem and I'll walk you through it.";
+        }
 
-    // Log session start once on mount
+        return [{ role: 'model', text: welcomeText }];
+    });
+    const [input, setInput] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
+    const [currentModel, setCurrentModel] = useState(null);
+    const [whiteboardImage, setWhiteboardImage] = useState(null);
+    const [isCapturing, setIsCapturing] = useState(false);
+    const [autoCapture, setAutoCapture] = useState(true);
+    const [emotionalState, setEmotionalState] = useState('neutral');
+    const [whiteboardAction, setWhiteboardAction] = useState(null);
+
+    const messages = externalMessages || localMessages;
+    const setMessages = setExternalMessages || setLocalMessages;
+
+    // === REFS ===
+    const prevEmotionRef = useRef('neutral');
+    const messagesEndRef = useRef(null);
+    const lastAIResponseRef = useRef('');
+    const messagesRef = useRef(messages);
+
+    // === EFFECTS ===
+    // Debug API Keys
     useEffect(() => {
         logEvent('session_start', { mode });
     }, []);
@@ -51,8 +81,8 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
             let prompt = "";
 
             if (isAuto) {
-                // "Live Tutor" persona - Check in gently
-                prompt = "I'm looking at your work live. If I see a mistake or a good next step, I'll mention it clearly. Otherwise, I'll give a quick thumbs up. Keep going.";
+                // "Live Tutor" persona - Active Observation
+                prompt = "I'm looking at your work live. Analyze what is on the board right now. If you see a math problem, solve it or give a hint. If it looks correct, say 'Great job!'. do NOT stay silent.";
             } else {
                 // Manual Upload
                 prompt = isUpdate 
@@ -67,21 +97,35 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
         return () => window.removeEventListener('ai-vision-upload', handleSnapUpload);
     }, []);
 
-    const messages = externalMessages || localMessages;
-    const setMessages = setExternalMessages || setLocalMessages;
-    const [input, setInput] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [isScanning, setIsScanning] = useState(false);
-    const [isOpen, setIsOpen] = useState(false);
-    const [currentModel, setCurrentModel] = useState(null);
-    const [whiteboardImage, setWhiteboardImage] = useState(null);
-    const [isCapturing, setIsCapturing] = useState(false);
-    const [autoCapture, setAutoCapture] = useState(true);
-    const [emotionalState, setEmotionalState] = useState('neutral');
+    // Proactive Help Listener
+    useEffect(() => {
+        const handleNotification = (e) => {
+            const { type, data } = e.detail;
+            if (type === 'ai_nudge') {
+                // If chat is closed, maybe pulse the button or show a toast?
+                // For now, we'll auto-open if it's critical, or just add a message if open
+                if (!isOpen) {
+                    // Could add a "pulsing" state to the launcher button
+                    // But for V2 Coherence, let's just log it or auto-open if actively engaged
+                    console.log("AI Nudge received:", data.message);
+                }
+                
+                // Inject the helpful message from the 'System'
+                setLocalMessages(prev => [...prev, { 
+                    role: 'model', 
+                    text: `💡 **Proactive Assist:** ${data.message}` 
+                }]);
+            }
+        };
 
-    // Track previous emotion to detect changes
-    const prevEmotionRef = useRef('neutral');
+        window.addEventListener('tower-notification', handleNotification);
+        return () => window.removeEventListener('tower-notification', handleNotification);
+    }, [isOpen]);
 
+    // Sync messagesRef
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
     // Log emotional shifts
     useEffect(() => {
         if (emotionalState !== prevEmotionRef.current) {
@@ -95,18 +139,8 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
         }
     }, [emotionalState, logEvent, messages]);
 
-    const [whiteboardAction, setWhiteboardAction] = useState(null);
-    const messagesEndRef = useRef(null);
-    const lastAIResponseRef = useRef('');
-    
-    // Track messages in a ref to avoid stale closures in event listeners
-    const messagesRef = useRef(messages);
-    useEffect(() => {
-        messagesRef.current = messages;
-    }, [messages]);
-
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     };
 
     useEffect(() => {
@@ -127,7 +161,8 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
 
     const silentCapture = useCallback(async () => {
         try {
-            const imageData = await captureWhiteboard();
+            // const imageData = await captureWhiteboard();
+            const imageData = null;
             return imageData;
         } catch (error) {
             console.warn('Silent capture failed:', error);
@@ -147,7 +182,8 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
     const handleCaptureWhiteboard = async () => {
         setIsCapturing(true);
         try {
-            const imageData = await captureWhiteboard();
+            // const imageData = await captureWhiteboard();
+            const imageData = null;
             if (imageData) {
                 setWhiteboardImage(imageData);
                 if (!input.trim()) {
@@ -179,27 +215,41 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
         const deviceContext = `User Environment: ${deviceType} (Viewport: ${width}x${height})`;
 
         // 2. Stroke Analytics
-        let strokeContext = strokeAnalytics.getContextString();
-        strokeContext = `${deviceContext}\n${strokeContext}`;
+        // let strokeContext = strokeAnalytics.getContextString();
+        // strokeContext = `${deviceContext}\n${strokeContext}`;
+        let strokeContext = deviceContext;
 
         // 2. Mastery Context (Curriculum Awareness)
         const currentUrlParams = window.location.pathname.split('/');
         const currentSessionId = currentUrlParams[2];
-        const currentNode = currentSessionId ? curriculum.nodes[currentSessionId] : null;
+        const currentNode = (currentSessionId && curriculum?.nodes) ? curriculum.nodes[currentSessionId] : null;
 
-        const masteredNodes = Object.values(curriculum.nodes)
-            .filter(n => getNodeStatus(n.id) === 'completed')
+        // Defensive logging
+        // console.log("[GeminiChat] Current Node:", currentNode?.title || "None");
+
+        const masteredNodes = Object.values(curriculum?.nodes || {})
+            .filter(n => n && getNodeStatus(n.id) === 'completed')
             .map(n => n.title);
 
-        const unlockedNodes = Object.values(curriculum.nodes)
-            .filter(n => getNodeStatus(n.id) === 'unlocked')
+        const unlockedNodes = Object.values(curriculum?.nodes || {})
+            .filter(n => n && getNodeStatus(n.id) === 'unlocked')
             .map(n => n.title);
 
         // 3. Spatial Context (Whiteboard Layout - V2.0 Enhanced)
-        const editor = getWhiteboardEditor();
-        const spatialContext = getEnhancedSpatialSummary(editor) || "Board state unknown.";
+        // const editor = getWhiteboardEditor();
+        // const spatialContext = getEnhancedSpatialSummary(editor) || "Board state unknown.";
+        const spatialContext = "Board state unknown.";
 
-        const fullContext = `${strokeContext}\n${masteryContext}\n${spatialContext}`;
+        // 4. Session Mode Context
+        const modeContext = `[SESSION_MODE: ${sessionMode.toUpperCase()}]`;
+
+        const masteryContext = `
+Mastered Nodes: ${masteredNodes.join(', ') || 'None'}
+Available Nodes: ${unlockedNodes.join(', ') || 'None'}
+Active Node: ${currentNode?.title || 'Unknown'}
+`;
+
+        const fullContext = `${strokeContext}\n${masteryContext}\n${spatialContext}\n${modeContext}`;
         // console.log('[v3.0] Full Context:', fullContext);
 
         // AUTO-CAPTURE LOGIC
@@ -247,7 +297,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
         let fullResponse = "";
 
         try {
-            await mindHive.streamResponse(
+            await getMindHive().streamResponse(
                 userText,
                 messages,
                 (chunk) => {
@@ -287,7 +337,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
             }
 
             // Reset stroke analytics after successful exchange
-            strokeAnalytics.reset();
+            // strokeAnalytics.reset();
 
         } catch (error) {
             console.error("Mind Hive Error:", error);
@@ -308,7 +358,10 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
         }
     };
 
-    const handleSend = () => sendMessage();
+    const handleSend = () => {
+        console.log('[GeminiChat] Send triggered. Input:', input, 'Image:', !!whiteboardImage);
+        sendMessage();
+    };
 
     // Emotional state badge
     const getEmotionBadge = () => {
@@ -330,8 +383,8 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                 onClick={() => setIsOpen(true)}
                 className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 text-white p-4 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.6)] hover:scale-105 transition-all z-50 flex items-center gap-3 border border-white/20"
             >
-                <img src={jiLogo} alt="JI Logo" className="w-14 h-14 rounded-full border-2 border-white/30" />
-                <span className="font-bold tracking-wide text-sm font-sans">Jefferson Intelligence</span>
+                {/* <img src={jiLogo} alt="JI Logo" className="w-14 h-14 rounded-full border-2 border-white/30" /> */}
+                <span className="font-bold tracking-wide text-sm font-sans">ToweR Intelligence</span>
             </button>
         );
     }
@@ -345,7 +398,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
     return (
         <div className={containerClasses}>
             {/* Scanning Overlay */}
-            <ScanningOverlay isActive={isScanning} />
+            {/* {isScanning && <ScanningOverlay isActive={true} />} */}
 
             {/* Header */}
             <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-4 flex justify-between items-center border-b border-white/5 relative overflow-hidden">
@@ -353,9 +406,10 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
 
                 <div className="flex flex-col z-10 w-full">
                     <div className="flex items-center gap-3">
-                        <img src={jiLogo} alt="JI Logo" className="w-12 h-12 rounded-full border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/20" />
+                        {/* <img src={jiLogo} alt="JI Logo" className="w-12 h-12 rounded-full border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/20" /> */}
+                        <div className="w-12 h-12 rounded-full border-2 border-cyan-500/50 bg-cyan-900/50 flex items-center justify-center text-[10px] text-cyan-200">AI</div>
                         <div>
-                            <span className="font-extrabold text-white text-sm tracking-wide uppercase">Jefferson Intelligence</span>
+                            <span className="font-extrabold text-white text-sm tracking-wide uppercase">ToweR Intelligence</span>
                             <div className="flex items-center gap-2 mt-0.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]"></span>
                                 <span className="text-[10px] text-slate-400 font-medium tracking-wider">
@@ -390,7 +444,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                                 }`}>
                                 {msg.role === 'model' && (
                                     <div className="text-[10px] font-bold text-cyan-400/80 mb-1 tracking-widest uppercase flex items-center gap-2">
-                                        Jefferson AI {currentModel && idx === messages.length - 1 && <span className="text-[8px] px-1 bg-cyan-900/50 rounded text-cyan-300">{currentModel}</span>}
+                                        ToweR AI {currentModel && idx === messages.length - 1 && <span className="text-[8px] px-1 bg-cyan-900/50 rounded text-cyan-300">{currentModel}</span>}
                                     </div>
                                 )}
                                 {msg.hasImage && (
@@ -400,7 +454,8 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                                 )}
                                 <div className="markdown-body">
                                     {msg.role === 'model' ? (
-                                        <ReactMarkdown
+                                        <div className="whitespace-pre-wrap font-sans text-sm">{msg.text}</div>
+                                        /* <ReactMarkdown
                                             remarkPlugins={[remarkGfm]}
                                             components={{
                                                 p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
@@ -413,7 +468,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
                                             }}
                                         >
                                             {msg.text}
-                                        </ReactMarkdown>
+                                        </ReactMarkdown> */
                                     ) : (
                                         <div className="whitespace-pre-wrap">{msg.text}</div>
                                     )}

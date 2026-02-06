@@ -124,68 +124,75 @@ export function useWhiteboardSync(editor, sessionId) {
         const docRef = doc(db, 'whiteboards', sessionId);
 
         // 2. LISTEN: Receive remote updates
-        const unsubscribeSnapshot = onSnapshot(docRef, (snapshot) => {
-            if (!snapshot.exists()) {
-                // If doc deleted, maybe clear board? For now do nothing.
+        const unsubscribeSnapshot = onSnapshot(docRef, { includeMetadataChanges: true }, (snapshot) => {
+            // 1. Strict Local Filter: If these are our own pending writes, IGNORE.
+            // This stops the "fighting" where the server echoes back our own movement 50ms later.
+            if (snapshot.metadata.hasPendingWrites) {
                 return;
             }
+
+            if (!snapshot.exists()) return;
 
             const data = snapshot.data();
+            
+            // Backup check: Instance ID (in case metadata fails or mixed updates)
+            if (data.instanceId === INSTANCE_ID && !isFirstLoad.current) return;
+            if (!data.records || typeof data.records !== 'object') return;
 
-            // Skip if this update originated from us
-            if (data.instanceId === INSTANCE_ID && !isFirstLoad.current) {
+            // SAFETY: Prevent accidental wipes
+            const remoteRecords = Object.values(data.records);
+            const localRecords = editor.store.allRecords();
+            if (remoteRecords.length === 0 && localRecords.length > 5 && !isFirstLoad.current) {
+                console.warn('[Sync] Ignoring suspicious empty update');
                 return;
             }
-
-            if (!data.records || typeof data.records !== 'object') return;
 
             isApplyingRemote.current = true;
             isFirstLoad.current = false;
 
             try {
-                // Update our truth source
                 lastServerState.current = { ...data.records };
-
-                const remoteRecords = Object.values(data.records);
-                const localRecords = editor.store.allRecords();
-                
-                // Diffing for the store
                 const remoteMap = new Map(Object.entries(data.records));
-                
+
+                // 2. Anti-Jitter: IDENTIFY PROTECTED SHAPES
+                // Don't let the server move shapes the user is currently holding/selecting.
+                const selectedIds = new Set(editor.getSelectedShapeIds());
+
                 // UPSERT (Add/Update)
                 const toUpsert = [];
                 for (const r of remoteRecords) {
+                    // Skip if user is holding this shape
+                    if (selectedIds.has(r.id)) continue;
+
                     const local = editor.store.get(r.id);
-                    // Only update if different
                     if (!local || JSON.stringify(local) !== JSON.stringify(r)) {
                         toUpsert.push(r);
                     }
                 }
 
                 // REMOVE (Exist locally but not remotely)
-                // We rely on the fact that 'data.records' is the source of truth
-                // We include 'binding' to ensure arrows/connections are cleaned up
                 const toRemove = localRecords
-                    .filter(l => !remoteMap.has(l.id) && (l.typeName === 'shape' || l.typeName === 'asset' || l.typeName === 'binding'))
+                    .filter(l => {
+                        const isPermanentType = l.typeName === 'shape' || l.typeName === 'asset' || l.typeName === 'binding';
+                        // Don't delete if user has it selected (unlikely but safe)
+                        if (selectedIds.has(l.id)) return false;
+                        
+                        return isPermanentType && !remoteMap.has(l.id);
+                    })
                     .map(l => l.id);
 
-                if (toUpsert.length > 0) {
-                    editor.store.put(toUpsert);
-                }
-                if (toRemove.length > 0) {
-                    editor.store.remove(toRemove);
-                }
-                
-                // console.log(`[Sync] Applied: +${toUpsert.length} -${toRemove.length}`);
+                // Apply changes
+                editor.store.mergeRemoteChanges(() => {
+                    if (toUpsert.length > 0) editor.store.put(toUpsert);
+                    if (toRemove.length > 0) editor.store.remove(toRemove);
+                });
 
             } catch (e) {
                 console.warn('[Sync] Apply error:', e);
             } finally {
-                // Short timeout to ensure store events settle before we allow pushing again
-                const timer = setTimeout(() => {
+                setTimeout(() => {
                     isApplyingRemote.current = false;
                 }, 50);
-                return () => clearTimeout(timer); // cleanup in case of fast updates
             }
         });
 

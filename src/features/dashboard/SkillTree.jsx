@@ -19,7 +19,7 @@ export default function SkillTree() {
     return (
         <div className="min-h-screen bg-slate-950 text-white p-4 sm:p-8 font-sans overflow-x-hidden">
             <header className="mb-8 sm:mb-12 text-center max-w-2xl mx-auto px-2">
-                <div className="text-cyan-500 font-bold tracking-widest uppercase mb-2 text-xs sm:text-sm">Jefferson Intelligence v4.0</div>
+                <div className="text-cyan-500 font-bold tracking-widest uppercase mb-2 text-xs sm:text-sm">ToweR Intelligence v4.0</div>
                 <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent mb-2 sm:mb-4">
                     {curriculum.track}: {curriculum.level}
                 </h1>

@@ -16,7 +16,7 @@ export default function VideoChat({ sessionId, onTogglePiP, isFloating }) {
     // Fix: Persist userName across re-renders to prevent iframe reload on tab switch
     const [userName] = React.useState(() => `User_${Math.floor(Math.random() * 1000)}`);
 
-    const videoUrl = `${mirotalkBase}/${roomName}?name=${userName}&video=true&audio=true&screen=0&notify=0`;
+    const videoUrl = `${mirotalkBase}/${roomName}?name=${userName}&video=true&audio=true&screen=0&notify=0&chat=0`;
 
     // Neutralize iframe on unmount to prevent memory leaks/zombie audio
     React.useEffect(() => {
