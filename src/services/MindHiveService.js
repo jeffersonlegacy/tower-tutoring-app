@@ -1,7 +1,7 @@
 /**
  * MindHiveService.js
  *
- * ChatGPT/OpenAI-backed tutoring stream service.
+ * Gemini-backed tutoring stream service.
  * All model access is routed through /api/chat/completions.
  */
 import { composeSystemPrompt } from './MindHivePlugins';
@@ -9,7 +9,7 @@ import { buildChatMessages } from './chatPayload';
 import { trackError } from './telemetry';
 
 const CONFIG = {
-  model: import.meta.env.VITE_OPENAI_MODEL || 'gpt-4.1-mini',
+  model: import.meta.env.VITE_GEMINI_MODEL || import.meta.env.VITE_OPENAI_MODEL || 'gemini-1.5-flash',
   temperature: 0.75,
   endpoint: '/api/chat/completions',
   systemPrompt: composeSystemPrompt({ ageGroup: 'high', enableLiveTutor: false }),
@@ -25,7 +25,7 @@ class MindHiveService {
     strokeContext = '',
   ) {
     if (onModelChange) {
-      onModelChange(`OPENAI ${CONFIG.model.toUpperCase()}`);
+      onModelChange(`GEMINI ${CONFIG.model.toUpperCase()}`);
     }
 
     const { messages } = buildChatMessages({
@@ -82,7 +82,7 @@ class MindHiveService {
       }
     }
 
-    if (!hasContent) throw new Error('Empty response from ChatGPT API');
+    if (!hasContent) throw new Error('Empty response from Gemini API');
   }
 
   async streamResponseSafe(...args) {
