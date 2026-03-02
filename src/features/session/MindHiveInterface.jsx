@@ -2,7 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { getMindHive } from '../../services/MindHiveService';
 import { useMastery } from '../../context/MasteryContext';
 
-const GeminiChat = lazy(() => import('../chat/GeminiChat'));
+const ChatGPTChat = lazy(() => import('../chat/ChatGPTChat'));
 
 export default function MindHiveInterface({ onHome }) {
     const { sessionLogs } = useMastery();
@@ -110,7 +110,7 @@ export default function MindHiveInterface({ onHome }) {
                             </div>
                             <div className="flex-1 relative">
                                 <Suspense fallback={<div className="flex items-center justify-center h-full text-slate-500 text-xs">Loading Chat...</div>}>
-                                    <GeminiChat
+                                    <ChatGPTChat
                                         mode="fullscreen"
                                         onHome={onHome}
                                         externalMessages={messages}

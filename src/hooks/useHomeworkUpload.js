@@ -26,9 +26,10 @@ export function useHomeworkUpload(sessionId) {
             });
 
             // 3. INTELLIGENT AWARENESS (Notify AI Brain)
-            // Dispatch event for GeminiChat to pick up immediately
+            // Dispatch event for ChatGPTChat to pick up immediately
             const aiEvent = new CustomEvent('ai-vision-upload', {
                 detail: {
+                    image: downloadURL,
                     imageUrl: downloadURL,
                     isAuto: false, // This is a manual user upload, so AI should acknowledge it
                     context: "User uploaded a file/homework."

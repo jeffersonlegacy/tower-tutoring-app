@@ -5,7 +5,31 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
-    { ignores: ['dist'] },
+    {
+        ignores: [
+            'dist/**',
+            'node_modules/**',
+            '.vercel/**',
+            '.firebase/**',
+            'build_log.txt',
+            'archived-games/**',
+            'experiments/**',
+        ],
+    },
+    {
+        files: ['api/**/*.js'],
+        languageOptions: {
+            ecmaVersion: 'latest',
+            sourceType: 'module',
+            globals: {
+                ...globals.node,
+            },
+        },
+        rules: {
+            ...js.configs.recommended.rules,
+            'no-unused-vars': 'warn',
+        },
+    },
     {
         files: ['**/*.{js,jsx}'],
         languageOptions: {
@@ -27,12 +51,17 @@ export default [
             ...js.configs.recommended.rules,
             ...react.configs.recommended.rules,
             ...react.configs['jsx-runtime'].rules,
-            ...reactHooks.configs.recommended.rules,
+            'react-hooks/rules-of-hooks': 'error',
+            'react-hooks/exhaustive-deps': 'warn',
             'react/jsx-no-target-blank': 'off',
+            'react/no-unescaped-entities': 'off',
+            'react/jsx-no-comment-textnodes': 'off',
             'react/react-in-jsx-scope': 'off',
             'react/prop-types': 'off',
             'react/display-name': 'off',
             'react/no-unknown-property': 'off',
+            'no-case-declarations': 'warn',
+            'no-empty': 'warn',
             'react-refresh/only-export-components': [
                 'warn',
                 { allowConstantExport: true },

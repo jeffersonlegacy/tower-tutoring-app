@@ -10,7 +10,8 @@ import {
     LogOut,
     Menu,
     X,
-    Video
+    Video,
+    GraduationCap
 } from "lucide-react";
 import { useHomeworkUpload } from "../hooks/useHomeworkUpload";
 import { useMastery } from "../context/MasteryContext";
@@ -21,10 +22,11 @@ import MindHiveInterface from "../features/session/MindHiveInterface";
 const Whiteboard = lazy(() => import("../features/session/Whiteboard"));
 const VideoChat = lazy(() => import("../features/session/VideoChat"));
 const BrainBreak = lazy(() => import("../features/games/BrainBreak"));
-const GeminiChat = lazy(() => import("../features/chat/GeminiChat"));
+const ChatGPTChat = lazy(() => import("../features/chat/ChatGPTChat"));
 const MathTools = lazy(() => import("../features/tools/MathTools"));
 const SessionMathCampOverlay = lazy(() => import("../features/session/SessionMathCampOverlay"));
 const PathEngine = lazy(() => import("../features/session/PathEngine"));
+const TeacherActions = lazy(() => import("../features/session/TeacherActions"));
 
 const ProfileDashboard = lazy(() => import("../features/profile/ProfileDashboard"));
 
@@ -60,6 +62,9 @@ export default function Session() {
         if (['visualize', 'guide'].includes(sessionMode)) return 'ai';
         return 'homework';
     });
+    
+    // NEW: Teacher Mode Toggle
+    const [showTeacherMenu, setShowTeacherMenu] = useState(false);
 
     // Main Tab Mode (Mobile Only): 'board' | 'sidebar'
     const [mainTab, setMainTab] = useState('sidebar');
@@ -312,21 +317,37 @@ export default function Session() {
                         <div className="flex flex-col gap-4">
                             <RailButton 
                                 icon={<Upload size={20} />} 
-                                active={sidebarMode === 'homework'} 
-                                onClick={() => setSidebarMode('homework')} 
+                                active={sidebarMode === 'homework' && !showTeacherMenu} 
+                                onClick={() => {
+                                    setSidebarMode('homework');
+                                    setShowTeacherMenu(false);
+                                }} 
                                 label="Upload"
                             />
                             <RailButton 
                                 icon={<Bot size={20} />} 
-                                active={sidebarMode === 'ai'} 
-                                onClick={() => setSidebarMode('ai')} 
+                                active={sidebarMode === 'ai' && !showTeacherMenu} 
+                                onClick={() => {
+                                    setSidebarMode('ai');
+                                    setShowTeacherMenu(false);
+                                }} 
                                 label="AI Tutor"
                             />
                             <RailButton 
                                 icon={<Calculator size={20} />} 
-                                active={sidebarMode === 'tools'} 
-                                onClick={() => setSidebarMode('tools')} 
+                                active={sidebarMode === 'tools' && !showTeacherMenu} 
+                                onClick={() => {
+                                    setSidebarMode('tools');
+                                    setShowTeacherMenu(false);
+                                }} 
                                 label="Tools"
+                            />
+                            <RailButton
+                                icon={<GraduationCap size={20} />}
+                                active={showTeacherMenu}
+                                onClick={() => setShowTeacherMenu(prev => !prev)}
+                                label="Teacher Mode"
+                                color="amber"
                             />
                             
                             <div className="w-8 h-[1px] bg-white/10 mx-auto"></div>
@@ -355,21 +376,30 @@ export default function Session() {
                                     </svg>
                                 } 
                                 active={sidebarMode === 'mathcamp'} 
-                                onClick={() => setSidebarMode('mathcamp')} 
+                                onClick={() => {
+                                    setSidebarMode('mathcamp');
+                                    setShowTeacherMenu(false);
+                                }} 
                                 label="Math Nexus"
                                 color="emerald"
                             />
                             <RailButton 
                                 icon={<Gamepad2 size={20} />} 
                                 active={sidebarMode === 'arcade'} 
-                                onClick={() => setSidebarMode('arcade')} 
+                                onClick={() => {
+                                    setSidebarMode('arcade');
+                                    setShowTeacherMenu(false);
+                                }} 
                                 label="Arcade"
                                 color="pink"
                             />
                             <RailButton 
                                 icon={<UserCircle size={20} />} 
                                 active={sidebarMode === 'profile'} 
-                                onClick={() => setSidebarMode('profile')} 
+                                onClick={() => {
+                                    setSidebarMode('profile');
+                                    setShowTeacherMenu(false);
+                                }} 
                                 label="Profile"
                                 color="blue"
                             />
@@ -388,6 +418,14 @@ export default function Session() {
 
                     {/* 2. CONTENT PANEL (Right Drawer) */}
                     <div className="flex-1 bg-slate-900/50 backdrop-blur relative overflow-hidden flex flex-col">
+                        
+                        {/* TEACHER OVERLAY MENU */}
+                        {showTeacherMenu && (
+                             <Suspense fallback={<ComponentLoader />}>
+                                 <TeacherActions sessionId={sessionId} onClose={() => setShowTeacherMenu(false)} />
+                             </Suspense>
+                        )}
+                        
                         {/* Header for Panel */}
                         <div className="h-[52px] border-b border-white/5 flex items-center px-4 bg-slate-900/80 sticky top-0 z-10">
                             <h2 className="text-sm font-bold text-slate-300 uppercase tracking-widest flex items-center gap-2">
@@ -407,7 +445,7 @@ export default function Session() {
                             )}
                             <Suspense fallback={<ComponentLoader />}>
                                 {sidebarMode === 'ai' && (
-                                    <GeminiChat sessionId={sessionId} mode="fullscreen" sessionMode={sessionMode} />
+                                    <ChatGPTChat sessionId={sessionId} mode="fullscreen" sessionMode={sessionMode} />
                                 )}
 
                                 {sidebarMode === 'mathcamp' && (
@@ -453,7 +491,8 @@ function RailButton({ icon, active, onClick, label, color = 'cyan' }) {
         cyan: 'bg-cyan-500/20 text-cyan-400 border-l-2 border-cyan-500',
         pink: 'bg-pink-500/20 text-pink-400 border-l-2 border-pink-500',
         blue: 'bg-blue-500/20 text-blue-400 border-l-2 border-blue-500', 
-        emerald: 'bg-emerald-500/20 text-emerald-400 border-l-2 border-emerald-500'
+        emerald: 'bg-emerald-500/20 text-emerald-400 border-l-2 border-emerald-500',
+        amber: 'bg-amber-500/20 text-amber-400 border-l-2 border-amber-500' // Added Amber
     };
 
     return (

@@ -17,6 +17,7 @@ export default function PathEngine({ node, mode, onComplete, onBack }) {
     const [confidence, setConfidence] = useState(null); // 0: Clueless, 1: Help, 2: Got it
     const [isDraggableActive, setIsDraggableActive] = useState(false);
     const [controlPos, setControlPos] = useState({ x: 0, y: 0 });
+    const dragRef = useRef(null);
     
     // Safety check for null node
     if (!node) return null;
@@ -45,7 +46,6 @@ export default function PathEngine({ node, mode, onComplete, onBack }) {
     };
 
     // DRAGGABLE CONTROL LOGIC
-    const dragRef = useRef(null);
     const handleDragStart = (e) => {
         setIsDraggableActive(true);
     };

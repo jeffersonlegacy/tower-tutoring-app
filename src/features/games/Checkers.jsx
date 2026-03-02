@@ -9,7 +9,7 @@ import confetti from 'canvas-confetti';
 const STATUS = { MENU: 'MENU', PLAYING: 'PLAYING', GAME_OVER: 'GAME_OVER' };
 
 export default function Checkers({ onBack }) {
-    const { awardXP } = useMastery();
+    const { awardPV } = useMastery();
     const [board, setBoard] = useState(createBoard());
     const [turn, setTurn] = useState(PLAYER.WHITE); // Player (White) starts? Standard is Red usually starts, but let's say Player (White) goes first? Actually Standard: BLACK(Red) moves first.
     // Let's stick to: PLAYER starts (WHITE) for ease, or follow logic.
@@ -42,10 +42,10 @@ export default function Checkers({ onBack }) {
             
             if (winner === PLAYER.WHITE) {
                 confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-                awardXP(50, 'Checkers Victory');
+                awardPV(50, 'Checkers Victory');
             }
         }
-    }, [currentMoves, status, turn, awardXP]);
+    }, [currentMoves, status, turn, awardPV]);
 
     // AI Turn (Red)
     useEffect(() => {

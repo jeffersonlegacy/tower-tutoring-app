@@ -1,6 +1,6 @@
 /**
  * OCRService.js
- * Handles image optimization for Gemini Vision
+ * Handles image optimization for AI vision processing
  */
 
 export const PROCESS_CONFIG = {

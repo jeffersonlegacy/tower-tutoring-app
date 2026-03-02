@@ -175,135 +175,36 @@ const createHeroAvatar = (imageSrc, stage = 1) => {
     });
 };
 
-// --- SILICONFLOW STABLE DIFFUSION IMG2IMG ---
-const generateSiliconFlowAvatar = async (imageSrc) => {
-    const apiKey = import.meta.env.VITE_SILICONFLOW_API_KEY;
-    
-    if (!apiKey) {
-        console.warn('[Avatar] No SiliconFlow API key');
-        return null;
-    }
-
+// --- OPENAI IMAGE BACKEND ---
+const generateOpenAIAvatar = async (imageSrc) => {
     try {
-        // Note: FLUX models do text-to-image, not img2img
-        // We'll generate a hero avatar based on a prompt description
-        const response = await fetch('https://api.siliconflow.com/v1/images/generations', {
+        const response = await fetch('/api/avatar/hero', {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: 'black-forest-labs/FLUX.1-schnell', // Fast, high quality
-                prompt: `Epic superhero portrait, heroic pose, vibrant colors, dynamic energy aura, cosmic background, anime style, bold saturated colors, glowing effects, powerful inspiring mood, cape flowing, premium quality avatar, masterpiece, young hero, determined expression`,
-                image_size: '512x512',
-                num_images: 1
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sourceImage: imageSrc }),
         });
 
-        const data = await response.json();
-        
-        if (data.images?.[0]?.url) {
-            // Fetch the generated image and convert to base64
-            const imgResponse = await fetch(data.images[0].url);
-            const blob = await imgResponse.blob();
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.readAsDataURL(blob);
-            });
-        } else if (data.images?.[0]?.b64_json) {
-            return `data:image/png;base64,${data.images[0].b64_json}`;
+        if (!response.ok) {
+            const err = await response.text();
+            console.warn('[Avatar] OpenAI avatar generation failed:', err);
+            return null;
         }
-        
-        console.warn('[Avatar] SiliconFlow response:', data);
-        return null;
+
+        const data = await response.json();
+        return data?.imageData || null;
     } catch (error) {
-        console.error('[Avatar] SiliconFlow generation failed:', error);
+        console.error('[Avatar] OpenAI avatar generation failed:', error);
         return null;
     }
 };
 
-// --- GEMINI AI BACKUP ---
-const generateGeminiAvatar = async (imageSrc) => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    
-    if (!apiKey) {
-        console.warn('[Avatar] No Gemini API key');
-        return null;
-    }
-
-    try {
-        const base64Data = imageSrc.split(',')[1];
-        
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            {
-                                text: `Create an AMAZING superhero portrait based on this person's photo.
-                                
-CRITICAL REQUIREMENTS:
-- Transform into a vibrant, colorful superhero/anime hero style
-- Keep their face recognizable but heroic
-- Add glowing energy effects and power auras
-- Include a cool hero costume with cape
-- Background: Dynamic energy bursts, not plain
-- Style: Premium quality, something a kid would LOVE
-- Colors: Bold, saturated, eye-catching
-- Mood: Epic, powerful, inspiring
-
-Output a single heroic portrait suitable for an avatar.`
-                            },
-                            {
-                                inline_data: {
-                                    mime_type: 'image/jpeg',
-                                    data: base64Data
-                                }
-                            }
-                        ]
-                    }],
-                    generationConfig: {
-                        responseModalities: ["image", "text"],
-                        responseMimeType: "image/png"
-                    }
-                })
-            }
-        );
-
-        const data = await response.json();
-        
-        if (data.candidates?.[0]?.content?.parts) {
-            for (const part of data.candidates[0].content.parts) {
-                if (part.inline_data?.data) {
-                    return `data:image/png;base64,${part.inline_data.data}`;
-                }
-            }
-        }
-        return null;
-    } catch (error) {
-        console.error('[Avatar] Gemini generation failed:', error);
-        return null;
-    }
-};
-
-// --- MASTER AI AVATAR GENERATOR (tries all providers) ---
+// --- MASTER AI AVATAR GENERATOR ---
 const generateAIAvatar = async (imageSrc, setStep) => {
-    // 1. Try Gemini first (supports img2img - transforms actual photo)
-    setStep?.('🤖 AI Photo Transformation (Gemini)...');
-    let result = await generateGeminiAvatar(imageSrc);
+    setStep?.('🤖 AI Hero Generation (ChatGPT)...');
+    const result = await generateOpenAIAvatar(imageSrc);
     if (result) return result;
-    
-    // 2. Fallback to SiliconFlow FLUX (generates new hero portrait)
-    setStep?.('🎨 AI Hero Generation (FLUX)...');
-    result = await generateSiliconFlowAvatar(imageSrc);
-    if (result) return result;
-    
-    // 3. Canvas effects fallback (always works, transforms actual photo)
+
+    // Canvas effects fallback (always works, transforms actual photo)
     return null;
 };
 
@@ -337,7 +238,7 @@ export default function AvatarEvolution({ onClose, onSave }) {
             setProcessingStep('Analyzing your features...');
             await new Promise(r => setTimeout(r, 1500));
 
-            // Step 2: Try AI providers (SiliconFlow → Gemini)
+            // Step 2: Try ChatGPT image generation
             let result = await generateAIAvatar(rawImage, setProcessingStep);
             
             // Step 3: Fallback to canvas effects if AI fails

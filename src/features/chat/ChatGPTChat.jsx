@@ -22,7 +22,7 @@ const INSTRUCTION_PATTERNS = [
     /label/i, /show me/i, /put/i, /add/i, /create/i, /make/i
 ];
 
-export default function GeminiChat({ mode = 'widget', onHome, externalMessages, setExternalMessages, sessionMode = 'standard' }) {
+export default function ChatGPTChat({ mode = 'widget', onHome, externalMessages, setExternalMessages, sessionMode = 'standard' }) {
     const { curriculum, getNodeStatus, logEvent } = useMastery();
 
     // === ALL STATE DECLARATIONS FIRST (before any useEffects) ===
@@ -72,7 +72,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
             const image = data.image || data; // Handle both direct string and object format
             const isAuto = data.isAuto;
 
-            // console.log('[GeminiChat] Received Snap upload:', e.detail);
+            // console.log('[ChatGPTChat] Received Snap upload:', e.detail);
             setIsOpen(true);
             setWhiteboardImage(image);
             
@@ -225,7 +225,7 @@ export default function GeminiChat({ mode = 'widget', onHome, externalMessages, 
         const currentNode = (currentSessionId && curriculum?.nodes) ? curriculum.nodes[currentSessionId] : null;
 
         // Defensive logging
-        // console.log("[GeminiChat] Current Node:", currentNode?.title || "None");
+        // console.log("[ChatGPTChat] Current Node:", currentNode?.title || "None");
 
         const masteredNodes = Object.values(curriculum?.nodes || {})
             .filter(n => n && getNodeStatus(n.id) === 'completed')
@@ -359,7 +359,7 @@ Active Node: ${currentNode?.title || 'Unknown'}
     };
 
     const handleSend = () => {
-        console.log('[GeminiChat] Send triggered. Input:', input, 'Image:', !!whiteboardImage);
+        console.log('[ChatGPTChat] Send triggered. Input:', input, 'Image:', !!whiteboardImage);
         sendMessage();
     };
 

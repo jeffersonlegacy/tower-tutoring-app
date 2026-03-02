@@ -21,9 +21,16 @@ const SwipeFight = lazy(() => import('./features/games/SwipeFight'));
 
 const PageLoader = () => (
   <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-    <div className="text-center">
-      <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-      <p className="text-cyan-400 font-mono tracking-widest animate-pulse">INITIALIZING...</p>
+    <div className="text-center space-y-6 animate-pulse">
+      <div className="relative w-20 h-20 mx-auto">
+        <div className="absolute inset-0 bg-cyan-500/20 rounded-full border-2 border-cyan-500/30" />
+        <div className="absolute inset-2 bg-cyan-500/10 rounded-full animate-ping" />
+      </div>
+      <div className="space-y-2">
+        <div className="h-6 bg-slate-800 rounded-lg w-48 mx-auto" />
+        <div className="h-4 bg-slate-800/50 rounded w-32 mx-auto" />
+      </div>
+      <p className="text-cyan-400 font-mono text-sm tracking-widest">INITIALIZING...</p>
     </div>
   </div>
 );

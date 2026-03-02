@@ -1,512 +1,178 @@
 /**
- * MindHiveService.js - ToweR Intelligence v3.0
- * 
- * Neuro-Adaptive Learning Architect with:
- * - Multi-provider fallback (Gemini → Groq)
- * - Stroke metadata injection
- * - JSON-structured responses for visual overlays
+ * MindHiveService.js
+ *
+ * ChatGPT/OpenAI-backed tutoring stream service.
+ * All model access is routed through /api/chat/completions.
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { composeSystemPrompt } from './MindHivePlugins';
 
-// OpenRouter Models (Unified Hub)
-const OPENROUTER_MODELS = {
-    math: 'deepseek/deepseek-r1', // High reasoning specialist
-    vision: 'google/gemini-2.0-flash-exp:free', // Vision specialist
-    general: 'google/gemini-2.0-flash-exp',
-    fallback: 'moonshotai/kimi-k2' // Vision fallback
-};
-
-const ENDPOINTS = {
-    openrouter: 'https://openrouter.ai/api/v1/chat/completions',
-    groq: 'https://api.groq.com/openai/v1/chat/completions',
-};
-
-const SYSTEM_PROMPT = `# TOWER INTELLIGENCE v3.0 (Neuro-Adaptive Architect)
-
-## IDENTITY & PRIME DIRECTIVE
-You are **ToweR Intelligence**, a Neuro-Adaptive Learning Architect. You analyze the **cognitive state** of each student to optimize their learning velocity.
-Your Goal: Build a mind that can solve ANY problem, not just the one currently on the board.
-MAINTAIN CONTINUITY: You are in a continuous session. If the user replies or uploads a new image, assume it is the NEXT STEP of the current problem, not a new one.
-ALWAYS PROPEL FORWARD: Every response must end with a specific, actionable question or a "Try this" instruction.
-
-## I. INPUT ANALYSIS LAYER (Reading the Student)
-
-### A. DIGITAL EMPATHY (Handwriting Forensics V2.0)
-You receive stroke metadata and cognitive state with each message. Use them:
-
-* **[EMOTION_STATE: FRUSTRATED]**: EMOTIONAL RESET. Stop the math. "I can tell this is frustrating. That's normal. Let's try a different angle."
-* **[EMOTION_STATE: CONFUSED]**: CLARIFY. "I see you're unsure. Let me break this down differently."
-* **[EMOTION_STATE: STUCK]**: UNSTICK. "You've been thinking hard. Here's a nudge: start by..."
-* **[EMOTION_STATE: FLOW]**: CELEBRATE + CHALLENGE. "You're on fire! Here's a slightly harder one."
-* **[EMOTION_STATE: CONFIDENT]**: ADVANCE. "Great work. Let's level up."
-* **[EMOTION_STATE: EXPLORING]**: ENCOURAGE. "I see you're experimenting. Good instinct."
-* **[COGNITIVE_VECTOR]**: Use the composite score (0-1) to gauge intervention intensity. composite > 0.7 = heavy support, composite < 0.3 = light touch.
-
-### B. CONTEXTUAL INTENT (The "Verbal Mirror")
-* **Never ask "Is that a 5?"** unless impossible to guess.
-* Infer symbols from mathematical logic. If 2x = 10 and they draw a squiggle, it's a 5.
-* State your assumption: "I see you wrote **2x = 5**. Let's solve..."
-
-## II. THE SCAFFOLDING ENGINE (Adaptive Modes)
-
-### MODE A: THE GUIDE (Standard)
-*Trigger:* Minor slip or asks for next steps.
-*Action:* Micro-Hint. "Look at the denominator in the second fraction."
-
-### MODE B: THE GUARDRAIL (Anti-Frustration)
-*Trigger:* Same step failed 2x OR pause > 15s OR frustration_detected.
-*Action:* Reduce cognitive load. Binary choice: "Does the graph go UP or DOWN from here?"
-
-### MODE C: THE MODEL (Stuck Loop)
-*Trigger:* Failed 3x or asks for the answer.
-*Action:* Worked example. "Watch me solve a similar one." (Generate parallel example, NOT the original).
-
-## III. AGE-ADAPTIVE COMMUNICATION
-
-### ELEMENTARY (K-5)
-* Stories: "Imagine you have 12 cookies..."
-* Tactile: "Draw circles for each one"
-* Celebrate: "YES! 🎉 You cracked it!"
-* MAX 2 sentences
-
-### MIDDLE SCHOOL (6-8)
-* Connect to games, sports
-* Give choices: "Equation or graph first?"
-* Challenge: "Why does this pattern work?"
-
-### HIGH SCHOOL (9-12)
-* Explain the WHY
-* Real applications: physics, coding, finance
-* Peer treatment: "Here's how I think about this..."
-
-### COLLEGE+
-* Technical vocabulary
-* Edge cases and exceptions
-* Multiple solution paths
-
-## IV. WHITEBOARD INTERACTION (Visual & Active)
-
-You have two modes of interaction:
-
-### A. GUIDE (Overlay - Ephemeral)
-Use for attention management (pointing, highlighting).
-* Tools: \`highlight\`, \`arrow\`, \`circle\`, \`text_label\`
-* Format: \`{ "tool": "arrow", "region": "top-right", "description": "here" }\`
-
-### B. COLLABORATE (Draw - Persistent)
-Use to create content (graphs, equations, diagrams) that stays on the board.
-* **DRAW_SHAPE**: Create geometry.
-    * \`tool\`: "box", "circle", "arrow"
-    * \`start\`: { "x": 50, "y": 50 } (Percent 0-100)
-    * \`end\`: { "x": 70, "y": 70 } (Percent 0-100)
-    * \`color\`: "red", "blue", "green"
-* **DRAW_TEXT**: Write textual content.
-    * \`text\`: "y = 2x + 1"
-    * \`position\`: { "x": 50, "y": 50 } (Percent 0-100)
-* **PAN**: Move the camera to a new section.
-    * \`region\`: "right", "left", "up", "down", "new-section" (Use "new-section" to jump to a clean space)
-* **CREATE_PAGE**: Start fresh (Use only if current page is chaotic).
-    * \`name\`: "Graph Example"
-* **MODIFY_AT**: God Mode. Edit shape at (x,y).
-    * \`point\`: { "x": 50, "y": 50 }
-    * \`operation\`: "delete", "resize", "text"
-    * \`value\`: 1.5 (scale) or "New Text"
-* **WIPE_REGION**: Erase a specific box.
-    * \`region\`: { "x": 10, "y": 10, "w": 30, "h": 30 }
-* **CLEAR**: Wipe the board (Use carefully).
-
-IMPORTANT: BE PROACTIVE.
-* Do not just "talk" about the math. DRAW IT.
-* If you ask them to solve for x, WRITE "x = ?" on the board.
-* If you see an error, CIRCLE it.
-* If explaining a concept, DRAW a diagram.
-* Your whiteboard usage should be HIGH frequency. Visuals anchor memory.
-
-Format in JSON response as \`whiteboard_action\`:
-\`\`\`json
-"whiteboard_action": {
-    "type": "PAN",
-    "region": "right"
-}
-\`\`\`
-
-## V. SPATIAL TUTORING AWARENESS
-* **The "Concept Corner"**: If explaining a rule, PAN "right" to a clean space, draw a box, and write the rule.
-* **Respect User Space**: Do not write *over* their work. PAN to the side or use "top-right".
-* **Visual Segregation**: Use lines to separate "Problem" from "Scratchpad".
-
-## VI. DEVICE AWARENESS PROTOCOL
-* **Input**: You will receive "User Environment: Mobile/Desktop".
-* **Mobile Strategy**:
-    * **ZOOM IN**: Focus on small areas.
-    * **Simplicity**: Draw fewer, larger items.
-    * **Vertical Flow**: Scroll DOWN, not sideways.
-* **Desktop Strategy**:
-    * **Spread Out**: Use the horizontal space.
-    * **Concept Corners**: Use side panels for notes.
-
-## VII. METACOGNITION (Post-Win Protocol)
-When they get the answer RIGHT, do NOT stop. Anchor the neural pathway:
-1. **Strategy Recap**: "How did you know to use that method?"
-2. **Trap Detection**: "Why would using X have been a mistake?"
-3. **Universality**: "Would this work if the angle was 90°?"
-
-## VI. RESPONSE FORMAT
-Reply in JSON (the frontend parses this):
-
-\`\`\`json
-{
-  "voice_response": "Your spoken response. Warm, adaptive, concise.",
-  "text_display": "Text shown on screen. USE PLAIN TEXT/UNICODE. Do NOT use LaTeX $ delimiters. Ex: x^2, sqrt(4), 5 * 5",
-  "whiteboard_action": {
-    "tool": "highlight",
-    "region": "top-right",
-    "description": "the exponent"
-  },
-  "emotional_state": "curious",
-  "cognitive_load": "medium",
-  "next_step": "Check the sign on the second term"
-}
-\`\`\`
-
-If you cannot determine coordinates, use descriptive regions: "top-left", "center", "bottom-right", etc.
-
-## XII. BEHAVIORAL GUARDRAILS
-* **No Lectures**: Max 3 sentences per turn.
-* **No Solving**: Never give final answer unless they derived it.
-* **Spatial Respect**: Only PAN if it helps the student see better.
-* **Safety**: If inappropriate content, respond normally but add "safety_flag": true.
-
-## VIII. CONTINUITY & FLOW
-* **Successive Images**: If the user uploads a new image, treat it as an UPDATE. "Okay, I see your next step..."
-* **One Step at a Time**: efficient scaffolding. Do not overwhelm.
-* **Proactive Guidance**: If they are quiet, suggest a move.
-* **Memory**: Reference previous mistakes/wins. "Remember how we fixed the sign last time?"
-
-## IX. LIVE TUTOR MODE (Active Observation)
-* **Trigger**: When you receive "isAuto": true.
-* **Persona**: You are watching over their shoulder.
-* **Behavior**:
-    * **Silence is Gold**: If they are doing well, say NOTHING or send a subtle "👍" (using \`whiteboard_action\` text).
-    * **Micro-Nudge**: If they stop or err, give a TINY hint. "Watch the sign."
-    * **Presence**: Use the \`PAN\` tool to show you are watching. Move the camera slightly to the active area.
-    * **NO LECTURES**: Max 5 words.
-
-## REMEMBER
-You're not an encyclopedia. You're a coach.
-Every question they answer themselves creates a neural pathway that STAYS.
-Every answer you hand them is forgotten by tomorrow.`;
-
 const CONFIG = {
-    systemPrompt: composeSystemPrompt({ ageGroup: 'high', enableLiveTutor: false }),
-    temperature: 0.75,
+  model: import.meta.env.VITE_OPENAI_MODEL || 'gpt-4.1-mini',
+  temperature: 0.75,
+  endpoint: '/api/chat/completions',
+  systemPrompt: composeSystemPrompt({ ageGroup: 'high', enableLiveTutor: false }),
 };
-
-// Response Cache (Phase 18.2)
-const responseCache = new Map();
-const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
-
-function getCacheKey(prompt, images) {
-    const imageHash = images.length > 0 ? images.length.toString() : 'no-img';
-    return `${prompt.substring(0, 100)}::${imageHash}`;
-}
-
-function getCachedResponse(key) {
-    const cached = responseCache.get(key);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-        console.log('[MindHive] Cache HIT');
-        return cached.response;
-    }
-    return null;
-}
-
-function setCachedResponse(key, response) {
-    responseCache.set(key, { response, timestamp: Date.now() });
-    // Limit cache size
-    if (responseCache.size > 100) {
-        const oldestKey = responseCache.keys().next().value;
-        responseCache.delete(oldestKey);
-    }
-}
 
 class MindHiveService {
-    constructor() {
-        this.geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
-        this.genAI = this.geminiKey ? new GoogleGenerativeAI(this.geminiKey) : null;
-        this.groqKey = import.meta.env.VITE_GROQ_API_KEY;
-        this.openrouterKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  async streamResponse(
+    prompt,
+    history = [],
+    onChunk,
+    onModelChange,
+    images = [],
+    strokeContext = '',
+  ) {
+    const enrichedPrompt = strokeContext ? `${strokeContext}\n\nUser Message: ${prompt}` : prompt;
+
+    if (onModelChange) {
+      onModelChange(`OPENAI ${CONFIG.model.toUpperCase()}`);
     }
 
-    /**
-     * Stream response with multi-provider fallback
-     * Injects stroke metadata into context
-     */
-    async streamResponse(prompt, history = [], onChunk, onModelChange, images = [], strokeContext = '') {
-        console.log('🐝 Activating Mind Hive v5.0 (Global Hub)...');
+    const messages = [{ role: 'system', content: CONFIG.systemPrompt }];
 
-        const enrichedPrompt = strokeContext ? `${strokeContext}\n\nUser Message: ${prompt}` : prompt;
-        const isComplexMath = /solve|equation|calculate|proof|integral|matrix/i.test(prompt);
-        const hasImages = images && images.length > 0;
+    // Keep prior conversational context (excluding in-progress placeholder entries).
+    let historyStarted = false;
+    for (const msg of history.slice(0, -1)) {
+      const role = msg.role === 'model' ? 'assistant' : 'user';
+      if (!historyStarted && role === 'assistant') continue;
+      historyStarted = true;
 
-        const providers = [
-            // Preference 1: Native Gemini (if available) for vision/speed
-            { name: 'Gemini', models: ['gemini-2.0-flash-exp', 'gemini-1.5-flash-latest'], key: this.geminiKey, type: 'gemini', priority: hasImages ? 1 : 10 },
-            
-            // Preference 2: OpenRouter (DeepSeek R1) for Math/Reasoning
-            { name: 'OpenRouter', models: [OPENROUTER_MODELS.math], key: this.openrouterKey, type: 'openai', endpoint: ENDPOINTS.openrouter, priority: isComplexMath ? 1 : 20 },
-            
-            // Preference 3: OpenRouter Fallbacks
-            { name: 'OpenRouter', models: [OPENROUTER_MODELS.general, OPENROUTER_MODELS.fallback], key: this.openrouterKey, type: 'openai', endpoint: ENDPOINTS.openrouter, priority: 30 },
-
-            // Preference 4: Groq (Text speed fallback)
-            { name: 'Groq', models: ['llama-3.3-70b-versatile'], key: this.groqKey, type: 'openai', endpoint: ENDPOINTS.groq, priority: 40 }
-        ].sort((a, b) => (a.priority || 5) - (b.priority || 5));
-
-        const errors = [];
-        for (const provider of providers) {
-            if (!provider.key) continue;
-
-            for (const modelName of provider.models) {
-                try {
-                    console.log(`🔄 [${provider.name}] Attempting: ${modelName}`);
-                    
-                    if (provider.type === 'gemini') {
-                        await this.streamGemini(modelName, enrichedPrompt, history, onChunk, onModelChange, images);
-                    } else {
-                        await this.streamOpenAI(provider.name, provider.endpoint, provider.key, modelName, enrichedPrompt, history, onChunk, onModelChange);
-                    }
-
-                    console.log(`✅ [${provider.name}] Success: ${modelName}`);
-                    return;
-                } catch (error) {
-                    console.warn(`⚠️ [${provider.name}] ${modelName} failed: ${error.message}`);
-                    errors.push(`${provider.name}/${modelName}: ${error.message}`);
-                }
-            }
-        }
-
-        console.error('🚨 Hive Collapse - All providers failed:', errors);
-        throw new Error('All AI providers are currently unavailable. Please try again.');
+      const text = typeof msg.text === 'string' ? msg.text : '';
+      if (!text) continue;
+      messages.push({ role, content: text });
     }
 
-    async streamGemini(modelName, prompt, history, onChunk, onModelChange, images = []) {
-        if (!this.genAI) throw new Error('Gemini SDK not available');
-        
-        const model = this.genAI.getGenerativeModel({
-            model: modelName,
-            systemInstruction: CONFIG.systemPrompt,
-            generationConfig: { temperature: CONFIG.temperature }
+    if (images?.length) {
+      const userContent = [{ type: 'text', text: enrichedPrompt }];
+      for (const src of images) {
+        if (!src) continue;
+        userContent.push({
+          type: 'image_url',
+          image_url: { url: src },
         });
-
-        if (onModelChange) {
-            onModelChange(modelName.toUpperCase().replace(/-/g, ' '));
-        }
-
-        let chatHistory = history.slice(0, -1).map(msg => ({
-            role: msg.role === 'model' ? 'model' : 'user',
-            parts: [{ text: msg.text }]
-        }));
-        while (chatHistory.length > 0 && chatHistory[0].role === 'model') {
-            chatHistory.shift();
-        }
-
-        let parts = [{ text: prompt }];
-        if (images && images.length > 0) {
-            for (const imgUrl of images) {
-                try {
-                    const response = await fetch(imgUrl);
-                    const blob = await response.blob();
-                    const base64 = await this.blobToBase64(blob);
-                    parts.push({
-                        inlineData: {
-                            mimeType: blob.type || 'image/png',
-                            data: base64.split(',')[1]
-                        }
-                    });
-                } catch (e) {
-                    console.warn('Image processing failed:', e);
-                }
-            }
-        }
-
-        const chat = model.startChat({ history: chatHistory });
-        const result = await chat.sendMessageStream(parts);
-
-        let hasContent = false;
-        for await (const chunk of result.stream) {
-            const text = chunk.text();
-            if (text) {
-                hasContent = true;
-                onChunk(text);
-            }
-        }
-
-        if (!hasContent) throw new Error('Empty response');
+      }
+      messages.push({ role: 'user', content: userContent });
+    } else {
+      messages.push({ role: 'user', content: enrichedPrompt });
     }
 
-    async streamOpenAI(providerName, endpoint, apiKey, modelName, prompt, history, onChunk, onModelChange) {
-        if (onModelChange) {
-            onModelChange(`${providerName.toUpperCase()} ${modelName}`);
-        }
+    const response = await fetch(CONFIG.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: CONFIG.model,
+        messages,
+        temperature: CONFIG.temperature,
+      }),
+    });
 
-        const messages = [{ role: 'system', content: CONFIG.systemPrompt }];
-
-        let historyStarted = false;
-        for (const msg of history.slice(0, -1)) {
-            const role = msg.role === 'model' ? 'assistant' : 'user';
-            if (!historyStarted && role === 'assistant') continue;
-            historyStarted = true;
-            messages.push({ role, content: msg.text });
-        }
-        messages.push({ role: 'user', content: prompt });
-
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'HTTP-Referer': 'https://jefferson.edu', // Required by OpenRouter
-                'X-Title': 'ToweR Intelligence'
-            },
-            body: JSON.stringify({
-                model: modelName,
-                messages,
-                temperature: CONFIG.temperature,
-                stream: true
-            })
-        });
-
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`HTTP ${response.status}: ${error}`);
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let hasContent = false;
-        let buffer = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            buffer += chunk;
-            
-            const lines = buffer.split('\n');
-            // Keep the last line in buffer if it's incomplete
-            buffer = lines.pop(); 
-
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed || trimmed === 'data: [DONE]') continue;
-                
-                if (trimmed.startsWith('data: ')) {
-                    try {
-                        const jsonStr = trimmed.substring(6); // Remove 'data: '
-                        const json = JSON.parse(jsonStr);
-                        
-                        // Handle OpenRouter/OpenAI delta format
-                        const content = json.choices?.[0]?.delta?.content || json.choices?.[0]?.text;
-                        
-                        if (content) {
-                            hasContent = true;
-                            onChunk(content);
-                        }
-                    } catch (e) { 
-                        // console.warn('JSON parse error in stream:', e); 
-                    }
-                }
-            }
-        }
-
-        if (!hasContent) throw new Error('Empty response from AI provider');
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Chat proxy failed (${response.status}): ${errorText}`);
     }
 
-    blobToBase64(blob) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let hasContent = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed === 'data: [DONE]') continue;
+        if (!trimmed.startsWith('data: ')) continue;
+
+        try {
+          const json = JSON.parse(trimmed.slice(6));
+          const content = json?.choices?.[0]?.delta?.content ?? '';
+          if (content) {
+            hasContent = true;
+            onChunk(content);
+          }
+        } catch {
+          // ignore malformed partial SSE lines
+        }
+      }
     }
+
+    if (!hasContent) {
+      throw new Error('Empty response from ChatGPT API');
+    }
+  }
 }
 
-// export const mindHive = new MindHiveService();
 let instance = null;
 export function getMindHive() {
-    if (!instance) {
-        instance = new MindHiveService();
-    }
-    return instance;
+  if (!instance) {
+    instance = new MindHiveService();
+  }
+  return instance;
 }
 
 /**
  * Parse AI response - handles both JSON and plain text
  */
 export function parseAIResponse(rawText) {
-    if (!rawText) return { isStructured: false, textDisplay: '' };
+  if (!rawText) return { isStructured: false, textDisplay: '' };
 
-    // 1. Try to extract JSON from code blocks
-    const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  let jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : null;
 
-    // 2. Try to find the raw JSON object structure if regex fails
-    let jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : null;
+  if (!jsonStr) {
+    const firstParen = rawText.indexOf('{');
+    const lastParen = rawText.lastIndexOf('}');
+    if (firstParen !== -1 && lastParen !== -1 && lastParen > firstParen) {
+      jsonStr = rawText.substring(firstParen, lastParen + 1);
+    }
+  }
 
-    if (!jsonStr) {
-        const firstParen = rawText.indexOf('{');
-        const lastParen = rawText.lastIndexOf('}');
-        if (firstParen !== -1 && lastParen !== -1 && lastParen > firstParen) {
-            jsonStr = rawText.substring(firstParen, lastParen + 1);
-        }
+  if (jsonStr) {
+    const trimmed = jsonStr.trim();
+    const isPotentialJson = trimmed.startsWith('{');
+    const isCompleteJson = trimmed.endsWith('}');
+
+    if (isPotentialJson && !isCompleteJson) {
+      return {
+        isStructured: true,
+        isPartial: true,
+        voiceResponse: '',
+        textDisplay: 'AI is formulating visual strategies...',
+        emotionalState: 'curious',
+      };
     }
 
-    if (jsonStr) {
-        // ADRVERSARIAL CHECK: Is the JSON complete? 
-        // If it looks like JSON but doesn't have a closing brace, it's likely still streaming.
-        // We return a "Partial" state to prevent the UI from showing raw JSON.
-        const trimmed = jsonStr.trim();
-        const isPotentialJson = trimmed.startsWith('{');
-        const isCompleteJson = trimmed.endsWith('}');
-
-        if (isPotentialJson && !isCompleteJson) {
-            return {
-                isStructured: true,
-                isPartial: true,
-                voiceResponse: '',
-                textDisplay: 'AI is formulating visual strategies...',
-                emotionalState: 'curious'
-            };
-        }
-
-        try {
-            const parsed = JSON.parse(jsonStr);
-            return {
-                isStructured: true,
-                voiceResponse: parsed.voice_response || parsed.text_display || rawText,
-                textDisplay: parsed.text_display || parsed.voice_response || rawText,
-                whiteboardAction: parsed.whiteboard_action || null,
-                emotionalState: parsed.emotional_state || 'neutral',
-                cognitiveLoad: parsed.cognitive_load || 'medium',
-                nextStep: parsed.next_step || null,
-                safetyFlag: parsed.safety_flag || false,
-            };
-        } catch (e) {
-            console.warn('JSON parse failed, falling back to plain text', e);
-        }
+    try {
+      const parsed = JSON.parse(jsonStr);
+      return {
+        isStructured: true,
+        voiceResponse: parsed.voice_response || parsed.text_display || rawText,
+        textDisplay: parsed.text_display || parsed.voice_response || rawText,
+        whiteboardAction: parsed.whiteboard_action || null,
+        emotionalState: parsed.emotional_state || 'neutral',
+        cognitiveLoad: parsed.cognitive_load || 'medium',
+        nextStep: parsed.next_step || null,
+        safetyFlag: parsed.safety_flag || false,
+      };
+    } catch {
+      // fall through to plain text
     }
+  }
 
-    // Fallback to plain text
-    return {
-        isStructured: false,
-        voiceResponse: rawText,
-        textDisplay: rawText,
-        whiteboardAction: null,
-        emotionalState: 'neutral',
-        cognitiveLoad: 'medium',
-        nextStep: null,
-        safetyFlag: false,
-    };
+  return {
+    isStructured: false,
+    voiceResponse: rawText,
+    textDisplay: rawText,
+    whiteboardAction: null,
+    emotionalState: 'neutral',
+    cognitiveLoad: 'medium',
+    nextStep: null,
+    safetyFlag: false,
+  };
 }

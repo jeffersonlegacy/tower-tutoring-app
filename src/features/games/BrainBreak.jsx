@@ -40,7 +40,7 @@ const GAMES = [
         description: 'Classic capture strategy.',
         tags: ['LOGIC', 'STRATEGY'],
         color: 'emerald',
-        route: '/game/checkers'
+        route: '/checkers'
     },
     {
         id: 'swipefight',

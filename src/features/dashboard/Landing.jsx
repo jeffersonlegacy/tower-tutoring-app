@@ -22,13 +22,15 @@ export default function Landing() {
       targetId = `demo_tower_${Math.floor(Math.random() * 1000)}`;
     }
 
-    // Persist
+    localStorage.setItem('last_tower_session', targetId);
     // Navigate directly to the LIVE SESSION (Video/Whiteboard) as requested
     navigate(`/session/${targetId}`);
   };
 
   const resumeSession = () => {
-    if (lastSessionId) navigate(`/session/${lastSessionId}`);
+    if (!lastSessionId) return;
+    localStorage.setItem('last_tower_session', lastSessionId);
+    navigate(`/session/${lastSessionId}`);
   };
 
   return (
@@ -62,7 +64,14 @@ export default function Landing() {
         <div className="text-center mb-8 md:mb-16 animate-in fade-in slide-in-from-bottom-4 duration-1000">
 
           {/* THE JEFFERSON EMBLEM */}
-          <div className="mb-8 md:mb-10 relative inline-block group cursor-pointer" onClick={() => navigate(`/session/demo_${Math.floor(Math.random() * 1000)}`)}>
+          <div
+            className="mb-8 md:mb-10 relative inline-block group cursor-pointer"
+            onClick={() => {
+              const demoId = `demo_${Math.floor(Math.random() * 1000)}`;
+              localStorage.setItem('last_tower_session', demoId);
+              navigate(`/session/${demoId}`);
+            }}
+          >
             {/* Outer Pulse Ring */}
             <div className="absolute -inset-8 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full blur-2xl opacity-20 group-hover:opacity-40 transition duration-1000 animate-pulse-slow"></div>
 

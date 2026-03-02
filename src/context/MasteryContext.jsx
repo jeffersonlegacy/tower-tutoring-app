@@ -192,7 +192,7 @@ export const MasteryProvider = ({ children }) => {
         const id = Date.now();
         setNotifications(prev => [...prev, { id, type, data }]);
         
-        // Dispatch global event for widgets like GeminiChat to listen to
+        // Dispatch global event for widgets like ChatGPTChat to listen to
         window.dispatchEvent(new CustomEvent('tower-notification', { detail: { type, data } }));
 
         setTimeout(() => {
@@ -284,8 +284,33 @@ export const MasteryProvider = ({ children }) => {
         velocity: 0, // 0-100 Speed/Accuracy Index
         focus: 100, // 0-100 Attention Metric
         learningStyle: 'balanced', // 'visual', 'kinetic', 'verbal'
-        recentErrors: [] // ['calc', 'logic', 'concept']
+        recentErrors: [], // ['calc', 'logic', 'concept']
+        conceptualMastery: {} // { [trackId]: score 0-1 }
     });
+
+    const recordGateCheck = useCallback((trackId, score) => {
+        setCognitiveState(prev => {
+            const currentMastery = prev.conceptualMastery[trackId] || 0;
+            const newMastery = (currentMastery * 0.5) + (score * 0.5); // Weighted average
+            
+            const newState = {
+                ...prev,
+                conceptualMastery: {
+                    ...prev.conceptualMastery,
+                    [trackId]: newMastery
+                }
+            };
+            
+            // If mastery is exceptionally high, award bonus PV
+            if (score > 0.9) {
+                awardPV(50, `Exceptional Mastery in ${trackId}`);
+            }
+
+            return newState;
+        });
+        
+        logEvent('gate_check_complete', { trackId, score });
+    }, [awardPV, logEvent]);
 
     const updateCognitiveState = useCallback((metrics) => {
         // metrics: { timeSpent, score, errorType }
@@ -380,6 +405,7 @@ export const MasteryProvider = ({ children }) => {
         setAvatarConfig,
         setTowerTag, // [EXPORTED]
         updateGameStats, // [EXPORTED]
+        recordGateCheck, // [EXPORTED]
         logEvent,
         resetProgress,
         updateCognitiveState,
@@ -388,7 +414,7 @@ export const MasteryProvider = ({ children }) => {
         updateAssessment, // [EXPORTED]
         getRecommendedSession,
         curriculum: CURRICULUM_DATA
-    }), [progress, sessionLogs, studentProfile, cognitiveState, assessmentState, awardPV, checkStreak, getNodeStatus, completeNode, logEvent, resetProgress, updateCognitiveState, updateAssessment, getRecommendedSession]);
+    }), [progress, sessionLogs, studentProfile, cognitiveState, assessmentState, awardPV, checkStreak, getNodeStatus, completeNode, logEvent, resetProgress, updateCognitiveState, reportFailure, reportSuccess, updateAssessment, getRecommendedSession, recordGateCheck]);
 
     return (
         <MasteryContext.Provider value={value}>

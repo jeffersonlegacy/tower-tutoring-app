@@ -564,3 +564,47 @@ export const getNextUnlockedNodes = (completedIds) => {
     });
     return nextNodes;
 };
+
+// --- NEXUS COORDINATE GENERATOR (The "Neural Cartography" Engine) ---
+// Auto-layout nodes in a star-map configuration based on track and sequence.
+// Center (0,0) is the "Basecamp".
+const LAYOUT_CONFIG = {
+    number_ops: { angle: -90, spread: 200, color: '#10b981' }, // North (Emerald)
+    algebra: { angle: 0, spread: 250, color: '#8b5cf6' },    // East (Purple)
+    geometry: { angle: 180, spread: 250, color: '#06b6d4' },   // West (Cyan)
+    test_prep: { angle: 90, spread: 300, color: '#f59e0b' },   // South (Amber)
+    speed_math: { angle: 45, spread: 220, color: '#ef4444' }   // South-East (Red)
+};
+
+const generateCoordinates = () => {
+    const nodes = Object.values(CURRICULUM_DATA.nodes);
+    const trackCounters = {};
+
+    nodes.forEach(node => {
+        if (!trackCounters[node.track]) trackCounters[node.track] = 0;
+        const index = trackCounters[node.track];
+        const config = LAYOUT_CONFIG[node.track] || { angle: 45, spread: 150 };
+        
+        // Polar to Cartesian conversion with some "constellation jitter"
+        const baseAngle = config.angle * (Math.PI / 180);
+        const distance = 150 + (index * 180); // Distance increases with depth
+        
+        // Add some organic "drift" to the path so it's not a straight line
+        const jitterX = (index % 2 === 0 ? 1 : -1) * 80 * Math.sin(index * 0.5); 
+        const jitterY = (index % 3 === 0 ? 1 : -1) * 60 * Math.cos(index * 0.5);
+
+        node.x = Math.round(Math.cos(baseAngle) * distance + jitterX);
+        node.y = Math.round(Math.sin(baseAngle) * distance + jitterY);
+        
+        // Special Case: "Basecamp" (Root Node) stays near center but not exactly 0,0 (Avatar is there)
+        if (node.id === CURRICULUM_DATA.rootNodeId) {
+            node.x = 0;
+            node.y = -120; // Slightly above center
+        }
+
+        trackCounters[node.track]++;
+    });
+};
+
+// Execute Generator immediately
+generateCoordinates();

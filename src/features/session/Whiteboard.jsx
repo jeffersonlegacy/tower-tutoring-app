@@ -68,7 +68,7 @@ const Whiteboard = memo(({ sessionId }) => {
   // Initialize Live Tutor Observation (Auto-Scan)
   useLiveObservation(editor, isLiveMode);
 
-  // Listen for AI whiteboard actions (from GeminiChat)
+  // Listen for AI whiteboard actions (from ChatGPTChat)
   useEffect(() => {
     const handleAIAction = (e) => {
       const action = e.detail;
@@ -160,7 +160,7 @@ const Whiteboard = memo(({ sessionId }) => {
     try {
         const imageData = await captureWhiteboard();
         if (imageData) {
-            // Dispatch event for GeminiChat to pick up
+            // Dispatch event for ChatGPTChat to pick up
             window.dispatchEvent(new CustomEvent('ai-vision-upload', { detail: imageData }));
         } else {
             alert("Canvas is empty! Draw something first.");
