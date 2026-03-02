@@ -4,6 +4,7 @@ import { useMastery } from '../../context/MasteryContext';
 import { db } from '../../services/firebase';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import AvatarCanvas from '../profile/AvatarCanvas';
+import { publishEvent } from '../../services/eventBus';
 
 const GAMES = [
     {
@@ -87,13 +88,15 @@ export default function BrainBreak({ onNavigate, onBack }) {
     }, [activeGameId]);
 
     const handleResetStats = () => {
-        if (window.confirm("Are you sure you want to reset your leaderboard stats? This cannot be undone.")) {
-            alert("Stats reset request sent to mainframe.");
-        }
+        publishEvent('ui-toast', {
+            level: 'info',
+            message: 'Stats reset is disabled in production mode.',
+            durationMs: 2500,
+        });
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white font-sans p-6 pb-20 relative overflow-hidden">
+        <div data-testid="brainbreak-page" className="min-h-screen bg-slate-950 text-white font-sans p-6 pb-20 relative overflow-hidden">
              {/* Background Effects */}
              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
              
@@ -179,6 +182,7 @@ export default function BrainBreak({ onNavigate, onBack }) {
                         return (
                             <div 
                                 key={game.id}
+                                data-testid={`game-card-${game.id}`}
                                 onClick={() => navigate(game.route)}
                                 className={`group relative bg-slate-900 border rounded-3xl p-8 hover:-translate-y-2 hover:bg-slate-800 transition-all cursor-pointer overflow-hidden
                                     ${game.color === 'cyan' ? 'border-cyan-500/20 hover:border-cyan-500/50' : 

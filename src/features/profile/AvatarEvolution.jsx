@@ -191,7 +191,7 @@ const generateOpenAIAvatar = async (imageSrc) => {
         }
 
         const data = await response.json();
-        return data?.imageData || null;
+        return data?.data?.imageData || data?.imageData || null;
     } catch (error) {
         console.error('[Avatar] OpenAI avatar generation failed:', error);
         return null;

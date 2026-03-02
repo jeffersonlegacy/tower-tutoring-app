@@ -11,6 +11,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { captureWhiteboard } from '../utils/WhiteboardCapture';
 import { strokeAnalytics } from '../utils/StrokeAnalytics';
+import { publishEvent } from '../services/eventBus';
 
 // Config (V2.1: More responsive timing)
 const BASE_DEBOUNCE_MS = 2500;
@@ -57,15 +58,11 @@ export function useLiveObservation(editor, isEnabled) {
             
             if (imageData) {
                 // Dispatch special "auto-observation" event
-                window.dispatchEvent(new CustomEvent('ai-vision-upload', { 
-                    detail: { 
-                        image: imageData, 
-                        isAuto: true,
-                        emotionState: emotion.primary,
-                        emotionConfidence: emotion.confidence,
-                        prompt: "The student is working on the whiteboard. Observe what they've drawn and provide helpful, encouraging feedback. If you see a math problem, help guide them toward the solution."
-                    } 
-                }));
+                publishEvent('ai-vision-upload', {
+                    source: 'auto',
+                    imageData,
+                    context: 'Live observation scan from whiteboard activity.',
+                });
                 lastScanTime.current = Date.now();
                 console.log('[LiveObserver] ✅ Auto-scan sent to AI');
             } else {
@@ -115,9 +112,7 @@ export function useLiveObservation(editor, isEnabled) {
                 const endTime = startTime + debounceMs;
                 
                 // Dispatch START event
-                window.dispatchEvent(new CustomEvent('live-tutor-timer-start', {
-                    detail: { durationMs: debounceMs }
-                }));
+                publishEvent('live-tutor-timer-start', { durationMs: debounceMs });
 
                 // Start TICK interval
                 let lastSeconds = Math.ceil(debounceMs / 1000);
@@ -129,13 +124,11 @@ export function useLiveObservation(editor, isEnabled) {
                         clearInterval(timeoutRef.current);
                         triggerObservation();
                         // Dispatch END event
-                        window.dispatchEvent(new CustomEvent('live-tutor-timer-end'));
+                        publishEvent('live-tutor-timer-end');
                     } else if (remaining !== lastSeconds) {
                         // Optimization: Only dispatch if integer second changed
                         lastSeconds = remaining;
-                        window.dispatchEvent(new CustomEvent('live-tutor-timer-tick', {
-                            detail: { seconds: remaining }
-                        }));
+                        publishEvent('live-tutor-timer-tick', { seconds: remaining });
                     }
                 }, 100); // Check frequently for smooth updates/cancellation
             }
@@ -143,7 +136,7 @@ export function useLiveObservation(editor, isEnabled) {
 
         return () => {
              unsubscribe();
-             if (timeoutRef.current) clearTimeout(timeoutRef.current);
+             if (timeoutRef.current) clearInterval(timeoutRef.current);
         };
     }, [editor, isEnabled, triggerObservation, getAdaptiveDebounce]);
 }

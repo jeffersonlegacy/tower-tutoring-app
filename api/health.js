@@ -1,3 +1,6 @@
+import { createTraceId, sendOk } from './_utils.js';
+
 export default function handler(req, res) {
-    res.status(200).json({ status: 'Alive', timestamp: Date.now() });
+    const traceId = createTraceId('health');
+    sendOk(res, { status: 'alive', timestamp: Date.now() }, traceId);
 }

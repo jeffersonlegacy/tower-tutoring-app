@@ -253,7 +253,7 @@ export default function Checkers({ onBack }) {
                 <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 animate-fade-in p-6 text-center">
                     <div className="text-6xl mb-4">{winner === PLAYER.WHITE ? '🏆' : '💀'}</div>
                     <h2 className="text-3xl font-black text-white mb-2">{winner === PLAYER.WHITE ? 'VICTORY' : 'DEFEAT'}</h2>
-                    <p className="text-slate-400 mb-6">{winner === PLAYER.WHITE ? '+50 XP Earned!' : 'The AI outsmarted you.'}</p>
+                    <p className="text-slate-400 mb-6">{winner === PLAYER.WHITE ? '+50 PV Earned!' : 'The AI outsmarted you.'}</p>
                     <button onClick={() => setStatus(STATUS.MENU)} className="px-8 py-3 bg-white text-black font-bold rounded-full hover:scale-105 transition">Play Again</button>
                 </div>
             )}

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { getMindHive } from '../../services/MindHiveService';
 import { useMastery } from '../../context/MasteryContext';
+import { publishEvent } from '../../services/eventBus';
+import { trackError } from '../../services/telemetry';
 
 const ChatGPTChat = lazy(() => import('../chat/ChatGPTChat'));
 
@@ -38,8 +40,12 @@ export default function MindHiveInterface({ onHome }) {
                 }
             );
         } catch (err) {
-            console.error(err);
-            alert("Failed to generate report.");
+            trackError('mindhive.generateReport', err);
+            publishEvent('ui-toast', {
+                level: 'error',
+                message: 'Failed to generate report. Please try again.',
+                durationMs: 4000,
+            });
         } finally {
             setIsGenerating(false);
         }
@@ -85,7 +91,7 @@ export default function MindHiveInterface({ onHome }) {
                             {[
                                 { label: 'Topics', val: '2', color: 'blue' },
                                 { label: 'Wins', val: '4', color: 'emerald' },
-                                { label: 'XP', val: '+250', color: 'amber' },
+                                { label: 'PV', val: '+250', color: 'amber' },
                                 { label: 'State', val: 'Zen', color: 'cyan' }
                             ].map(s => (
                                 <div key={s.label} className="bg-slate-950/50 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center w-28 md:w-32 hover:border-white/20 transition-all shadow-lg">
@@ -222,9 +228,22 @@ export default function MindHiveInterface({ onHome }) {
                         </div>
                         <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-wrap justify-end gap-3">
                             <button 
-                                onClick={() => {
-                                    navigator.clipboard.writeText(report);
-                                    alert("Report Card copied!");
+                                onClick={async () => {
+                                    try {
+                                        await navigator.clipboard.writeText(report);
+                                        publishEvent('ui-toast', {
+                                            level: 'success',
+                                            message: 'Report copied to clipboard.',
+                                            durationMs: 2500,
+                                        });
+                                    } catch (error) {
+                                        trackError('mindhive.copyReport', error);
+                                        publishEvent('ui-toast', {
+                                            level: 'error',
+                                            message: 'Could not copy report on this device.',
+                                            durationMs: 2800,
+                                        });
+                                    }
                                 }}
                                 className="px-6 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black text-xs uppercase tracking-widest rounded-xl transition-all"
                             >

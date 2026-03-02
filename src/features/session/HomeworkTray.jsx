@@ -4,9 +4,12 @@ import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase
 import { ref, deleteObject } from 'firebase/storage';
 import { useHomeworkUpload } from '../../hooks/useHomeworkUpload';
 import { getMindHive } from '../../services/MindHiveService';
+import { publishEvent } from '../../services/eventBus';
+import { trackError } from '../../services/telemetry';
 
 export default function HomeworkTray({ sessionId }) {
     const [files, setFiles] = useState([]);
+    const [pendingDelete, setPendingDelete] = useState(null);
     const { uploadFile, uploading } = useHomeworkUpload(sessionId);
 
     useEffect(() => {
@@ -33,13 +36,22 @@ export default function HomeworkTray({ sessionId }) {
     };
 
     const handleDelete = async (file) => {
-        if (!window.confirm(`Delete ${file.name}?`)) return;
         try {
             await deleteDoc(doc(db, 'whiteboards', sessionId, 'files', file.id));
             const storageRef = ref(storage, file.path);
             await deleteObject(storageRef);
+            publishEvent('ui-toast', {
+                level: 'success',
+                message: `${file.name} deleted.`,
+                durationMs: 2200,
+            });
         } catch (error) {
-            console.error("Delete failed", error);
+            trackError('homework.delete', error, { sessionId, fileId: file.id });
+            publishEvent('ui-toast', {
+                level: 'error',
+                message: 'Delete failed. Please retry.',
+                durationMs: 3000,
+            });
         }
     };
 
@@ -74,7 +86,7 @@ export default function HomeworkTray({ sessionId }) {
             );
         } catch (err) {
             setAnalysisResult("Error analyzing document. Please try again.");
-            console.error(err);
+            trackError('homework.analyze', err, { sessionId, fileName: file.name });
         } finally {
             setIsAnalyzing(false);
         }
@@ -139,9 +151,15 @@ export default function HomeworkTray({ sessionId }) {
                             {file.type.includes('image') && (
                                 <button
                                     onClick={() => {
-                                        window.dispatchEvent(new CustomEvent('whiteboard-staple-image', { 
-                                            detail: { url: file.url, name: file.name } 
-                                        }));
+                                        publishEvent('whiteboard-staple-image', {
+                                            url: file.url,
+                                            name: file.name,
+                                        });
+                                        publishEvent('ui-toast', {
+                                            level: 'success',
+                                            message: `${file.name} stapled to board.`,
+                                            durationMs: 2000,
+                                        });
                                     }}
                                     className="p-1 hover:text-emerald-400 text-slate-400"
                                     title="Staple to Board"
@@ -159,7 +177,7 @@ export default function HomeworkTray({ sessionId }) {
                                 ↗
                             </a>
                             <button
-                                onClick={() => handleDelete(file)}
+                                onClick={() => setPendingDelete(file)}
                                 className="p-1 hover:text-red-400 text-slate-400"
                                 title="Delete"
                             >
@@ -195,6 +213,35 @@ export default function HomeworkTray({ sessionId }) {
                         </div>
                         <div className="p-3 border-t border-white/10 bg-slate-950/30 text-center">
                             <span className="text-[9px] text-slate-600 uppercase tracking-widest">Powered by ToweR Intelligence Vision</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {pendingDelete && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-sm bg-slate-900 border border-rose-500/30 rounded-xl p-5 shadow-2xl">
+                        <h4 className="text-sm font-bold text-white mb-2">Delete file?</h4>
+                        <p className="text-xs text-slate-400 mb-5">
+                            This will remove <span className="text-slate-200 font-semibold">{pendingDelete.name}</span> from the tray.
+                        </p>
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => setPendingDelete(null)}
+                                className="px-3 py-2 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    const target = pendingDelete;
+                                    setPendingDelete(null);
+                                    await handleDelete(target);
+                                }}
+                                className="px-3 py-2 text-xs rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold"
+                            >
+                                Delete
+                            </button>
                         </div>
                     </div>
                 </div>

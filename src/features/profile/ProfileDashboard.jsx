@@ -65,7 +65,7 @@ export default function ProfileDashboard() {
                     </div>
                     
                     <div>
-                        <h2 className="text-2xl font-black text-white uppercase tracking-tight">{window.location.pathname.split('/').pop() || 'Student'}</h2>
+                        <h2 className="text-2xl font-black text-white uppercase tracking-tight">{studentProfile.towerTag || 'Student'}</h2>
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-2">
                             <span>Identity Verified</span>
                             <span className="w-1 h-1 rounded-full bg-slate-600"></span>

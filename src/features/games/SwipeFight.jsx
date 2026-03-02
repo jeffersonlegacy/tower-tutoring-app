@@ -154,13 +154,14 @@ export default function SwipeFight() {
     );
 
     return (
-        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white overflow-hidden relative">
+        <div data-testid="swipefight-page" className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white overflow-hidden relative">
             {/* Background Grid */}
             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
             <div className="absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-slate-950"></div>
 
             {gameState === 'menu' && (
                 <motion.div 
+                    data-testid="swipefight-menu"
                     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                     className="text-center z-10 p-8"
                 >
@@ -173,6 +174,7 @@ export default function SwipeFight() {
                     <p className="text-slate-400 tracking-widest uppercase mb-8 font-bold">The Tinder for Math</p>
                     
                     <button 
+                        data-testid="swipefight-start"
                         onClick={startGame}
                         className="bg-white text-slate-950 px-10 py-5 rounded-full font-black text-xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_white]"
                     >
@@ -182,7 +184,7 @@ export default function SwipeFight() {
             )}
 
             {gameState === 'playing' && (
-                <div className="relative z-10 w-full max-w-md flex flex-col items-center h-[600px]">
+                <div data-testid="swipefight-playing" className="relative z-10 w-full max-w-md flex flex-col items-center h-[600px]">
                     {/* HUD */}
                     <div className="w-full flex justify-between px-8 mb-8">
                         <div className="flex flex-col">

@@ -9,6 +9,8 @@ import { useHomeworkUpload } from '../../hooks/useHomeworkUpload';
 import { useWhiteboardActions } from '../../hooks/useWhiteboardActions';
 import { useLiveObservation } from '../../hooks/useLiveObservation';
 import { useDraggable } from '../../hooks/useDraggable';
+import { publishEvent, subscribeEvent } from '../../services/eventBus';
+import { trackError } from '../../services/telemetry';
 
 // V5.0: Smart Image Compression (Phase 18.5)
 const MAX_IMAGE_SIZE = 1024 * 1024; // 1MB
@@ -70,8 +72,10 @@ const Whiteboard = memo(({ sessionId }) => {
 
   // Listen for AI whiteboard actions (from ChatGPTChat)
   useEffect(() => {
-    const handleAIAction = (e) => {
-      const action = e.detail;
+    const handleAIAction = (actionDetail) => {
+      const action = actionDetail?.payload
+        ? { ...actionDetail.payload, type: actionDetail.type || actionDetail.payload.type }
+        : actionDetail;
       
       // Check if this is a persistent DRAW action
       if (action && (action.type?.startsWith('DRAW') || action.type === 'CLEAR')) {
@@ -92,21 +96,19 @@ const Whiteboard = memo(({ sessionId }) => {
         setAiAction(prev => prev?.type === 'THINKING' ? null : prev);
     };
 
-    window.addEventListener('ai-whiteboard-action', handleAIAction);
-    window.addEventListener('ai-thinking-start', handleThinkingStart);
-    window.addEventListener('ai-thinking-stop', handleThinkingStop);
-
-    const handleStaple = (e) => {
-        const { url, name } = e.detail;
+    const unsubs = [
+      subscribeEvent('ai-whiteboard-action', handleAIAction),
+      subscribeEvent('ai-thinking-start', handleThinkingStart),
+      subscribeEvent('ai-thinking-stop', handleThinkingStop),
+      subscribeEvent('whiteboard-staple-image', (detail) => {
+        const url = detail?.url || detail?.imageUrl || '';
+        const name = detail?.name || 'stapled-image';
         executeAction(editor, { type: 'STAPLE_IMAGE', url, name });
-    };
-    window.addEventListener('whiteboard-staple-image', handleStaple);
+      }),
+    ];
 
     return () => {
-        window.removeEventListener('ai-whiteboard-action', handleAIAction);
-        window.removeEventListener('ai-thinking-start', handleThinkingStart);
-        window.removeEventListener('ai-thinking-stop', handleThinkingStop);
-        window.removeEventListener('whiteboard-staple-image', handleStaple);
+      unsubs.forEach((unsubscribe) => unsubscribe());
     };
   }, [editor, executeAction]);
 
@@ -136,19 +138,21 @@ const Whiteboard = memo(({ sessionId }) => {
         const reader = new FileReader();
         reader.onload = (readerEvent) => {
           const base64 = readerEvent.target.result;
-          window.dispatchEvent(new CustomEvent('ai-vision-upload', {
-            detail: {
-              image: base64,
-              isAuto: false,
-              context: "User just snapped a photo of their homework. Analyze and guide them."
-            }
-          }));
+          publishEvent('ai-vision-upload', {
+            source: 'homework',
+            imageData: base64,
+            context: 'User snapped homework from camera.',
+          });
         };
         reader.readAsDataURL(file);
       }
     } catch (err) {
-      console.error('Snap upload failed:', err);
-      alert('Upload failed. Please try again.');
+      trackError('whiteboard.snapUpload', err, { sessionId });
+      publishEvent('ui-toast', {
+        level: 'error',
+        message: 'Upload failed. Please try again.',
+        durationMs: 3500,
+      });
     } finally {
       setIsProcessing(false);
       e.target.value = ''; // Reset input
@@ -161,12 +165,25 @@ const Whiteboard = memo(({ sessionId }) => {
         const imageData = await captureWhiteboard();
         if (imageData) {
             // Dispatch event for ChatGPTChat to pick up
-            window.dispatchEvent(new CustomEvent('ai-vision-upload', { detail: imageData }));
+            publishEvent('ai-vision-upload', {
+              source: 'board',
+              imageData,
+              context: 'User requested board scan.',
+            });
         } else {
-            alert("Canvas is empty! Draw something first.");
+            publishEvent('ui-toast', {
+              level: 'warning',
+              message: 'Canvas is empty. Draw something first.',
+              durationMs: 3000,
+            });
         }
     } catch (error) {
-        console.error('Scan failed:', error);
+        trackError('whiteboard.scan', error, { sessionId });
+        publishEvent('ui-toast', {
+          level: 'error',
+          message: 'Board scan failed. Please try again.',
+          durationMs: 3500,
+        });
     } finally {
         setIsProcessing(false);
     }

@@ -1,15 +1,31 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // 1. OPEN ACCESS for Connect 4 Games (Seamless Play)
-    match /whiteboards/{sessionId}/games/{gameId} {
-      allow read, write: if true;
+    function isAuthed() {
+      return request.auth != null;
     }
 
-    // 2. AUTH REQUIRED for everything else
+    // Leaderboards are public-read, authenticated-write.
+    match /leaderboards/{gameId}/scores/{scoreId} {
+      allow read: if true;
+      allow write: if isAuthed();
+    }
+
+    // Session and whiteboard data requires auth.
+    match /sessions/{sessionId} {
+      allow read, write: if isAuthed();
+    }
+
+    match /whiteboards/{sessionId} {
+      allow read, write: if isAuthed();
+      match /{document=**} {
+        allow read, write: if isAuthed();
+      }
+    }
+
+    // Default auth requirement for any remaining collection.
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isAuthed();
     }
   }
 }

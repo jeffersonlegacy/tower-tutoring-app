@@ -317,7 +317,7 @@ const getAIMove = (board, difficulty) => {
 
 export default function Connect4({ sessionId, onBack }) {
     const gameId = 'connect4_v6';
-    const { awardXP } = useMastery(); // [NEW]
+    const { awardPV } = useMastery();
     const { gameState, playerId, isHost, updateState } = useRealtimeGame(sessionId, gameId, INITIAL_STATE);
 
     const [hoveredCol, setHoveredCol] = useState(null);
@@ -384,13 +384,13 @@ export default function Connect4({ sessionId, onBack }) {
         if (gameState?.winner && gameState.winner !== 'draw') {
             confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
             
-            // [NEW] Award XP if I won (and verify we haven't already awarded for this specific game instance to avoid dupes)
+            // Award PV if I won (and verify we haven't already awarded for this specific game instance to avoid dupes)
             // Ideally we'd track "awarded" state, but for MVP:
             if (gameState.winner === myColor) {
-               awardXP(50, 'Won Connect 4');
+               awardPV(50, 'Won Connect 4');
             }
         }
-    }, [gameState?.winner, myColor, awardXP]);
+    }, [gameState?.winner, myColor, awardPV]);
 
     // Handlers
     const handleDrop = useCallback((col) => {
@@ -455,7 +455,7 @@ export default function Connect4({ sessionId, onBack }) {
     // ═══════════════════════════════════════════════════════════════
     if (gameState.status === STATUS.MENU) {
         return (
-            <div className="flex flex-col items-center justify-center h-full p-6 bg-gradient-to-b from-slate-900 to-black">
+            <div data-testid="connect4-menu" className="flex flex-col items-center justify-center h-full p-6 bg-gradient-to-b from-slate-900 to-black">
                 <div className="text-7xl mb-4 animate-bounce">🔴</div>
                 <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-red-500 mb-2">
                     NEON CONNECT
@@ -487,6 +487,7 @@ export default function Connect4({ sessionId, onBack }) {
                     ) : (
                         <>
                             <button
+                                data-testid="connect4-vs-computer"
                                 onClick={() => setShowDiffMenu(true)}
                                 className="w-full py-4 bg-slate-800 border border-slate-600 hover:border-pink-500 rounded-xl font-bold text-white"
                             >
@@ -554,7 +555,7 @@ export default function Connect4({ sessionId, onBack }) {
     const canPlay = gameState.mode === MODE.SOLO ? gameState.turn === PLAYER.RED : isMyTurn;
 
     return (
-        <div className="flex flex-col items-center h-full p-4 max-w-lg mx-auto">
+        <div data-testid="connect4-gameplay" className="flex flex-col items-center h-full p-4 max-w-lg mx-auto">
             {/* Header */}
             <div className="flex items-center justify-between w-full mb-4">
                 <button onClick={onBack} className="text-xs text-slate-500 hover:text-white">EXIT</button>

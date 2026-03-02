@@ -2,9 +2,12 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 // import ReactMarkdown from 'react-markdown';
 // import remarkGfm from 'remark-gfm';
 import { getMindHive, parseAIResponse } from '../../services/MindHiveService';
-// import { captureWhiteboard } from '../../utils/WhiteboardCapture';
+import { captureWhiteboard } from '../../utils/WhiteboardCapture';
 // import { strokeAnalytics } from '../../utils/StrokeAnalytics';
 import { useMastery } from '../../context/MasteryContext';
+import { normalizeImageInputs } from '../../services/chatPayload';
+import { publishEvent, subscribeEvent } from '../../services/eventBus';
+import { trackError } from '../../services/telemetry';
 // import ScanningOverlay from '../../components/ScanningOverlay';
 // import jiLogo from '../../assets/ji_logo.jpg';
 // import { getEnhancedSpatialSummary } from '../../utils/WhiteboardSpatialAwareness';
@@ -22,7 +25,7 @@ const INSTRUCTION_PATTERNS = [
     /label/i, /show me/i, /put/i, /add/i, /create/i, /make/i
 ];
 
-export default function ChatGPTChat({ mode = 'widget', onHome, externalMessages, setExternalMessages, sessionMode = 'standard' }) {
+export default function ChatGPTChat({ mode = 'widget', onHome, externalMessages, setExternalMessages, sessionMode = 'standard', sessionId }) {
     const { curriculum, getNodeStatus, logEvent } = useMastery();
 
     // === ALL STATE DECLARATIONS FIRST (before any useEffects) ===
@@ -58,6 +61,7 @@ export default function ChatGPTChat({ mode = 'widget', onHome, externalMessages,
     const messagesEndRef = useRef(null);
     const lastAIResponseRef = useRef('');
     const messagesRef = useRef(messages);
+    const pendingRequestsRef = useRef([]);
 
     // === EFFECTS ===
     // Debug API Keys
@@ -67,20 +71,18 @@ export default function ChatGPTChat({ mode = 'widget', onHome, externalMessages,
 
     // Listen for Snap-to-Solve events from Whiteboard
     useEffect(() => {
-        const handleSnapUpload = (e) => {
-            const data = e.detail;
-            const image = data.image || data; // Handle both direct string and object format
-            const isAuto = data.isAuto;
+        const handleSnapUpload = (data) => {
+            const images = normalizeImageInputs([data.imageData, data.imageUrl]);
+            if (!images.length) return;
 
-            // console.log('[ChatGPTChat] Received Snap upload:', e.detail);
             setIsOpen(true);
-            setWhiteboardImage(image);
+            setWhiteboardImage(images[0]);
             
             // Auto-send with scaffolding prompt
             const isUpdate = messagesRef.current.length > 1; // welcoming message is index 0
             let prompt = "";
 
-            if (isAuto) {
+            if (data.source === 'auto') {
                 // "Live Tutor" persona - Active Observation
                 prompt = "I'm looking at your work live. Analyze what is on the board right now. If you see a math problem, solve it or give a hint. If it looks correct, say 'Great job!'. do NOT stay silent.";
             } else {
@@ -90,17 +92,20 @@ export default function ChatGPTChat({ mode = 'widget', onHome, externalMessages,
                     : "I've uploaded a picture of my homework. Can you help me scaffold the solution? Please don't give me the answer, but help me identify the first step.";
             }
             
-            sendMessage(prompt, [image]);
+            sendMessage({
+                text: prompt,
+                images,
+                source: data.source,
+                context: data.context,
+            });
         };
 
-        window.addEventListener('ai-vision-upload', handleSnapUpload);
-        return () => window.removeEventListener('ai-vision-upload', handleSnapUpload);
+        return subscribeEvent('ai-vision-upload', handleSnapUpload);
     }, []);
 
     // Proactive Help Listener
     useEffect(() => {
-        const handleNotification = (e) => {
-            const { type, data } = e.detail;
+        return subscribeEvent('tower-notification', ({ type, data }) => {
             if (type === 'ai_nudge') {
                 // If chat is closed, maybe pulse the button or show a toast?
                 // For now, we'll auto-open if it's critical, or just add a message if open
@@ -111,16 +116,13 @@ export default function ChatGPTChat({ mode = 'widget', onHome, externalMessages,
                 }
                 
                 // Inject the helpful message from the 'System'
-                setLocalMessages(prev => [...prev, { 
+                setMessages(prev => [...prev, { 
                     role: 'model', 
                     text: `💡 **Proactive Assist:** ${data.message}` 
                 }]);
             }
-        };
-
-        window.addEventListener('tower-notification', handleNotification);
-        return () => window.removeEventListener('tower-notification', handleNotification);
-    }, [isOpen]);
+        });
+    }, [isOpen, setMessages]);
 
     // Sync messagesRef
     useEffect(() => {
@@ -150,9 +152,11 @@ export default function ChatGPTChat({ mode = 'widget', onHome, externalMessages,
     // Broadcast whiteboard action to parent for overlay rendering
     useEffect(() => {
         if (whiteboardAction) {
-            window.dispatchEvent(new CustomEvent('ai-whiteboard-action', {
-                detail: whiteboardAction
-            }));
+            publishEvent('ai-whiteboard-action', {
+                type: whiteboardAction.type || 'UNKNOWN',
+                payload: whiteboardAction.payload || whiteboardAction,
+                expiresMs: 4000,
+            });
             // Clear after 4 seconds
             const timer = setTimeout(() => setWhiteboardAction(null), 4000);
             return () => clearTimeout(timer);
@@ -161,14 +165,13 @@ export default function ChatGPTChat({ mode = 'widget', onHome, externalMessages,
 
     const silentCapture = useCallback(async () => {
         try {
-            // const imageData = await captureWhiteboard();
-            const imageData = null;
+            const imageData = await captureWhiteboard();
             return imageData;
         } catch (error) {
-            console.warn('Silent capture failed:', error);
+            trackError('chat.silentCapture', error, { sessionId });
             return null;
         }
-    }, []);
+    }, [sessionId]);
 
     const shouldAutoCaptureOnSend = useCallback((userText) => {
         if (!autoCapture) return false;
@@ -182,30 +185,44 @@ export default function ChatGPTChat({ mode = 'widget', onHome, externalMessages,
     const handleCaptureWhiteboard = async () => {
         setIsCapturing(true);
         try {
-            // const imageData = await captureWhiteboard();
-            const imageData = null;
+            const imageData = await captureWhiteboard();
             if (imageData) {
                 setWhiteboardImage(imageData);
                 if (!input.trim()) {
                     setInput("Here's my whiteboard. Can you help me with this?");
                 }
             } else {
-                setMessages(prev => [...prev, {
-                    role: 'model',
-                    text: "I couldn't capture the whiteboard. Make sure you've drawn something first!"
-                }]);
+                publishEvent('ui-toast', {
+                    level: 'warning',
+                    message: "I couldn't capture the whiteboard. Draw something first.",
+                    durationMs: 3000,
+                });
             }
         } catch (error) {
-            console.error('Capture error:', error);
+            trackError('chat.captureWhiteboard', error, { sessionId });
+            publishEvent('ui-toast', {
+                level: 'error',
+                message: 'Capture failed. Please try again.',
+                durationMs: 3000,
+            });
         }
         setIsCapturing(false);
     };
 
-    const sendMessage = async (textOverride = null, imagesOverride = null) => {
-        if ((!input.trim() && !whiteboardImage) || isLoading) return;
+    const sendMessage = async (request = {}) => {
+        const requestText = typeof request.text === 'string' ? request.text : input;
+        const requestImages = normalizeImageInputs(
+            Array.isArray(request.images) ? request.images : (whiteboardImage ? [whiteboardImage] : []),
+        );
+        const userText = requestText?.trim() || (requestImages.length ? 'Look at my whiteboard' : '');
 
-        const userText = textOverride || input || "Look at my whiteboard";
-        let images = imagesOverride || (whiteboardImage ? [whiteboardImage] : []);
+        if (!userText && requestImages.length === 0) return;
+        if (isLoading) {
+            pendingRequestsRef.current.push({ text: userText, images: requestImages, source: request.source || 'manual' });
+            return;
+        }
+
+        let images = requestImages;
 
         // === CONTEXT INJECTION ===
         // 1. Device Context (Screen Size Awareness)
@@ -220,9 +237,7 @@ export default function ChatGPTChat({ mode = 'widget', onHome, externalMessages,
         let strokeContext = deviceContext;
 
         // 2. Mastery Context (Curriculum Awareness)
-        const currentUrlParams = window.location.pathname.split('/');
-        const currentSessionId = currentUrlParams[2];
-        const currentNode = (currentSessionId && curriculum?.nodes) ? curriculum.nodes[currentSessionId] : null;
+        const currentNode = (sessionId && curriculum?.nodes) ? curriculum.nodes[sessionId] : null;
 
         // Defensive logging
         // console.log("[ChatGPTChat] Current Node:", currentNode?.title || "None");
@@ -289,7 +304,7 @@ Active Node: ${currentNode?.title || 'Unknown'}
         setCurrentModel(null);
         
         // VISUAL FEEDBACK: Tell whiteboard we are thinking
-        window.dispatchEvent(new CustomEvent('ai-thinking-start'));
+        publishEvent('ai-thinking-start', { source: request.source || 'manual' });
 
         const placeholderId = Date.now();
         setMessages(prev => [...prev, { role: 'model', text: '', id: placeholderId, isStreaming: true }]);
@@ -340,7 +355,10 @@ Active Node: ${currentNode?.title || 'Unknown'}
             // strokeAnalytics.reset();
 
         } catch (error) {
-            console.error("Mind Hive Error:", error);
+            trackError('chat.sendMessage', error, {
+                sessionId,
+                source: request.source || 'manual',
+            });
             setMessages(prev => prev.map(msg =>
                 msg.id === placeholderId
                     ? { ...msg, text: "I'm having trouble connecting right now. Please try again in a moment." }
@@ -349,18 +367,24 @@ Active Node: ${currentNode?.title || 'Unknown'}
         } finally {
             setIsLoading(false);
             setIsScanning(false);
-            window.dispatchEvent(new CustomEvent('ai-thinking-stop'));
+            publishEvent('ai-thinking-stop', { source: request.source || 'manual' });
             setMessages(prev => prev.map(msg =>
                 msg.id === placeholderId
                     ? { ...msg, isStreaming: false }
                     : msg
             ));
+
+            const nextRequest = pendingRequestsRef.current.shift();
+            if (nextRequest) {
+                setTimeout(() => {
+                    sendMessage(nextRequest);
+                }, 0);
+            }
         }
     };
 
     const handleSend = () => {
-        console.log('[ChatGPTChat] Send triggered. Input:', input, 'Image:', !!whiteboardImage);
-        sendMessage();
+        sendMessage({ source: 'manual' });
     };
 
     // Emotional state badge
@@ -396,7 +420,7 @@ Active Node: ${currentNode?.title || 'Unknown'}
     const emotionBadge = getEmotionBadge();
 
     return (
-        <div className={containerClasses}>
+        <div data-testid="chat-container" className={containerClasses}>
             {/* Scanning Overlay */}
             {/* {isScanning && <ScanningOverlay isActive={true} />} */}
 
@@ -522,6 +546,7 @@ Active Node: ${currentNode?.title || 'Unknown'}
                     </button>
 
                     <textarea
+                        data-testid="chat-input"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => {
@@ -535,6 +560,7 @@ Active Node: ${currentNode?.title || 'Unknown'}
                         className="flex-1 bg-slate-950/80 text-white text-sm rounded-xl px-4 py-3 border border-white/10 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 placeholder-slate-600 resize-none min-h-[44px] max-h-[120px] transition-all"
                     />
                     <button
+                        data-testid="chat-send"
                         onClick={handleSend}
                         disabled={isLoading || (!input.trim() && !whiteboardImage)}
                         className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white p-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transform hover:-translate-y-0.5"

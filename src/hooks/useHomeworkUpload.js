@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { storage, db } from '../services/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc } from 'firebase/firestore';
+import { publishEvent } from '../services/eventBus';
+import { trackError } from '../services/telemetry';
 
 export function useHomeworkUpload(sessionId) {
     const [uploading, setUploading] = useState(false);
@@ -27,20 +29,20 @@ export function useHomeworkUpload(sessionId) {
 
             // 3. INTELLIGENT AWARENESS (Notify AI Brain)
             // Dispatch event for ChatGPTChat to pick up immediately
-            const aiEvent = new CustomEvent('ai-vision-upload', {
-                detail: {
-                    image: downloadURL,
-                    imageUrl: downloadURL,
-                    isAuto: false, // This is a manual user upload, so AI should acknowledge it
-                    context: "User uploaded a file/homework."
-                }
+            publishEvent('ai-vision-upload', {
+                source: 'homework',
+                imageUrl: downloadURL,
+                context: 'User uploaded homework file.',
             });
-            window.dispatchEvent(aiEvent);
 
             return true;
         } catch (error) {
-            console.error("Upload failed", error);
-            alert("Upload failed: " + error.message);
+            trackError('homework.upload', error, { sessionId, fileName: file?.name });
+            publishEvent('ui-toast', {
+                level: 'error',
+                message: `Upload failed: ${error.message}`,
+                durationMs: 4000,
+            });
             return false;
         } finally {
             setUploading(false);

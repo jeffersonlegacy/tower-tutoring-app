@@ -5,6 +5,8 @@
  * All model access is routed through /api/chat/completions.
  */
 import { composeSystemPrompt } from './MindHivePlugins';
+import { buildChatMessages } from './chatPayload';
+import { trackError } from './telemetry';
 
 const CONFIG = {
   model: import.meta.env.VITE_OPENAI_MODEL || 'gpt-4.1-mini',
@@ -22,39 +24,17 @@ class MindHiveService {
     images = [],
     strokeContext = '',
   ) {
-    const enrichedPrompt = strokeContext ? `${strokeContext}\n\nUser Message: ${prompt}` : prompt;
-
     if (onModelChange) {
       onModelChange(`OPENAI ${CONFIG.model.toUpperCase()}`);
     }
 
-    const messages = [{ role: 'system', content: CONFIG.systemPrompt }];
-
-    // Keep prior conversational context (excluding in-progress placeholder entries).
-    let historyStarted = false;
-    for (const msg of history.slice(0, -1)) {
-      const role = msg.role === 'model' ? 'assistant' : 'user';
-      if (!historyStarted && role === 'assistant') continue;
-      historyStarted = true;
-
-      const text = typeof msg.text === 'string' ? msg.text : '';
-      if (!text) continue;
-      messages.push({ role, content: text });
-    }
-
-    if (images?.length) {
-      const userContent = [{ type: 'text', text: enrichedPrompt }];
-      for (const src of images) {
-        if (!src) continue;
-        userContent.push({
-          type: 'image_url',
-          image_url: { url: src },
-        });
-      }
-      messages.push({ role: 'user', content: userContent });
-    } else {
-      messages.push({ role: 'user', content: enrichedPrompt });
-    }
+    const { messages } = buildChatMessages({
+      systemPrompt: CONFIG.systemPrompt,
+      prompt,
+      history,
+      images,
+      strokeContext,
+    });
 
     const response = await fetch(CONFIG.endpoint, {
       method: 'POST',
@@ -102,8 +82,16 @@ class MindHiveService {
       }
     }
 
-    if (!hasContent) {
-      throw new Error('Empty response from ChatGPT API');
+    if (!hasContent) throw new Error('Empty response from ChatGPT API');
+  }
+
+  async streamResponseSafe(...args) {
+    try {
+      await this.streamResponse(...args);
+      return { ok: true, error: null };
+    } catch (error) {
+      trackError('mindhive.streamResponse', error);
+      return { ok: false, error };
     }
   }
 }

@@ -1,10 +1,20 @@
+import { createTraceId, readJsonBody, sendError, sendOk } from '../_utils.js';
+
 function toDataUrlFromBase64(base64, mime = 'image/png') {
   return `data:${mime};base64,${base64}`;
 }
 
 export default async function handler(req, res) {
+  const traceId = createTraceId('avatar');
+
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return sendError(res, {
+      status: 405,
+      code: 'method_not_allowed',
+      message: 'Method not allowed',
+      retryable: false,
+      traceId,
+    });
   }
 
   try {
@@ -12,10 +22,16 @@ export default async function handler(req, res) {
     const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
 
     if (!apiKey) {
-      return res.status(500).json({ error: 'Missing OPENAI_API_KEY' });
+      return sendError(res, {
+        status: 500,
+        code: 'missing_api_key',
+        message: 'Missing OPENAI_API_KEY',
+        retryable: false,
+        traceId,
+      });
     }
 
-    const rawBody = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const rawBody = readJsonBody(req);
     const prompt =
       rawBody?.prompt ||
       'Create an epic superhero portrait avatar, bold colors, glowing energy aura, cinematic lighting, inspiring and kid-friendly style.';
@@ -35,27 +51,47 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      return res.status(response.status).json({ error: errorText });
+      return sendError(res, {
+        status: response.status,
+        code: 'openai_image_error',
+        message: 'OpenAI image generation failed',
+        retryable: response.status >= 500 || response.status === 429,
+        details: errorText,
+        traceId,
+      });
     }
 
     const data = await response.json();
     const item = data?.data?.[0];
 
     if (item?.b64_json) {
-      return res.status(200).json({
+      return sendOk(res, {
         imageData: toDataUrlFromBase64(item.b64_json),
-      });
+      }, traceId);
     }
 
     if (item?.url) {
-      return res.status(200).json({
+      return sendOk(res, {
         imageData: item.url,
-      });
+      }, traceId);
     }
 
-    return res.status(500).json({ error: 'No image returned from OpenAI' });
+    return sendError(res, {
+      status: 500,
+      code: 'no_image_returned',
+      message: 'No image returned from OpenAI',
+      retryable: true,
+      traceId,
+    });
   } catch (error) {
-    console.error('OpenAI avatar route error:', error);
-    return res.status(500).json({ error: 'Avatar generation failed' });
+    console.error(`[${traceId}] OpenAI avatar route error:`, error);
+    return sendError(res, {
+      status: 500,
+      code: 'avatar_generation_failed',
+      message: 'Avatar generation failed',
+      retryable: true,
+      details: error?.message || 'unknown',
+      traceId,
+    });
   }
 }

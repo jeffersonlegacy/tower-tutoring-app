@@ -34,7 +34,7 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 font-sans selection:bg-cyan-500/30 overflow-x-hidden relative flex flex-col">
+    <div data-testid="landing-page" className="min-h-screen bg-slate-950 font-sans selection:bg-cyan-500/30 overflow-x-hidden relative flex flex-col">
 
       {/* --- BACKGROUND LAYERS --- */}
       <div className="fixed inset-0 z-0 pointer-events-none">
@@ -123,6 +123,7 @@ export default function Landing() {
           {lastSessionId && (
             <div className="animate-in fade-in slide-in-from-top-4 duration-700 mb-6">
               <button
+                data-testid="resume-session-button"
                 onClick={resumeSession}
                 className="group flex items-center gap-3 px-6 py-3 bg-slate-800/80 hover:bg-slate-700 text-white rounded-full border border-cyan-500/30 hover:border-cyan-400 transition-all shadow-[0_0_20px_rgba(6,182,212,0.1)] hover:shadow-[0_0_30px_rgba(6,182,212,0.3)]"
               >
@@ -150,6 +151,7 @@ export default function Landing() {
                  <span className="text-[9px] font-mono text-slate-600">V4.1</span>
               </div>
               <input
+                data-testid="landing-session-input"
                 className="w-full bg-slate-900 text-cyan-100 px-6 py-4 rounded-lg border border-slate-700 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 placeholder-slate-700 font-mono text-lg tracking-wider text-center transition-all shadow-inner"
                 type="text"
                 placeholder="TOWERTAG"
@@ -159,6 +161,7 @@ export default function Landing() {
               />
             </div>
             <button
+              data-testid="landing-start-button"
               onClick={handleStart}
               className="w-full group/btn relative overflow-hidden bg-gradient-to-r from-cyan-700 to-blue-700 hover:from-cyan-600 hover:to-blue-600 text-white font-bold py-5 rounded-lg transition-all shadow-[0_4px_20px_rgba(6,182,212,0.2)] hover:shadow-[0_4px_30px_rgba(6,182,212,0.4)] active:scale-[0.98]"
             >

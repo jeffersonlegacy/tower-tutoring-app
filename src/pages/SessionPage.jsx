@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Suspense, lazy } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { 
     Upload, 
     Bot, 
@@ -38,13 +38,14 @@ const ComponentLoader = () => (
 
 export default function Session() {
     const { sessionId } = useParams();
+    const navigate = useNavigate();
     // [NEW] Read Adaptive Mode
     const [searchParams] = useSearchParams();
     const sessionMode = searchParams.get('mode') || 'standard'; // 'visualize', 'train', 'guide'
 
     const [maintenanceMode, setMaintenanceMode] = useState({ enabled: false, message: '' });
     const { uploadFile } = useHomeworkUpload(sessionId);
-    const { curriculum } = useMastery();
+    const { curriculum, initSession } = useMastery();
     const [isDragging, setIsDragging] = useState(false);
     const [sessionEnded, setSessionEnded] = useState(false);
 
@@ -68,6 +69,12 @@ export default function Session() {
 
     // Main Tab Mode (Mobile Only): 'board' | 'sidebar'
     const [mainTab, setMainTab] = useState('sidebar');
+
+    useEffect(() => {
+        if (sessionId) {
+            initSession(sessionId);
+        }
+    }, [initSession, sessionId]);
 
     useEffect(() => {
         // [NEW] Announce Mode Start
@@ -95,8 +102,9 @@ export default function Session() {
                     throw new Error(`Invalid content-type: ${contentType}`);
                 }
 
-                const config = await response.json();
-                if (config.maintenanceMode) {
+                const payload = await response.json();
+                const config = payload?.data || payload;
+                if (config?.maintenanceMode) {
                     setMaintenanceMode(config.maintenanceMode);
                 }
             } catch (error) {
@@ -181,6 +189,7 @@ export default function Session() {
 
     return (
         <div
+            data-testid="session-shell"
             className="flex flex-col h-full overflow-hidden relative bg-slate-900"
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -188,7 +197,7 @@ export default function Session() {
         >
             {/* End Session Interface Overlay */}
             {sessionEnded && (
-                <MindHiveInterface onHome={() => window.location.href = '/'} />
+                <MindHiveInterface onHome={() => navigate('/')} />
             )}
 
             {/* [NEW] Path Engine Overlay (Full Screen Experience) */}
@@ -199,7 +208,7 @@ export default function Session() {
                             node={activeNode} 
                             mode={sessionMode} 
                             onComplete={() => setSessionEnded(true)}
-                            onBack={() => window.history.back()}
+                            onBack={() => navigate(-1)}
                         />
                     </Suspense>
                 </div>
@@ -323,6 +332,7 @@ export default function Session() {
                                     setShowTeacherMenu(false);
                                 }} 
                                 label="Upload"
+                                testId="rail-homework"
                             />
                             <RailButton 
                                 icon={<Bot size={20} />} 
@@ -332,6 +342,7 @@ export default function Session() {
                                     setShowTeacherMenu(false);
                                 }} 
                                 label="AI Tutor"
+                                testId="rail-ai"
                             />
                             <RailButton 
                                 icon={<Calculator size={20} />} 
@@ -392,6 +403,7 @@ export default function Session() {
                                 }} 
                                 label="Arcade"
                                 color="pink"
+                                testId="rail-arcade"
                             />
                             <RailButton 
                                 icon={<UserCircle size={20} />} 
@@ -474,6 +486,7 @@ export default function Session() {
 
                 {/* Main Stage: Whiteboard (Right/Bottom) */}
                 <div className={`flex-1 bg-slate-200 relative overflow-hidden h-full ${mainTab === 'board' ? 'block' : 'hidden md:block'}`}>
+                    <div data-testid="whiteboard-stage" className="absolute inset-0 pointer-events-none" />
                     <Suspense fallback={<ComponentLoader />}>
                         <Whiteboard sessionId={sessionId} />
                     </Suspense>
@@ -486,7 +499,7 @@ export default function Session() {
 }
 
 // Helper Component for Rail Buttons
-function RailButton({ icon, active, onClick, label, color = 'cyan' }) {
+function RailButton({ icon, active, onClick, label, color = 'cyan', testId }) {
     const activeColors = {
         cyan: 'bg-cyan-500/20 text-cyan-400 border-l-2 border-cyan-500',
         pink: 'bg-pink-500/20 text-pink-400 border-l-2 border-pink-500',
@@ -497,6 +510,7 @@ function RailButton({ icon, active, onClick, label, color = 'cyan' }) {
 
     return (
         <button
+            data-testid={testId}
             onClick={onClick}
             className={`w-12 h-12 rounded-lg flex items-center justify-center transition-all group relative
                 ${active 
