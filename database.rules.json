@@ -1,14 +1,24 @@
 {
     "rules": {
+        ".read": false,
+        ".write": false,
         "sessions": {
             "$sessionId": {
+                ".read": "auth != null",
+                ".write": "auth != null",
                 "games": {
-                    ".read": "auth != null",
-                    ".write": "auth != null"
+                    "$gameId": {
+                        ".read": "auth != null && data.child('players').child(auth.uid).exists()",
+                        ".write": "auth != null && (data.child('hostId').val() === auth.uid || newData.child('hostId').val() === auth.uid)",
+                        "players": {
+                            "$playerId": {
+                                ".read": "auth != null && $playerId === auth.uid",
+                                ".write": "auth != null && $playerId === auth.uid"
+                            }
+                        }
+                    }
                 }
             }
-        },
-        ".read": false,
-        ".write": false
+        }
     }
 }

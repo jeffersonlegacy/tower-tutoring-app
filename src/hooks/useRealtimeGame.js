@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { rtdb } from '../services/firebase';
 import { ref, onValue, set, update, get, onDisconnect } from 'firebase/database';
+import { auth } from '../services/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const HEARTBEAT_MS = 5000;
 const STALE_PLAYER_MS = 70 * 1000;
@@ -21,15 +23,43 @@ function deriveLifecycle(status, fallback = 'lobby') {
  */
 export function useRealtimeGame(sessionId, gameId, initialState) {
     // Generate stable player ID per browser session
-    const [playerId] = useState(() => {
-        const storageKey = `tower_player_${gameId}`;
-        let pid = sessionStorage.getItem(storageKey);
-        if (!pid) {
-            pid = `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-            sessionStorage.setItem(storageKey, pid);
+    const SESSION_PLAYER_KEY = `tower_player_${gameId}`;
+    const generateFallbackId = () => {
+        const randomId = `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+        if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem(SESSION_PLAYER_KEY, randomId);
         }
-        return pid;
+        return randomId;
+    };
+
+    const initialStored = typeof sessionStorage !== 'undefined'
+        ? sessionStorage.getItem(SESSION_PLAYER_KEY)
+        : null;
+    const initialAuthId = auth?.currentUser?.uid || null;
+
+    const [playerId, setPlayerId] = useState(() => {
+        const seedId = initialAuthId || initialStored;
+        if (seedId && typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem(SESSION_PLAYER_KEY, seedId);
+        }
+        return seedId || generateFallbackId();
     });
+
+    useEffect(() => {
+        if (!auth) return undefined;
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (!user) return;
+            const newId = user.uid;
+            setPlayerId((prev) => {
+                if (prev === newId) return prev;
+                if (typeof sessionStorage !== 'undefined') {
+                    sessionStorage.setItem(SESSION_PLAYER_KEY, newId);
+                }
+                return newId;
+            });
+        });
+        return unsubscribe;
+    }, [SESSION_PLAYER_KEY]);
 
     const [gameState, setGameState] = useState(null);
     const [isHost, setIsHost] = useState(false);

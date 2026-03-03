@@ -7,7 +7,7 @@
  * - Uses deleteField() to remove records.
  */
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { db } from '../services/firebase';
+import { db, auth } from '../services/firebase';
 import { doc, onSnapshot, setDoc, updateDoc, getDoc, serverTimestamp, deleteField } from 'firebase/firestore';
 
 // Unique ID per browser tab (prevents self-echo)
@@ -100,6 +100,7 @@ export function useWhiteboardSync(editor, sessionId) {
                     records: recordsObj,
                     instanceId: INSTANCE_ID,
                     createdAt: serverTimestamp(),
+                    ownerId: auth?.currentUser?.uid || null,
                     updatedAt: serverTimestamp()
                 });
                 

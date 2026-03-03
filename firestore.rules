@@ -5,27 +5,47 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Leaderboards are public-read, authenticated-write.
-    match /leaderboards/{gameId}/scores/{scoreId} {
-      allow read: if true;
-      allow write: if isAuthed();
+    function readSessionOwner(sessionId, resource) {
+      let owner = resource?.data?.ownerId;
+      if (!owner) {
+        owner = get(/databases/$(database)/documents/sessions/$(sessionId)).data.ownerId;
+      }
+      return owner || null;
     }
 
-    // Session and whiteboard data requires auth.
+    function isSessionOwner(sessionId, resource) {
+      const owner = readSessionOwner(sessionId, resource);
+      return isAuthed() && owner != null && owner == request.auth.uid;
+    }
+
+    // Leaderboards: public-read, authenticated writes with minimal vetting.
+    match /leaderboards/{gameId}/scores/{scoreId} {
+      allow read: if true;
+      allow write: if isAuthed()
+        && request.resource.data.towerTag is string
+        && request.resource.data.score is number;
+    }
+
     match /sessions/{sessionId} {
-      allow read, write: if isAuthed();
+      allow create: if isAuthed()
+        && request.resource.data.ownerId == request.auth.uid;
+      allow read: if isAuthed() && (readSessionOwner(sessionId, resource) == null || readSessionOwner(sessionId, resource) == request.auth.uid);
+      allow update, delete: if isSessionOwner(sessionId, resource);
     }
 
     match /whiteboards/{sessionId} {
-      allow read, write: if isAuthed();
+      allow read: if isAuthed() && (readSessionOwner(sessionId, resource) == null || readSessionOwner(sessionId, resource) == request.auth.uid);
+      allow write: if isSessionOwner(sessionId);
       match /{document=**} {
-        allow read, write: if isAuthed();
+        allow read: if isAuthed() && (readSessionOwner(sessionId, resource) == null || readSessionOwner(sessionId, resource) == request.auth.uid);
+        allow write: if isSessionOwner(sessionId);
       }
     }
 
-    // Default auth requirement for any remaining collection.
+    // Default deny for everything else except authenticated reads.
     match /{document=**} {
-      allow read, write: if isAuthed();
+      allow read: if isAuthed();
+      allow write: if false;
     }
   }
 }
