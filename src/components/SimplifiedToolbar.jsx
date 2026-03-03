@@ -18,6 +18,7 @@ const COLORS = [
  */
 export function SimplifiedToolbar() {
     const editor = useEditor();
+    const isDesktop = typeof window !== 'undefined' ? window.innerWidth >= 768 : false;
     
     // Get current tool and color from editor state
     const currentTool = useValue('current tool', () => editor.getCurrentToolId(), [editor]);
@@ -25,8 +26,12 @@ export function SimplifiedToolbar() {
     
     // Draggable positioning
     const { dragHandlers, style } = useDraggable({ 
-        x: 20, 
+        x: isDesktop ? 420 : 20,
         y: window.innerHeight / 2 - 100 
+    }, {
+        minX: isDesktop ? 380 : 8,
+        minY: 8,
+        margin: 8,
     });
 
     const setTool = (toolId) => {

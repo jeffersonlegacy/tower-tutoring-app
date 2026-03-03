@@ -197,17 +197,28 @@ const Whiteboard = memo(({ sessionId }) => {
     };
   }, []);
 
-    const { 
-        position: actionsPos, 
-        dragHandlers: actionsHandlers, 
-        style: actionsStyle 
-    } = useDraggable({ x: 20, y: window.innerHeight - 100 });
+    const isDesktop = typeof window !== 'undefined' ? window.innerWidth >= 768 : false;
+    const { dragHandlers: actionsHandlers, style: actionsStyle } = useDraggable(
+      {
+        x: isDesktop ? 440 : 16,
+        y: (typeof window !== 'undefined' ? window.innerHeight : 900) - 120,
+      },
+      {
+        minX: isDesktop ? 380 : 8,
+        minY: 8,
+      },
+    );
 
-    const { 
-        position: livePos, 
-        dragHandlers: liveHandlers, 
-        style: liveStyle 
-    } = useDraggable({ x: window.innerWidth - 180, y: 100 });
+    const { dragHandlers: liveHandlers, style: liveStyle } = useDraggable(
+      {
+        x: (typeof window !== 'undefined' ? window.innerWidth : 1280) - 220,
+        y: 96,
+      },
+      {
+        minX: isDesktop ? 380 : 8,
+        minY: 8,
+      },
+    );
 
 
   return (

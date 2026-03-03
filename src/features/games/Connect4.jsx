@@ -511,11 +511,16 @@ export default function Connect4({ sessionId, onBack }) {
     // RENDER: WAITING FOR OPPONENT
     // ═══════════════════════════════════════════════════════════════
     if (gameState.status === STATUS.WAITING) {
+        const isAbandoned = gameState.lifecycle === 'abandoned';
         return (
             <div className="flex flex-col items-center justify-center h-full p-6 text-center">
                 <div className="text-5xl mb-4 animate-pulse">⏳</div>
-                <h2 className="text-xl font-bold text-white mb-2">Waiting for opponent...</h2>
-                <p className="text-slate-500 text-sm mb-4">Share this session ID with a friend</p>
+                <h2 className="text-xl font-bold text-white mb-2">
+                    {isAbandoned ? 'Match abandoned.' : 'Waiting for opponent...'}
+                </h2>
+                <p className="text-slate-500 text-sm mb-4">
+                    {isAbandoned ? 'No active opponent detected. Start fresh or wait for reconnect.' : 'Share this session ID with a friend'}
+                </p>
                 {isHost && (
                     <button
                         onClick={() => updateState({ status: STATUS.PLAYING })}
@@ -527,6 +532,14 @@ export default function Connect4({ sessionId, onBack }) {
                 <button onClick={() => updateState({ status: STATUS.MENU })} className="mt-4 text-sm text-slate-500 hover:text-white">
                     ← Back to Menu
                 </button>
+                {isHost && isAbandoned && (
+                    <button
+                        onClick={() => updateState({ status: STATUS.MENU, lifecycle: 'lobby' })}
+                        className="mt-3 text-xs px-4 py-2 rounded-lg bg-slate-700 text-white hover:bg-slate-600"
+                    >
+                        Reset Match
+                    </button>
+                )}
             </div>
         );
     }

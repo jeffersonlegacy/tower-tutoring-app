@@ -46,6 +46,15 @@ test('swipe fight launches and enters active match', async ({ page }) => {
   await expect(page.getByTestId('swipefight-playing')).toBeVisible();
 });
 
+test('session rail opens AI panel without whiteboard controls blocking clicks', async ({ page }) => {
+  await page.goto('/session/e2e-rail-ai');
+  await expect(page.getByTestId('session-shell')).toBeVisible();
+
+  await page.getByTestId('rail-ai').click();
+  await expect(page.getByTestId('chat-container')).toBeVisible();
+  await expect(page.getByTestId('chat-input')).toBeVisible();
+});
+
 test('chat shows graceful fallback when API fails', async ({ page }) => {
   await page.route('**/api/chat/completions', async (route) => {
     await route.fulfill({
@@ -53,7 +62,7 @@ test('chat shows graceful fallback when API fails', async ({ page }) => {
       contentType: 'application/json',
       body: JSON.stringify({
         ok: false,
-        error: { code: 'openai_error', message: 'Injected test failure', retryable: true },
+        error: { code: 'gemini_error', message: 'Injected test failure', retryable: true },
         traceId: 'trace-e2e-failure',
       }),
     });

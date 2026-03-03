@@ -318,10 +318,10 @@ export default function Session() {
             <div className="flex flex-1 flex-col md:flex-row overflow-hidden relative">
 
                 {/* Sidebar (Command Rail + Panel) */}
-                <div className={`flex-none w-full md:w-[350px] lg:w-[400px] border-b md:border-b-0 md:border-r border-slate-700 bg-black flex relative z-20 shrink-0 h-full ${mainTab === 'sidebar' ? 'flex' : 'hidden md:flex'}`}>
+                <div className={`flex-none w-full md:w-[350px] lg:w-[400px] border-b md:border-b-0 md:border-r border-slate-700 bg-black flex relative z-[1200] shrink-0 h-full ${mainTab === 'sidebar' ? 'flex' : 'hidden md:flex'}`}>
 
                     {/* 1. COMMAND RAIL (Left Slim Bar) */}
-                    <div className="w-[64px] bg-slate-950 border-r border-white/5 flex flex-col items-center py-4 gap-4 shrink-0 z-30">
+                    <div className="w-[64px] bg-slate-950 border-r border-white/5 flex flex-col items-center py-4 gap-4 shrink-0 z-[1210]">
                         {/* Top Tools */}
                         <div className="flex flex-col gap-4">
                             <RailButton 
