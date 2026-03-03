@@ -1,7 +1,73 @@
 import { createTraceId, readJsonBody, sendError, sendOk } from '../_utils.js';
 
-function toDataUrlFromBase64(base64, mime = 'image/png') {
-  return `data:${mime};base64,${base64}`;
+function hashSeed(input = '') {
+  const str = String(input || 'tower-hero');
+  let hash = 2166136261;
+  for (let i = 0; i < str.length; i += 1) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0);
+}
+
+function pick(arr, seed, offset = 0) {
+  return arr[(seed + offset) % arr.length];
+}
+
+function svgToDataUrl(svg) {
+  return `data:image/svg+xml;base64,${Buffer.from(svg, 'utf8').toString('base64')}`;
+}
+
+function buildHeroSvg(seedText) {
+  const seed = hashSeed(seedText);
+  const palettes = [
+    ['#06b6d4', '#2563eb', '#0f172a'],
+    ['#f43f5e', '#7c3aed', '#111827'],
+    ['#f59e0b', '#ef4444', '#1f2937'],
+    ['#10b981', '#14b8a6', '#111827'],
+    ['#22c55e', '#3b82f6', '#0b1022'],
+  ];
+  const symbols = ['⚡', '🛡️', '⭐', '🔥', '🧠', '🚀'];
+
+  const [c1, c2, c3] = pick(palettes, seed);
+  const symbol = pick(symbols, seed, 7);
+  const ringOpacity = 0.18 + ((seed % 30) / 100);
+  const tilt = ((seed % 21) - 10) / 10;
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Hero avatar">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="70%">
+      <stop offset="0%" stop-color="${c1}" />
+      <stop offset="55%" stop-color="${c2}" />
+      <stop offset="100%" stop-color="${c3}" />
+    </radialGradient>
+    <radialGradient id="aura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.45)" />
+      <stop offset="100%" stop-color="rgba(255,255,255,0)" />
+    </radialGradient>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)" />
+  <circle cx="512" cy="512" r="420" fill="none" stroke="white" stroke-opacity="${ringOpacity.toFixed(2)}" stroke-width="24"/>
+  <circle cx="512" cy="512" r="330" fill="url(#aura)" />
+  <circle cx="512" cy="470" r="190" fill="rgba(255,255,255,0.08)" />
+  <path d="M352 736 C430 660, 594 660, 672 736" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="36" stroke-linecap="round"/>
+  <g transform="translate(512, 512) rotate(${tilt})" filter="url(#softGlow)">
+    <text x="0" y="46" text-anchor="middle" font-size="232" font-family="Arial, sans-serif">${symbol}</text>
+  </g>
+  <text x="512" y="922" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="44" font-family="Arial, sans-serif" letter-spacing="6">TOWER HERO</text>
+</svg>
+`;
+
+  return svg;
 }
 
 export default async function handler(req, res) {
@@ -18,73 +84,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
+    const rawBody = readJsonBody(req) || {};
+    const prompt = String(rawBody.prompt || rawBody.sourceImage || 'tower-hero');
+    const svg = buildHeroSvg(prompt);
 
-    if (!apiKey) {
-      return sendError(res, {
-        status: 500,
-        code: 'missing_api_key',
-        message: 'Missing OPENAI_API_KEY',
-        retryable: false,
-        traceId,
-      });
-    }
-
-    const rawBody = readJsonBody(req);
-    const prompt =
-      rawBody?.prompt ||
-      'Create an epic superhero portrait avatar, bold colors, glowing energy aura, cinematic lighting, inspiring and kid-friendly style.';
-
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        prompt,
-        size: '1024x1024',
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return sendError(res, {
-        status: response.status,
-        code: 'openai_image_error',
-        message: 'OpenAI image generation failed',
-        retryable: response.status >= 500 || response.status === 429,
-        details: errorText,
-        traceId,
-      });
-    }
-
-    const data = await response.json();
-    const item = data?.data?.[0];
-
-    if (item?.b64_json) {
-      return sendOk(res, {
-        imageData: toDataUrlFromBase64(item.b64_json),
-      }, traceId);
-    }
-
-    if (item?.url) {
-      return sendOk(res, {
-        imageData: item.url,
-      }, traceId);
-    }
-
-    return sendError(res, {
-      status: 500,
-      code: 'no_image_returned',
-      message: 'No image returned from OpenAI',
-      retryable: true,
-      traceId,
-    });
+    return sendOk(res, {
+      imageData: svgToDataUrl(svg),
+      provider: 'hero_forge',
+    }, traceId);
   } catch (error) {
-    console.error(`[${traceId}] OpenAI avatar route error:`, error);
+    console.error(`[${traceId}] Hero avatar route error:`, error);
     return sendError(res, {
       status: 500,
       code: 'avatar_generation_failed',

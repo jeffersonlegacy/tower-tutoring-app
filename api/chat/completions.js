@@ -79,7 +79,7 @@ function extractGeminiText(result) {
     .trim();
 }
 
-function writeOpenAICompatibleSSE(res, text, traceId) {
+function writeSSEChunks(res, text, traceId) {
   const chunks = text.match(/[\s\S]{1,180}/g) || [];
 
   for (const piece of chunks) {
@@ -220,7 +220,7 @@ export default async function handler(req, res) {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
     res.setHeader('X-Trace-Id', traceId);
-    writeOpenAICompatibleSSE(res, text, traceId);
+    writeSSEChunks(res, text, traceId);
     res.end();
   } catch (error) {
     console.error(`[${traceId}] Gemini proxy error:`, error);

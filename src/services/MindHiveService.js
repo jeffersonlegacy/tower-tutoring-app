@@ -9,7 +9,7 @@ import { buildChatMessages } from './chatPayload';
 import { trackError } from './telemetry';
 
 const CONFIG = {
-  model: import.meta.env.VITE_GEMINI_MODEL || import.meta.env.VITE_OPENAI_MODEL || 'gemini-1.5-flash',
+  model: import.meta.env.VITE_GEMINI_MODEL || 'gemini-1.5-flash',
   temperature: 0.75,
   endpoint: '/api/chat/completions',
   systemPrompt: composeSystemPrompt({ ageGroup: 'high', enableLiveTutor: false }),

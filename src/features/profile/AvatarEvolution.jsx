@@ -175,8 +175,8 @@ const createHeroAvatar = (imageSrc, stage = 1) => {
     });
 };
 
-// --- OPENAI IMAGE BACKEND ---
-const generateOpenAIAvatar = async (imageSrc) => {
+// --- HERO FORGE BACKEND ---
+const generateHeroForgeAvatar = async (imageSrc) => {
     try {
         const response = await fetch('/api/avatar/hero', {
             method: 'POST',
@@ -186,22 +186,22 @@ const generateOpenAIAvatar = async (imageSrc) => {
 
         if (!response.ok) {
             const err = await response.text();
-            console.warn('[Avatar] OpenAI avatar generation failed:', err);
+            console.warn('[Avatar] Hero forge generation failed:', err);
             return null;
         }
 
         const data = await response.json();
         return data?.data?.imageData || data?.imageData || null;
     } catch (error) {
-        console.error('[Avatar] OpenAI avatar generation failed:', error);
+        console.error('[Avatar] Hero forge generation failed:', error);
         return null;
     }
 };
 
 // --- MASTER AI AVATAR GENERATOR ---
 const generateAIAvatar = async (imageSrc, setStep) => {
-    setStep?.('🤖 AI Hero Generation (ChatGPT)...');
-    const result = await generateOpenAIAvatar(imageSrc);
+    setStep?.('🤖 Hero Forge generation...');
+    const result = await generateHeroForgeAvatar(imageSrc);
     if (result) return result;
 
     // Canvas effects fallback (always works, transforms actual photo)
@@ -238,7 +238,7 @@ export default function AvatarEvolution({ onClose, onSave }) {
             setProcessingStep('Analyzing your features...');
             await new Promise(r => setTimeout(r, 1500));
 
-            // Step 2: Try ChatGPT image generation
+            // Step 2: Try hero forge image generation
             let result = await generateAIAvatar(rawImage, setProcessingStep);
             
             // Step 3: Fallback to canvas effects if AI fails
