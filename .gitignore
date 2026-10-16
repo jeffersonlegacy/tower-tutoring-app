@@ -130,6 +130,10 @@ dist/
 dist-ssr/
 *.local
 .vercel
-.env*.local
+.env*
+!.env.example
+*firebase-adminsdk*.json
+*serviceAccount*.json
 .firebase/
 jmc_background.png
+build_log.txt
