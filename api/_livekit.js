@@ -1,9 +1,9 @@
 import { SignJWT } from 'jose';
 import { randomUUID } from 'node:crypto';
 
-const FALLBACK_LIVEKIT_URL = 'wss://livekit.73.189.223.234.sslip.io:8448';
-const FALLBACK_LIVEKIT_API_KEY = 'lk_97c6b6b08a5398673804901f817bafee';
-const FALLBACK_LIVEKIT_API_SECRET = '1a77a58cd5fd3d8c88014ebb8d2029991a27af6eca803a31f1ea10ef296338b8';
+const FALLBACK_LIVEKIT_URL = process.env.LIVEKIT_URL || process.env.VITE_LIVEKIT_URL || '';
+const FALLBACK_LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || '';
+const FALLBACK_LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || '';
 
 export function getLiveKitConfig() {
   const apiKey = process.env.LIVEKIT_API_KEY || FALLBACK_LIVEKIT_API_KEY;
